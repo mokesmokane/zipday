@@ -3,8 +3,8 @@
 import { auth, firestore } from "firebase-admin"
 import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
-import { Task } from "@/types/tasks-types"
-
+import { Day, Task } from "@/types/daily-task-types"
+import { addDays, format } from "date-fns"
 const db = firestore()
 
 // Helper function to get authenticated user ID
@@ -19,35 +19,51 @@ async function getAuthenticatedUserId(): Promise<string> {
   return decodedClaims.uid
 }
 
-// Get tasks by date range
-export async function getTasksByDateRangeAction(
+/**
+ * Retrieves all tasks for a given date range by reading daily docs
+ * in userDays/{userId}/dailyTasks.
+ */
+export async function getDaysByDateRangeAction(
   startDate: string,
   endDate: string
-): Promise<ActionState<Task[]>> {
+): Promise<ActionState<Day[]>> {
   try {
     const userId = await getAuthenticatedUserId()
-    const snapshot = await db
-      .collection("userTasks")
-      .doc(userId)
-      .collection("tasks")
-      .where("date", ">=", startDate)
-      .where("date", "<=", endDate)
-      .orderBy("date", "asc")
-      .get()
 
-    const tasks: Task[] = []
-    snapshot.forEach(doc => {
-      const data = doc.data() as Omit<Task, "id">
-      tasks.push({
-        ...data,
-        id: doc.id
-      })
-    })
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const days: Day[] = []
+
+    let currentDate = start
+    while (currentDate <= end) {
+      const dateDocId = format(currentDate, "yyyy-MM-dd")
+      const docRef = db
+        .collection("userDays")
+        .doc(userId)
+        .collection("dailyTasks")
+        .doc(dateDocId)
+
+      const snapshot = await docRef.get()
+      if (snapshot.exists) {
+        const data = snapshot.data()
+        if (data) {
+          const day: Day = {
+            id: snapshot.id,
+            createdAt: snapshot.createTime?.toDate().toISOString() || "",
+            updatedAt: snapshot.updateTime?.toDate().toISOString() || "",
+            date: dateDocId,
+            tasks: data.tasks as Task[] || []
+          }
+          days.push(day)
+        }
+      }
+      currentDate = addDays(currentDate, 1)
+    }
 
     return {
       isSuccess: true,
       message: "Tasks retrieved successfully",
-      data: tasks
+      data: days
     }
   } catch (error) {
     console.error("Error getting tasks by date range:", error)
@@ -55,38 +71,49 @@ export async function getTasksByDateRangeAction(
   }
 }
 
-// Create a single task
+/**
+ * Creates a single task in userDays/{userId}/dailyTasks/{dateDoc}.
+ * If the daily doc doesn't exist, it is created. The tasks array is then updated.
+ */
 export async function createTaskAction(
+  dateDoc: string,
   task: Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
-    
+
     const docRef = db
-      .collection("userTasks")
+      .collection("userDays")
       .doc(userId)
-      .collection("tasks")
-      .doc()
-    
-    const taskData = {
-      ...task,
-      userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      .collection("dailyTasks")
+      .doc(dateDoc)
+
+    const docSnap = await docRef.get()
+    const nowIso = new Date().toISOString()
+
+    let tasks: Task[] = []
+    if (docSnap.exists) {
+      const dailyData = docSnap.data() as { tasks: Task[] }
+      tasks = dailyData.tasks || []
     }
-    
-    await docRef.set(taskData)
+
+    // Generate a new random ID from Firestore
+    const newTaskId = db.collection("_").doc().id
+
+    const newTask: Task = {
+      ...task,
+      id: newTaskId,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    }
+    tasks.push(newTask)
+
+    await docRef.set({ tasks }, { merge: true })
 
     return {
       isSuccess: true,
       message: "Task created successfully",
-      data: {
-        id: docRef.id,
-        ...task,
-        userId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      } as Task
+      data: newTask
     }
   } catch (error) {
     console.error("Error creating task:", error)
@@ -94,46 +121,94 @@ export async function createTaskAction(
   }
 }
 
-// Update a single task
+/**
+ * Updates a single task in userDays/{userId}/dailyTasks/{dateDoc}.
+ * If the date is changed, the caller is responsible for removing from the old date doc
+ * and calling createTaskAction on the new date doc.
+ */
 export async function updateTaskAction(
+  dateDoc: string,
   taskId: string,
   updates: Partial<Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">>
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
-    
 
-    const taskRef = db
-      .collection("userTasks")
+    const docRef = db
+      .collection("userDays")
       .doc(userId)
-      .collection("tasks")
-      .doc(taskId)
+      .collection("dailyTasks")
+      .doc(dateDoc)
 
-    const taskDoc = await taskRef.get()
-    if (!taskDoc.exists) {
+    const docSnap = await docRef.get()
+    if (!docSnap.exists) {
+      return { isSuccess: false, message: "Daily doc not found" }
+    }
+
+    const dailyData = docSnap.data() as { tasks: Task[] }
+    const tasks = dailyData.tasks || []
+
+    const idx = tasks.findIndex(t => t.id === taskId)
+    if (idx === -1) {
       return { isSuccess: false, message: "Task not found" }
     }
 
-    const updatedData: Partial<Task> = {
+    const nowIso = new Date().toISOString()
+    const oldTask = tasks[idx]
+    const updatedTask: Task = {
+      ...oldTask,
       ...updates,
-      updatedAt: new Date().toISOString()
+      updatedAt: nowIso
     }
 
-    await taskRef.update(updatedData)
-
-    const updatedDoc = await taskRef.get()
-    const updatedTask = updatedDoc.data() as Omit<Task, "id">
+    tasks[idx] = updatedTask
+    await docRef.set({ tasks }, { merge: true })
 
     return {
       isSuccess: true,
       message: "Task updated successfully",
-      data: {
-        ...updatedTask,
-        id: taskId
-      }
+      data: updatedTask
     }
   } catch (error) {
     console.error("Error updating task:", error)
     return { isSuccess: false, message: "Failed to update task" }
+  }
+}
+
+/**
+ * Removes a single task from userDays/{userId}/dailyTasks/{dateDoc}.
+ */
+export async function deleteTaskAction(
+  dateDoc: string,
+  taskId: string
+): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+
+    const docRef = db
+      .collection("userDays")
+      .doc(userId)
+      .collection("dailyTasks")
+      .doc(dateDoc)
+
+    const docSnap = await docRef.get()
+    if (!docSnap.exists) {
+      return { isSuccess: false, message: "Daily doc not found" }
+    }
+
+    const dailyData = docSnap.data() as { tasks: Task[] }
+    let tasks = dailyData.tasks || []
+
+    tasks = tasks.filter(t => t.id !== taskId)
+
+    await docRef.set({ tasks }, { merge: true })
+
+    return {
+      isSuccess: true,
+      message: "Task deleted successfully"
+    }
+  } catch (error) {
+    console.error("Error deleting task:", error)
+    return { isSuccess: false, message: "Failed to delete task" }
   }
 }

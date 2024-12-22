@@ -143,3 +143,14 @@ Global styles for the app.
   border-bottom: 1px solid var(--border);
   padding-bottom: 0.5rem;
 }
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+}

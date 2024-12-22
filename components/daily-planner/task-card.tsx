@@ -6,13 +6,17 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, GripVertical } from "lucide-react"
 import { CustomCheckbox } from "@/components/ui/custom-checkbox"
-import type { Task, Subtask } from "@/types/tasks-types"
+import type { Task, Subtask } from "@/types/daily-task-types"
 
 interface TaskCardProps {
-  task: Task
+  task: Task | undefined
 }
 
 export function TaskCard({ task }: TaskCardProps) {
+  if (!task) {
+    return null
+  }
+
   const {
     attributes,
     listeners,
@@ -27,7 +31,6 @@ export function TaskCard({ task }: TaskCardProps) {
     transition,
     opacity: isDragging ? 0.5 : undefined
   }
-
   return (
     <Card
       ref={setNodeRef}

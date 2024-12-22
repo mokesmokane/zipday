@@ -1,13 +1,17 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { Task } from "@/types/tasks-types"
-import { getTasksByDateRangeAction } from "@/actions/db/tasks-actions"
+import { getDaysByDateRangeAction } from "@/actions/db/tasks-actions"
 import { useDate } from "./date-context"
 import { useAuth } from "./auth-context"
+import { Day } from "@/types/daily-task-types"
 
+/** 
+ * If you only need a flat list of tasks, you can keep 'tasks' the same. 
+ * If you also want day-level data (like 'meta'), store it in dailyDocs.
+ */
 interface TasksContextType {
-  tasks: Task[]
+  dailyTasks: Record<string, Day>
   isLoading: boolean
   error: string | null
   refreshTasks: () => Promise<void>
@@ -16,32 +20,42 @@ interface TasksContextType {
 const TasksContext = createContext<TasksContextType | undefined>(undefined)
 
 export function TasksProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [dailyTasks, setDailyTasks] = useState<Record<string, Day>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const { dateWindow } = useDate()
   const { user } = useAuth()
 
+  /**
+   * A function to fetch the tasks for the current date window,
+   * and store them in both dailyDocs and tasks (flat list).
+   */
   const refreshTasks = async () => {
     if (!user) {
-      setTasks([])
+      setDailyTasks({})
       setIsLoading(false)
       return
     }
 
     setIsLoading(true)
-    const result = await getTasksByDateRangeAction(
-      dateWindow.startDate.toISOString().split("T")[0],
-      dateWindow.endDate.toISOString().split("T")[0]
-    )
+
+    const startDateStr = dateWindow.startDate.toISOString().split("T")[0]
+    const endDateStr = dateWindow.endDate.toISOString().split("T")[0]
+    const result = await getDaysByDateRangeAction(startDateStr, endDateStr)
 
     if (result.isSuccess) {
-      setTasks(result.data || [])
+      console.log("result.data", result.data)
+      // Convert the array of days to a dictionary keyed by date
+      const daysByDate: Record<string, Day> = {}
+      for (const day of result.data || []) {
+        daysByDate[day.date] = day
+      }
+      setDailyTasks(daysByDate)
       setError(null)
     } else {
-      setError(result.message)
-      setTasks([])
+      setError(result.message)  
+      setDailyTasks({})
     }
 
     setIsLoading(false)
@@ -49,10 +63,18 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void refreshTasks()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, dateWindow.startDate, dateWindow.endDate])
 
   return (
-    <TasksContext.Provider value={{ tasks, isLoading, error, refreshTasks }}>
+    <TasksContext.Provider
+      value={{
+        dailyTasks,
+        isLoading,
+        error,
+        refreshTasks
+      }}
+    >
       {children}
     </TasksContext.Provider>
   )
@@ -60,7 +82,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
 export function useTasks() {
   const context = useContext(TasksContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useTasks must be used within a TasksProvider")
   }
   return context
