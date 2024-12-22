@@ -41,7 +41,10 @@ export function TaskCard({ task }: TaskCardProps) {
     >
       <CardHeader className="p-4 pb-2">
         <div className="flex items-start justify-between gap-4">
-          <h3 className="font-medium leading-none">{task.title}</h3>
+          <div className="space-y-1">
+            <h3 className="font-medium leading-none">{task.title}</h3>
+            <p className="text-xs text-muted-foreground">ID: {task.id}</p>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-4 pt-2">

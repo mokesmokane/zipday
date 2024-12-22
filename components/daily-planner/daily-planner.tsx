@@ -7,24 +7,25 @@ import {
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  closestCorners,
   PointerSensor,
   useSensor,
-  useSensors
+  useSensors,
+  closestCorners
 } from "@dnd-kit/core"
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import {
+  SortableContext,
+  verticalListSortingStrategy
+} from "@dnd-kit/sortable"
 import { format } from "date-fns"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { TaskColumn } from "./task-column"
 import { TaskCard } from "./task-card"
+
 import { useDate } from "@/lib/context/date-context"
 import { useTasks } from "@/lib/context/tasks-context"
-import {
-  createTaskAction,
-  updateTaskAction,
-  deleteTaskAction
-} from "@/actions/db/tasks-actions"
+import { updateTaskAction, createTaskAction, deleteTaskAction } from "@/actions/db/tasks-actions"
 import type { Day, Task } from "@/types/daily-task-types"
 
 const SCROLL_PADDING = 40
@@ -39,29 +40,31 @@ export default function DailyPlanner() {
     days
   } = useDate()
 
-  // -------------------------
-  // Context: dailyTasks object
-  // e.g. { "2024-12-12": { tasks: [...], meta: {...} }, ... }
-  // -------------------------
-  const { dailyTasks, isLoading: isLoadingTasks, refreshTasks } = useTasks()
+  const {
+    dailyTasks, // Record<string, Day>
+    isLoading: isLoadingTasks
+  } = useTasks()
 
-  // ----------------------------------
-  // 1) Make a local copy for drag/drop
-  // ----------------------------------
-  // This local state ensures the UI updates immediately for animations,
-  // without waiting on server round trips.
-  const [localDailyTasks, setLocalDailyTasks] = useState<
-    Record<string, Day>
-  >({})
+  // --------------------------------
+  // 1) LOCAL STATE for DRAG & DROP
+  // --------------------------------
+  const [localDailyTasks, setLocalDailyTasks] = useState<Record<string, Day>>({})
+  // The task currently being dragged
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  // The date from which the task was originally dragged
+  const [dragStartDate, setDragStartDate] = useState<string | null>(null)
+  // The DnDKit "active ID"
+  const [activeId, setActiveId] = useState<string | null>(null)
+  // A snapshot of localDailyTasks taken at drag start, for revert
+  const prevLocalDailyTasksRef = useRef<Record<string, Day> | null>(null)
 
-  // Whenever `dailyTasks` from context changes, update local copy
+  // Whenever `dailyTasks` changes, sync local state
   useEffect(() => {
     setLocalDailyTasks(dailyTasks)
   }, [dailyTasks])
 
   // Build columns from localDailyTasks
   const columns = days.map(dateStr => {
-    // If we have no doc for that date, create an empty one
     const doc = localDailyTasks[dateStr] ?? { tasks: [] }
     return {
       date: dateStr,
@@ -69,12 +72,14 @@ export default function DailyPlanner() {
     }
   })
 
-  // Setup DnDKit
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  // Setup DnD
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
 
-  // Utility to find a single task by ID across all days in localDailyTasks
+  // --------------------------------
+  // UTILS
+  // --------------------------------
   function findTaskById(id: string): { date: string; task: Task } | null {
     for (const [date, dailyDoc] of Object.entries(localDailyTasks)) {
       const found = dailyDoc.tasks.find(t => t.id === id)
@@ -85,153 +90,141 @@ export default function DailyPlanner() {
     return null
   }
 
-  // -------------------------------
+  // --------------------------------
   // 2) DRAG & DROP EVENT HANDLERS
-  // -------------------------------
+  // --------------------------------
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string)
+
+    // Store a snapshot of localDailyTasks in case we need to revert
+    prevLocalDailyTasksRef.current = structuredClone(localDailyTasks)
+
+    // Find the dragged task + date
+    const found = findTaskById(event.active.id as string)
+    if (!found) return
+    const { date: fromDate, task } = found
+
+    // Remove it from local state so the "hover insert" animations have space
+    setLocalDailyTasks(prev => {
+      const updated = structuredClone(prev) as typeof prev
+      updated[fromDate].tasks = updated[fromDate].tasks.filter(
+        t => t.id !== task.id
+      )
+      return updated
+    })
+
+    setActiveTask(task)
+    setDragStartDate(fromDate)
   }
 
-  /**
-   * If user drags from date A -> date B, do local removal & insertion,
-   * then server calls in the background.
-   */
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event
-    if (!over) return
+    if (!over || !activeTask || !dragStartDate) return
 
     const activeId = active.id as string
     const overId = over.id as string
 
-    // Find old date/column and new date/column
-    const oldCol = columns.find(col => col.tasks.some(t => t.id === activeId))
-    if (!oldCol) return
-    const activeTask = oldCol.tasks.find(t => t.id === activeId)
-    if (!activeTask) return
-
+    // 1) Identify the column being hovered
     const newCol = columns.find(
       col => col.date === overId || col.tasks.some(t => t.id === overId)
     )
     if (!newCol) return
 
-    if (oldCol.date !== newCol.date) {
-      // 1) Locally remove from old date & add to new date
-      setLocalDailyTasks(prev => {
-        // Clone
-        const updated = structuredClone(prev) as typeof prev
-        // Remove from old date
-        updated[oldCol.date].tasks = updated[oldCol.date].tasks.filter(
-          t => t.id !== activeId
-        )
-        // Add to new date
-        updated[newCol.date].tasks.push({
-          ...activeTask
-        })
-        return updated
-      })
+    // 2) Figure out "overIndex" to place the dragged card
+    const overIndex = newCol.tasks.findIndex(t => t.id === overId)
+    const indexToInsert = overIndex >= 0 ? overIndex : newCol.tasks.length
 
-      // 2) Fire off server calls
-      void deleteTaskAction(oldCol.date, activeId)
-        .then(() =>
-          createTaskAction(newCol.date, {
-            title: activeTask.title,
-            time: activeTask.time,
-            subtasks: activeTask.subtasks,
-            completed: activeTask.completed,
-            tag: activeTask.tag,
-            order: newCol.tasks.length
-          })
-        )
-        .then(() => refreshTasks())
-        .catch(err => {
-          console.error("DragOver error:", err)
-          // Optionally revert or refresh:
-          void refreshTasks()
-        })
-    }
-  }
-
-  /**
-   * If reordering tasks within the same day, reorder them locally,
-   * then do background updates on the server.
-   */
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over) {
-      setActiveId(null)
-      return
-    }
-    const activeId = active.id as string
-    const overId = over.id as string
-
-    // find date col for the active task
-    const dateCol = columns.find(col => col.tasks.some(t => t.id === activeId))
-    if (!dateCol) {
-      setActiveId(null)
-      return
-    }
-
-    const tasksArray = dateCol.tasks
-    const oldIndex = tasksArray.findIndex(t => t.id === activeId)
-    const newIndex = tasksArray.findIndex(t => t.id === overId)
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
-      setActiveId(null)
-      return
-    }
-
-    // 1) Locally reorder
+    // 3) Update localDailyTasks
     setLocalDailyTasks(prev => {
       const updated = structuredClone(prev) as typeof prev
-      const colTasks = updated[dateCol.date].tasks
-      const [moved] = colTasks.splice(oldIndex, 1)
-      colTasks.splice(newIndex, 0, moved)
+
+      // Remove the task from ALL columns (to prevent duplicates)
+      Object.keys(updated).forEach(date => {
+        updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
+      })
+
+      // Insert the task into the new column
+      if (!updated[newCol.date]) {
+        updated[newCol.date] = {
+          tasks: [],
+          date: newCol.date,
+          id: "",
+          createdAt: "",
+          updatedAt: ""
+        }
+      }
+      updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
+
       return updated
     })
-
-    // 2) Server reorder calls
-    // (same naive approach you had previously)
-    const activeTask = tasksArray[oldIndex]
-    const start = Math.min(oldIndex, newIndex)
-    const end = Math.max(oldIndex, newIndex)
-    const movingUp = oldIndex > newIndex
-    const rangeTasks = tasksArray.slice(start, end + 1).sort((a, b) => a.order - b.order)
-
-    Promise.all(
-      rangeTasks.map(async t => {
-        if (t.id === activeId) return
-        const newOrder = movingUp ? t.order + 1 : t.order - 1
-        return updateTaskAction(dateCol.date, t.id, { order: newOrder })
-      })
-    )
-      .then(() => {
-        if (activeTask) {
-          const newOrder = movingUp
-            ? rangeTasks[0].order
-            : rangeTasks[rangeTasks.length - 1].order
-          return updateTaskAction(dateCol.date, activeTask.id, { order: newOrder })
-        }
-      })
-      .then(() => refreshTasks())
-      .catch(err => {
-        console.error("DragEnd reorder error:", err)
-        void refreshTasks()
-      })
-
-    setActiveId(null)
   }
 
-  // ------------------------
-  // 3) ADD TASK HELPER
-  // ------------------------
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    setActiveId(null)
+
+    // If user dropped outside valid columns or something is off, revert
+    if (!over || !activeTask) {
+      if (prevLocalDailyTasksRef.current) {
+        setLocalDailyTasks(prevLocalDailyTasksRef.current)
+      }
+      setActiveTask(null)
+      setDragStartDate(null)
+      return
+    }
+
+    // Identify the column that the user dropped onto
+    const overId = over.id as string
+    const newCol = columns.find(
+      col => col.date === overId || col.tasks.some(t => t.id === overId)
+    )
+    if (!newCol || !dragStartDate) {
+      // Revert
+      if (prevLocalDailyTasksRef.current) {
+        setLocalDailyTasks(prevLocalDailyTasksRef.current)
+      }
+      setActiveTask(null)
+      setDragStartDate(null)
+      return
+    }
+
+    // --------------------------------
+    // We finalize the local changes
+    // (the tasks are already placed by handleDragOver)
+    // Then we do background saves for the old date + new date
+    // --------------------------------
+    const newDate = newCol.date
+    const oldDate = dragStartDate
+    if (oldDate !== newDate) {
+      // The user moved to a different column/date
+      void saveDayToFirestore(oldDate, localDailyTasks[oldDate])
+      void saveDayToFirestore(newDate, localDailyTasks[newDate])
+    } else {
+      // The user reordered tasks within the same date
+      void saveDayToFirestore(newDate, localDailyTasks[newDate])
+    }
+
+    // Clear out
+    setActiveTask(null)
+    setDragStartDate(null)
+  }
+
+  // --------------------------------
+  // 3) ADD TASK
+  // --------------------------------
   async function addTask(dateStr: string) {
-    // 1) Insert locally first
     setLocalDailyTasks(prev => {
       const updated = structuredClone(prev) as typeof prev
       if (!updated[dateStr]) {
-        updated[dateStr] = { tasks: [], date: dateStr, id: "", createdAt: "", updatedAt: "" }
+        updated[dateStr] = {
+          tasks: [],
+          date: dateStr,
+          id: "",
+          createdAt: "",
+          updatedAt: ""
+        }
       }
       updated[dateStr].tasks.push({
-        // Make a temp ID or get it from Firestore if you prefer
         id: crypto.randomUUID(),
         title: "New Task",
         time: "0:00",
@@ -245,42 +238,39 @@ export default function DailyPlanner() {
       return updated
     })
 
-    // 2) Server call
-    await createTaskAction(dateStr, {
-      title: "New Task",
-      time: "0:00",
-      subtasks: [],
-      completed: false,
-      tag: "work",
-      order: dailyTasks[dateStr]?.tasks?.length ?? 0
-    })
-    await refreshTasks()
+    // Then save that day in the background
+    await saveDayToFirestore(dateStr, localDailyTasks[dateStr])
   }
 
-  // ---------------------------------------------
-  // 4) DRAG OVERLAY: find the active task to show
-  // ---------------------------------------------
-  const activeTaskData = activeId ? findTaskById(activeId) : null
-  const activeTask = activeTaskData?.task
+  // --------------------------------
+  // DRAG OVERLAY
+  // --------------------------------
+  const dragOverlayContent = activeTask ? <TaskCard task={activeTask} /> : null
 
-  // 5) Scroll to date
-  function scrollToDate(date: string) {
-    const targetColumn = columns.find(col => col.date === date)
+  // --------------------------------
+  // SCROLL TO A DATE
+  // --------------------------------
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  function scrollToDate(dateStr: string) {
+    const targetColumn = columns.find(col => col.date === dateStr)
     if (!targetColumn || !containerRef.current) {
-      loadDates(new Date(date)) // attempt to load that date
+      loadDates(new Date(dateStr))
       return
     }
-    const columnElement = document.getElementById(date)
+    const columnElement = document.getElementById(dateStr)
     if (!columnElement) return
 
     const container = containerRef.current
     const scrollLeft =
-      columnElement.offsetLeft - container.offsetWidth / 2 + columnElement.offsetWidth / 2
+      columnElement.offsetLeft -
+      container.offsetWidth / 2 +
+      columnElement.offsetWidth / 2
 
     container.scrollTo({ left: scrollLeft, behavior: "smooth" })
   }
 
-  // Whenever selectedDate changes, we scroll to that date’s column
+  // Whenever selectedDate changes, scroll to that date’s column
   useEffect(() => {
     if (selectedDate) {
       scrollToDate(format(selectedDate, "yyyy-MM-dd"))
@@ -288,8 +278,44 @@ export default function DailyPlanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, columns])
 
+  // --------------------------------
+  // LOADING STATE
+  // --------------------------------
   const isLoading = isLoadingDates || isLoadingTasks
 
+  async function saveDayToFirestore(dateStr: string, dayData: Day) {
+    try {
+      const prevDay = prevLocalDailyTasksRef.current?.[dateStr]
+      const prevTasks = new Set(prevDay?.tasks.map(t => t.id) || [])
+      const currentTasks = new Set(dayData.tasks.map(t => t.id))
+
+      const tasksToAdd = dayData.tasks.filter(t => !prevTasks.has(t.id))
+      const tasksToUpdate = dayData.tasks.filter(t => prevTasks.has(t.id))
+      const tasksToDelete = prevDay?.tasks.filter(t => !currentTasks.has(t.id)) || []
+
+      for (const task of tasksToAdd) {
+        const { id, createdAt, updatedAt, ...taskData } = task
+        await createTaskAction(dateStr, taskData)
+      }
+
+      for (const task of tasksToUpdate) {
+        const { id, createdAt, updatedAt, ...updates } = task
+        await updateTaskAction(dateStr, id, updates)
+      }
+
+      for (const task of tasksToDelete) {
+        await deleteTaskAction(dateStr, task.id)
+      }
+
+      console.log("Successfully saved day to Firestore:", dateStr)
+    } catch (error) {
+      console.error("Error saving day to Firestore:", error)
+    }
+  }
+
+  // --------------------------------
+  // RENDER
+  // --------------------------------
   return (
     <div className="relative size-full">
       <DndContext
@@ -367,11 +393,7 @@ export default function DailyPlanner() {
           </div>
         </div>
 
-        <DragOverlay>
-          {activeId && activeTask ? (
-            <TaskCard task={activeTask} />
-          ) : null}
-        </DragOverlay>
+        <DragOverlay>{dragOverlayContent}</DragOverlay>
       </DndContext>
     </div>
   )
