@@ -68,7 +68,10 @@ export default function DailyPlanner() {
     const doc = localDailyTasks[dateStr] ?? { tasks: [] }
     return {
       date: dateStr,
-      tasks: doc.tasks || []
+      tasks: doc.tasks || [],
+      id: doc.id,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
     }
   })
 
@@ -104,15 +107,6 @@ export default function DailyPlanner() {
     if (!found) return
     const { date: fromDate, task } = found
 
-    // Remove it from local state so the "hover insert" animations have space
-    setLocalDailyTasks(prev => {
-      const updated = structuredClone(prev) as typeof prev
-      updated[fromDate].tasks = updated[fromDate].tasks.filter(
-        t => t.id !== task.id
-      )
-      return updated
-    })
-
     setActiveTask(task)
     setDragStartDate(fromDate)
   }
@@ -138,10 +132,12 @@ export default function DailyPlanner() {
     setLocalDailyTasks(prev => {
       const updated = structuredClone(prev) as typeof prev
 
-      // Remove the task from ALL columns (to prevent duplicates)
-      Object.keys(updated).forEach(date => {
-        updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
-      })
+      // Remove from original position first
+      if (dragStartDate && updated[dragStartDate]) {
+        updated[dragStartDate].tasks = updated[dragStartDate].tasks.filter(
+          t => t.id !== activeId
+        )
+      }
 
       // Insert the task into the new column
       if (!updated[newCol.date]) {
@@ -153,7 +149,11 @@ export default function DailyPlanner() {
           updatedAt: ""
         }
       }
-      updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
+
+      // Only insert if it's not already there
+      if (!updated[newCol.date].tasks.some(t => t.id === activeId)) {
+        updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
+      }
 
       return updated
     })
@@ -164,7 +164,7 @@ export default function DailyPlanner() {
     setActiveId(null)
 
     // If user dropped outside valid columns or something is off, revert
-    if (!over || !activeTask) {
+    if (!over || !activeTask || !dragStartDate) {
       if (prevLocalDailyTasksRef.current) {
         setLocalDailyTasks(prevLocalDailyTasksRef.current)
       }
@@ -178,7 +178,7 @@ export default function DailyPlanner() {
     const newCol = columns.find(
       col => col.date === overId || col.tasks.some(t => t.id === overId)
     )
-    if (!newCol || !dragStartDate) {
+    if (!newCol) {
       // Revert
       if (prevLocalDailyTasksRef.current) {
         setLocalDailyTasks(prevLocalDailyTasksRef.current)
@@ -188,23 +188,17 @@ export default function DailyPlanner() {
       return
     }
 
-    // --------------------------------
-    // We finalize the local changes
-    // (the tasks are already placed by handleDragOver)
-    // Then we do background saves for the old date + new date
-    // --------------------------------
     const newDate = newCol.date
     const oldDate = dragStartDate
+
+    // The state is already updated in handleDragOver, just save to Firestore
     if (oldDate !== newDate) {
-      // The user moved to a different column/date
       void saveDayToFirestore(oldDate, localDailyTasks[oldDate])
       void saveDayToFirestore(newDate, localDailyTasks[newDate])
     } else {
-      // The user reordered tasks within the same date
       void saveDayToFirestore(newDate, localDailyTasks[newDate])
     }
 
-    // Clear out
     setActiveTask(null)
     setDragStartDate(null)
   }
@@ -245,7 +239,7 @@ export default function DailyPlanner() {
   // --------------------------------
   // DRAG OVERLAY
   // --------------------------------
-  const dragOverlayContent = activeTask ? <TaskCard task={activeTask} /> : null
+  const dragOverlayContent = activeTask ? <TaskCard task={activeTask}  /> : null
 
   // --------------------------------
   // SCROLL TO A DATE
@@ -285,31 +279,55 @@ export default function DailyPlanner() {
 
   async function saveDayToFirestore(dateStr: string, dayData: Day) {
     try {
+      console.log("Saving day to Firestore:", { dateStr, dayData })
+      
       const prevDay = prevLocalDailyTasksRef.current?.[dateStr]
       const prevTasks = new Set(prevDay?.tasks.map(t => t.id) || [])
       const currentTasks = new Set(dayData.tasks.map(t => t.id))
 
-      const tasksToAdd = dayData.tasks.filter(t => !prevTasks.has(t.id))
+      // For task updates, we only want to update tasks that already exist
       const tasksToUpdate = dayData.tasks.filter(t => prevTasks.has(t.id))
+      
+      // Only add tasks that don't exist yet
+      const tasksToAdd = dayData.tasks.filter(t => !prevTasks.has(t.id))
+      
+      // Find tasks that were removed
       const tasksToDelete = prevDay?.tasks.filter(t => !currentTasks.has(t.id)) || []
 
-      for (const task of tasksToAdd) {
-        const { id, createdAt, updatedAt, ...taskData } = task
-        await createTaskAction(dateStr, taskData)
-      }
+      console.log("Tasks to process:", {
+        update: tasksToUpdate.length,
+        add: tasksToAdd.length,
+        delete: tasksToDelete.length
+      })
 
+      // Handle updates first
       for (const task of tasksToUpdate) {
+        console.log("Updating task:", task.id)
         const { id, createdAt, updatedAt, ...updates } = task
-        await updateTaskAction(dateStr, id, updates)
+        await updateTaskAction(dateStr, id, {
+          ...updates
+        })
       }
 
+      // Handle new tasks
+      for (const task of tasksToAdd) {
+        console.log("Creating task:", task)
+        const { id, createdAt, updatedAt, ...taskData } = task
+        await createTaskAction(dateStr, {
+          ...taskData
+        })
+      }
+
+      // Handle deletions
       for (const task of tasksToDelete) {
+        console.log("Deleting task:", task.id)
         await deleteTaskAction(dateStr, task.id)
       }
 
       console.log("Successfully saved day to Firestore:", dateStr)
     } catch (error) {
       console.error("Error saving day to Firestore:", error)
+      throw error // Re-throw to handle in the caller
     }
   }
 
@@ -362,6 +380,7 @@ export default function DailyPlanner() {
               >
                 <div className="mb-4 space-y-1.5">
                   <h2 className="text-lg font-semibold">
+                    
                     {format(new Date(column.date), "EEEE")}
                     <span className="text-muted-foreground text-sm ml-2">
                       {format(new Date(column.date), "MMM d")}
@@ -375,7 +394,41 @@ export default function DailyPlanner() {
                 >
                   <TaskColumn id={column.date}>
                     {column.tasks.map(task => (
-                      <TaskCard key={task.id} task={task} />
+                      <TaskCard 
+                        key={task.id} 
+                        task={task} 
+                        day={column} 
+                        onTaskUpdate={async (updatedTask) => {
+                          try {
+                            console.log("Task update triggered:", updatedTask)
+                            // Update local state
+                            setLocalDailyTasks(prev => {
+                              const updated = structuredClone(prev) as typeof prev
+                              if (!updated[column.date]) {
+                                updated[column.date] = {
+                                  tasks: [],
+                                  date: column.date,
+                                  id: "",
+                                  createdAt: "",
+                                  updatedAt: ""
+                                }
+                              }
+                              updated[column.date].tasks = updated[column.date].tasks.map(t => 
+                                t.id === updatedTask.id ? updatedTask : t
+                              )
+                              return updated
+                            })
+                            
+                            // Save to Firestore
+                            await saveDayToFirestore(column.date, {
+                              ...column,
+                              tasks: column.tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+                            })
+                          } catch (error) {
+                            console.error("Failed to update task:", error)
+                          }
+                        }}
+                      />
                     ))}
                   </TaskColumn>
                 </SortableContext>
