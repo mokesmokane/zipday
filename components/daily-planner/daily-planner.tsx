@@ -132,14 +132,12 @@ export default function DailyPlanner() {
     setLocalDailyTasks(prev => {
       const updated = structuredClone(prev) as typeof prev
 
-      // Remove from original position first
-      if (dragStartDate && updated[dragStartDate]) {
-        updated[dragStartDate].tasks = updated[dragStartDate].tasks.filter(
-          t => t.id !== activeId
-        )
-      }
+      // Remove the dragged task from ALL columns first
+      Object.keys(updated).forEach(date => {
+        updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
+      })
 
-      // Insert the task into the new column
+      // Insert the task into only the currently hovered column
       if (!updated[newCol.date]) {
         updated[newCol.date] = {
           tasks: [],
@@ -150,10 +148,7 @@ export default function DailyPlanner() {
         }
       }
 
-      // Only insert if it's not already there
-      if (!updated[newCol.date].tasks.some(t => t.id === activeId)) {
-        updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
-      }
+      updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
 
       return updated
     })
@@ -207,33 +202,36 @@ export default function DailyPlanner() {
   // 3) ADD TASK
   // --------------------------------
   async function addTask(dateStr: string) {
-    setLocalDailyTasks(prev => {
-      const updated = structuredClone(prev) as typeof prev
-      if (!updated[dateStr]) {
-        updated[dateStr] = {
-          tasks: [],
-          date: dateStr,
-          id: "",
-          createdAt: "",
-          updatedAt: ""
-        }
-      }
-      updated[dateStr].tasks.push({
-        id: crypto.randomUUID(),
-        title: "New Task",
-        time: "0:00",
-        subtasks: [],
-        completed: false,
-        tag: "work",
-        order: updated[dateStr].tasks.length,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      })
-      return updated
-    })
+    // Create the new task object
+    const newTask = {
+      id: crypto.randomUUID(),
+      title: "New Task",
+      time: "0:00",
+      subtasks: [],
+      completed: false,
+      tag: "work",
+      order: localDailyTasks[dateStr]?.tasks?.length || 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
 
-    // Then save that day in the background
-    await saveDayToFirestore(dateStr, localDailyTasks[dateStr])
+    // Create the new day data
+    const updatedDay = {
+      tasks: [...(localDailyTasks[dateStr]?.tasks || []), newTask],
+      date: dateStr,
+      id: localDailyTasks[dateStr]?.id || "",
+      createdAt: localDailyTasks[dateStr]?.createdAt || "",
+      updatedAt: localDailyTasks[dateStr]?.updatedAt || ""
+    }
+
+    // Update local state
+    setLocalDailyTasks(prev => ({
+      ...prev,
+      [dateStr]: updatedDay
+    }))
+
+    // Save to Firestore using the new day data
+    await saveDayToFirestore(dateStr, updatedDay)
   }
 
   // --------------------------------
@@ -283,7 +281,7 @@ export default function DailyPlanner() {
       
       const prevDay = prevLocalDailyTasksRef.current?.[dateStr]
       const prevTasks = new Set(prevDay?.tasks.map(t => t.id) || [])
-      const currentTasks = new Set(dayData.tasks.map(t => t.id))
+      const currentTasks = new Set(dayData?.tasks.map(t => t.id) || [])
 
       // For task updates, we only want to update tasks that already exist
       const tasksToUpdate = dayData.tasks.filter(t => prevTasks.has(t.id))

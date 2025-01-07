@@ -68,11 +68,7 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave }: EditTas
   }
 
   const handleSave = () => {
-    const updatedTask = {
-      ...editedTask,
-      updatedAt: new Date().toISOString()
-    }
-    onSave(updatedTask)
+    onSave(editedTask)
     onOpenChange(false)
   }
 
@@ -90,6 +86,9 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave }: EditTas
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] [&>button]:hidden">
         <DialogHeader className="space-y-2">
+          <span className="sr-only">
+            <DialogTitle>Edit Task</DialogTitle>
+          </span>
           <div className="flex items-center justify-between">
             <div>
               {task.tag && (
@@ -166,10 +165,10 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave }: EditTas
 
           <div className="grid gap-2">
             <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="subtasks">
+              <Droppable droppableId="subtasks" isDropDisabled={false} isCombineEnabled={false} ignoreContainerClipping={true}>
                 {(provided) => (
                   <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-                    <AnimatePresence>
+                    <AnimatePresence mode="popLayout">
                       {editedTask.subtasks.map((subtask, index) => (
                         <Draggable key={subtask.id} draggableId={subtask.id} index={index}>
                           {(provided) => (

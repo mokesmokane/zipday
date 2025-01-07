@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Settings, HelpCircle, LogOut, Moon, Sun, User } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 
 interface SidebarFooterProps {
   isExpanded: boolean
@@ -11,13 +12,18 @@ interface SidebarFooterProps {
 
 export function SidebarFooter({ isExpanded }: SidebarFooterProps) {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const items = [
     { icon: Settings, label: "Settings", href: "/settings" },
     { icon: HelpCircle, label: "Help", href: "/help" },
     { icon: User, label: "Profile", href: "/profile" },
     {
-      icon: theme === "light" ? Moon : Sun,
+      icon: mounted ? (theme === "light" ? Moon : Sun) : Moon,
       label: "Theme",
       action: () => setTheme(theme === "light" ? "dark" : "light")
     },

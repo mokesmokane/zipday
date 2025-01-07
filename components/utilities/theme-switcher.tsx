@@ -3,13 +3,12 @@
 This client component provides a theme switcher for the app.
 </ai_context>
 */
-
 "use client"
 
 import { cn } from "@/lib/utils"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
-import { HTMLAttributes, ReactNode } from "react"
+import { HTMLAttributes, ReactNode, useEffect, useState } from "react"
 
 interface ThemeSwitcherProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode
@@ -17,6 +16,15 @@ interface ThemeSwitcherProps extends HTMLAttributes<HTMLDivElement> {
 
 export const ThemeSwitcher = ({ children, ...props }: ThemeSwitcherProps) => {
   const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   return (
     <div

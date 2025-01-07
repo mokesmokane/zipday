@@ -14,6 +14,7 @@ export interface Task extends BaseDocument {
   time?: string
   subtasks: Subtask[]
   completed: boolean
+  description?: string
   tag?: string
   order: number
 }
