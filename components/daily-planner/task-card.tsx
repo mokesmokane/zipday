@@ -10,14 +10,16 @@ import { Button } from "@/components/ui/button"
 import { CustomCheckbox } from "@/components/ui/custom-checkbox"
 import { EditTaskDialog } from "./edit-task-dialog"
 import type { Task, Subtask, Day } from "@/types/daily-task-types"
+import { cn } from "@/lib/utils"
 
 interface TaskCardProps {
   task: Task | undefined
   day?: Day
+  isOverDeleteZone: boolean
   onTaskUpdate?: (updatedTask: Task) => void
 }
 
-export function TaskCard({ task, day, onTaskUpdate }: TaskCardProps) {
+export function TaskCard({ task, day, isOverDeleteZone, onTaskUpdate }: TaskCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   if (!task) {
@@ -36,7 +38,9 @@ export function TaskCard({ task, day, onTaskUpdate }: TaskCardProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : undefined
+    backgroundColor: isOverDeleteZone ? 'rgb(239, 68, 68, 0.1)' : undefined,
+    borderColor: isOverDeleteZone ? 'rgb(239, 68, 68)' : undefined,
+    opacity: isDragging ? 0.5 : 1
   }
 
   const handleTaskUpdate = (updatedTask: Task) => {
@@ -48,7 +52,10 @@ export function TaskCard({ task, day, onTaskUpdate }: TaskCardProps) {
       <Card
         ref={setNodeRef}
         style={style}
-        className="bg-card relative cursor-grab touch-none active:cursor-grabbing"
+        className={cn(
+          "bg-card relative cursor-grab touch-none active:cursor-grabbing transition-colors duration-200",
+          isOverDeleteZone && "border-destructive"
+        )}
         {...attributes}
         {...listeners}
       >
@@ -72,7 +79,7 @@ export function TaskCard({ task, day, onTaskUpdate }: TaskCardProps) {
           </div>
         </CardHeader>
         <CardContent className="p-4 pt-2">
-          {task.subtasks.length > 0 && (
+          {task.subtasks && task.subtasks.length > 0 && (
             <div className="space-y-2">
               {task.subtasks.map((subtask: Subtask) => (
                 <div key={subtask.id} className="flex items-center space-x-2">

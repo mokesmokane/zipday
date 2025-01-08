@@ -75,9 +75,10 @@ export async function getDaysByDateRangeAction(
  * Creates a single task in userDays/{userId}/dailyTasks/{dateDoc}.
  * If the daily doc doesn't exist, it is created. The tasks array is then updated.
  */
-export async function createTaskAction(
+
+export async function addTaskAction(
   dateDoc: string,
-  task: Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">
+  task: Task
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
@@ -89,7 +90,6 @@ export async function createTaskAction(
       .doc(dateDoc)
 
     const docSnap = await docRef.get()
-    const nowIso = new Date().toISOString()
 
     let tasks: Task[] = []
     if (docSnap.exists) {
@@ -97,23 +97,14 @@ export async function createTaskAction(
       tasks = dailyData.tasks || []
     }
 
-    // Generate a new random ID from Firestore
-    const newTaskId = db.collection("_").doc().id
-
-    const newTask: Task = {
-      ...task,
-      id: newTaskId,
-      createdAt: nowIso,
-      updatedAt: nowIso
-    }
-    tasks.push(newTask)
+    tasks.push(task)
 
     await docRef.set({ tasks }, { merge: true })
 
     return {
       isSuccess: true,
       message: "Task created successfully",
-      data: newTask
+      data: task
     }
   } catch (error) {
     console.error("Error creating task:", error)
