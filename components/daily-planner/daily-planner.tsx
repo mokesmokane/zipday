@@ -184,6 +184,17 @@ export default function DailyPlanner() {
     })
   }
 
+
+  async function deleteTask(taskId: string, date: string) {
+    setLocalDailyTasks(prev => {
+      const updated = structuredClone(prev)
+      updated[date].tasks = updated[date].tasks.filter(t => t.id !== taskId)
+      return updated
+    })
+
+    await deleteTaskAction(date, taskId)
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     console.log("Drag End:", {
@@ -261,16 +272,16 @@ export default function DailyPlanner() {
       if (dragStartDate === targetDate) {
         // The local state is already up-to-date from handleDragOver
         // => Just save to Firestore
-        await saveDayToFirestore(targetDate, localDailyTasks[targetDate])
+        await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
       } else {
         // b) Moved to a different date
         // The local state is updated from handleDragOver to reflect new day
         // => We just do the Firestore calls
         // Save new day
-        await saveDayToFirestore(targetDate, localDailyTasks[targetDate])
+        await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
         // Save old day
         if (localDailyTasks[dragStartDate]) {
-          await saveDayToFirestore(dragStartDate, localDailyTasks[dragStartDate])
+          await saveDayChangesToFirestore(dragStartDate, localDailyTasks[dragStartDate])
         }
       }
     } catch (error) {
@@ -335,7 +346,9 @@ export default function DailyPlanner() {
   // --------------------------------
   const isLoading = isLoadingDates || isLoadingTasks
 
-  async function saveDayToFirestore(dateStr: string, dayData: Day) {
+
+  // --------------------------------
+  async function saveDayChangesToFirestore(dateStr: string, dayData: Day) {
     try {
       console.log("Saving day to Firestore:", { dateStr, dayData })
 
@@ -477,6 +490,9 @@ export default function DailyPlanner() {
                         task={task}
                         day={column}
                         isOverDeleteZone={isOverDeleteZone && activeTask?.id === task.id}
+                        onDelete={async (taskId) => {
+                          await deleteTask(taskId, column.date)
+                        }}
                         onTaskUpdate={async updatedTask => {
                           try {
                             console.log("Task update triggered:", updatedTask)
@@ -499,13 +515,7 @@ export default function DailyPlanner() {
                               return updated
                             })
 
-                            // Save to Firestore
-                            await saveDayToFirestore(column.date, {
-                              ...column,
-                              tasks: column.tasks.map(t =>
-                                t.id === updatedTask.id ? updatedTask : t
-                              )
-                            })
+                            await updateTaskAction(column.date, updatedTask.id, { ...updatedTask })
                           } catch (error) {
                             console.error("Failed to update task:", error)
                           }
@@ -539,9 +549,10 @@ export default function DailyPlanner() {
               createdAt: localDailyTasks[newTaskDate]?.createdAt || "",
               updatedAt: localDailyTasks[newTaskDate]?.updatedAt || ""
             }}
+            isNewTask={true}
             task={{
               id: crypto.randomUUID(),
-              title: "",
+              title: "New Task",
               time: "",
               subtasks: [],
               completed: false,
@@ -573,7 +584,7 @@ export default function DailyPlanner() {
                 }))
 
                 // Save to Firestore
-                await saveDayToFirestore(newTaskDate, updatedDay)
+                await addTaskAction(newTaskDate, newTask)
               } catch (error) {
                 console.error("Failed to add new task:", error)
               }

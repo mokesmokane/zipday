@@ -16,10 +16,11 @@ interface TaskCardProps {
   task: Task | undefined
   day?: Day
   isOverDeleteZone: boolean
+  onDelete?: (taskId: string) => void
   onTaskUpdate?: (updatedTask: Task) => void
 }
 
-export function TaskCard({ task, day, isOverDeleteZone, onTaskUpdate }: TaskCardProps) {
+export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }: TaskCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   if (!task) {
@@ -44,6 +45,23 @@ export function TaskCard({ task, day, isOverDeleteZone, onTaskUpdate }: TaskCard
   }
 
   const handleTaskUpdate = (updatedTask: Task) => {
+    onTaskUpdate?.(updatedTask)
+  }
+
+  const handleSubtaskToggle = (subtaskId: string) => {
+    if (!task) return
+
+    const updatedSubtasks = task.subtasks.map(subtask => 
+      subtask.id === subtaskId 
+        ? { ...subtask, completed: !subtask.completed }
+        : subtask
+    )
+
+    const updatedTask: Task = {
+      ...task,
+      subtasks: updatedSubtasks
+    }
+
     onTaskUpdate?.(updatedTask)
   }
 
@@ -83,7 +101,11 @@ export function TaskCard({ task, day, isOverDeleteZone, onTaskUpdate }: TaskCard
             <div className="space-y-2">
               {task.subtasks.map((subtask: Subtask) => (
                 <div key={subtask.id} className="flex items-center space-x-2">
-                  <CustomCheckbox id={subtask.id} checked={subtask.completed} />
+                  <CustomCheckbox 
+                    id={subtask.id} 
+                    checked={subtask.completed}
+                    onCheckedChange={() => handleSubtaskToggle(subtask.id)}
+                  />
                   <label
                     htmlFor={subtask.id}
                     className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -113,6 +135,7 @@ export function TaskCard({ task, day, isOverDeleteZone, onTaskUpdate }: TaskCard
         <EditTaskDialog
           day={day}
           task={task}
+          onDelete={onDelete}
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           onSave={handleTaskUpdate}

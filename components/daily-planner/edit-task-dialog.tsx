@@ -22,7 +22,9 @@ interface EditTaskDialogProps {
   task: Task
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (updatedTask: Task) => void
+  onSave: (task: Task) => void
+  isNewTask?: boolean
+  onDelete?: (taskId: string) => void
 }
 
 const TIME_OPTIONS = [
@@ -38,7 +40,7 @@ const TIME_OPTIONS = [
   { label: '8 hours', value: '8h' },
 ]
 
-export function EditTaskDialog({ day,task, open, onOpenChange, onSave }: EditTaskDialogProps) {
+export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask, onDelete }: EditTaskDialogProps) {
   const [editedTask, setEditedTask] = useState<Task>({ ...task })
 
   useEffect(() => {
@@ -246,11 +248,28 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave }: EditTas
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save Changes</Button>
+        <div className="flex justify-between items-center mt-6">
+          {!isNewTask && (
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                // TODO: Add confirmation dialog before deletion
+                onDelete?.(task.id)
+                onOpenChange(false)
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Task
+            </Button>
+          )}
+          <div className="flex gap-2 ml-auto">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              {isNewTask ? 'Add Task' : 'Save Changes'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
