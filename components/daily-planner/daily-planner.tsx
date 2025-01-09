@@ -131,43 +131,38 @@ export default function DailyPlanner() {
     const { active, over } = event
     if (!over || !activeTask || !dragStartDate) return
 
-    // 1. First check if anything has actually changed
     const activeId = active.id as string
     const overId = over.id as string
     
-    // 2. Find the target column
+    // Check for delete zone first
+    if (over.id === `${dragStartDate}-delete-zone`) {
+      setIsOverDeleteZone(true)
+      return // Return early to prevent other updates
+    }
+    
+    // Reset delete zone state if we're not over it
+    setIsOverDeleteZone(false)
+
+    // Rest of the existing drag over logic...
     const newCol = columns.find(
       col => col.date === overId || col.tasks.some(t => t.id === overId)
     )
     if (!newCol) return
 
-    // 3. If we're over the delete zone, just update that state and return
-    if (over.id === `${dragStartDate}-delete-zone`) {
-      setIsOverDeleteZone(true)
-      return
-    }
-    setIsOverDeleteZone(false)
-
-    // 4. Check if the task is already in the correct position
     const overIndex = newCol.tasks.findIndex(t => t.id === overId)
     const currentIndex = newCol.tasks.findIndex(t => t.id === activeId)
     const indexToInsert = overIndex >= 0 ? overIndex : newCol.tasks.length
 
-    // Only update if the position has actually changed
     if (currentIndex === indexToInsert && newCol.date === dragStartDate) {
       return
     }
 
-    // 5. If we get here, we need to update the position
     setLocalDailyTasks(prev => {
       const updated = structuredClone(prev)
-      
-      // Remove from all columns
       Object.keys(updated).forEach(date => {
         updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
       })
 
-      // Insert into new position
       if (!updated[newCol.date]) {
         updated[newCol.date] = {
           tasks: [],
