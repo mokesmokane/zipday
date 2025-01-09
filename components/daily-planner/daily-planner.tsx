@@ -38,7 +38,6 @@ const SCROLL_PADDING = 40
 
 export default function DailyPlanner() {
   const {
-    selectedDate,
     loadDates,
     addToStartOfDateWindow,
     addToEndOfDateWindow,
@@ -68,6 +67,7 @@ export default function DailyPlanner() {
   const [newTaskDate, setNewTaskDate] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isOverDeleteZone, setIsOverDeleteZone] = useState(false)
+  const { selectedDate, setSelectedDate } = useDate()
 
   // Whenever `dailyTasks` changes, sync local state
   useEffect(() => {
@@ -412,43 +412,32 @@ export default function DailyPlanner() {
   }, [isDragging, isOverDeleteZone, activeId, dragStartDate])
   
 
-  // Add a constant for column width and number of columns to scroll
-  const COLUMN_WIDTH = 300 // Width of each column (matches the w-[300px] class)
-  const COLUMN_GAP = 24 // Gap between columns (matches the gap-6 class which is 1.5rem = 24px)
+  // Constants for date navigation
   const COLUMNS_TO_SCROLL = 3
 
-  // Modify the chevron click handlers to scroll by 3 columns
   function handleLeftClick() {
-    const container = containerRef.current
-    if (container) {
-      const scrollAmount = (COLUMN_WIDTH + COLUMN_GAP) * COLUMNS_TO_SCROLL
-      const targetScroll = Math.max(0, container.scrollLeft - scrollAmount)
-      
-      container.scrollTo({ 
-        left: targetScroll, 
-        behavior: "smooth" 
-      })
+    if (selectedDate) {
+      const newDate = new Date(selectedDate)
+      newDate.setDate(newDate.getDate() - COLUMNS_TO_SCROLL)
+      setSelectedDate(newDate)
 
-      // Check if we're near the start and need more data
-      if (container.scrollLeft < scrollAmount) {
+      // Check if we need more data
+      const formattedNewDate = format(newDate, "yyyy-MM-dd")
+      if (!columns.some(col => col.date === formattedNewDate)) {
         addToStartOfDateWindow()
       }
     }
   }
 
   function handleRightClick() {
-    const container = containerRef.current
-    if (container) {
-      const scrollAmount = (COLUMN_WIDTH + COLUMN_GAP) * COLUMNS_TO_SCROLL
-      const targetScroll = container.scrollLeft + scrollAmount
-      
-      container.scrollTo({ 
-        left: targetScroll, 
-        behavior: "smooth" 
-      })
+    if (selectedDate) {
+      const newDate = new Date(selectedDate)
+      newDate.setDate(newDate.getDate() + COLUMNS_TO_SCROLL)
+      setSelectedDate(newDate)
 
-      // Check if we're near the end and need more data
-      if (container.scrollLeft + container.offsetWidth + scrollAmount > container.scrollWidth - 100) {
+      // Check if we need more data
+      const formattedNewDate = format(newDate, "yyyy-MM-dd")
+      if (!columns.some(col => col.date === formattedNewDate)) {
         addToEndOfDateWindow()
       }
     }
