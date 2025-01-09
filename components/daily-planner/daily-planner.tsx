@@ -131,43 +131,43 @@ export default function DailyPlanner() {
     const { active, over } = event
     if (!over || !activeTask || !dragStartDate) return
 
-    console.log("Drag Over:", {
-      activeId: active.id,
-      overId: over.id,
-      deleteZoneId: `${dragStartDate}-delete-zone`,
-      isOverDeleteZone: over.id === `${dragStartDate}-delete-zone`
-    })
+    // 1. First check if anything has actually changed
+    const activeId = active.id as string
+    const overId = over.id as string
+    
+    // 2. Find the target column
+    const newCol = columns.find(
+      col => col.date === overId || col.tasks.some(t => t.id === overId)
+    )
+    if (!newCol) return
 
-    // Check if over delete zone
+    // 3. If we're over the delete zone, just update that state and return
     if (over.id === `${dragStartDate}-delete-zone`) {
       setIsOverDeleteZone(true)
       return
     }
     setIsOverDeleteZone(false)
 
-    const activeId = active.id as string
-    const overId = over.id as string
-
-    // Find the column into which we're dragging
-    const newCol = columns.find(
-      col => col.date === overId || col.tasks.some(t => t.id === overId)
-    )
-    if (!newCol) return
-
-    // 2) Figure out "overIndex" to place the dragged card
+    // 4. Check if the task is already in the correct position
     const overIndex = newCol.tasks.findIndex(t => t.id === overId)
+    const currentIndex = newCol.tasks.findIndex(t => t.id === activeId)
     const indexToInsert = overIndex >= 0 ? overIndex : newCol.tasks.length
 
-    // 3) Update localDailyTasks for "live" preview
-    setLocalDailyTasks(prev => {
-      const updated = structuredClone(prev) as typeof prev
+    // Only update if the position has actually changed
+    if (currentIndex === indexToInsert && newCol.date === dragStartDate) {
+      return
+    }
 
-      // Remove the dragged task from ALL columns first
+    // 5. If we get here, we need to update the position
+    setLocalDailyTasks(prev => {
+      const updated = structuredClone(prev)
+      
+      // Remove from all columns
       Object.keys(updated).forEach(date => {
         updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
       })
 
-      // Insert the task into the currently hovered column
+      // Insert into new position
       if (!updated[newCol.date]) {
         updated[newCol.date] = {
           tasks: [],
@@ -179,7 +179,6 @@ export default function DailyPlanner() {
       }
 
       updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
-
       return updated
     })
   }
