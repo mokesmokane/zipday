@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { TagSelector } from "./tag-selector"
 
 interface EditTaskDialogProps {
   day: Day
@@ -92,25 +93,18 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
             <DialogTitle>Edit Task</DialogTitle>
           </span>
           <div className="flex items-center justify-between">
-            <div>
-              {task.tag && (
-                <Badge variant="secondary" className="text-sm">
-
-                  {task.tag}
-                </Badge>
-              )}
-            </div>
+            <TagSelector 
+              tags={editedTask.tags || []}
+              recentTags={[
+                // You'll need to pass recently used tags from your data store
+                "work", "personal", "urgent", "meeting", "followup"
+              ]}
+              onTagsChange={(newTags) => 
+                setEditedTask(prev => ({ ...prev, tags: newTags }))
+              }
+            />
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{day.date}</span>
-              
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddSubtask}
-                  className="h-8"
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Subtasks
-                </Button>
             </div>
           </div>
         </DialogHeader>
@@ -229,16 +223,15 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
                     <motion.div 
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex items-center gap-2 pl-7"
                     >
-                      <div className="w-4" />
+                      <div className="w-5" />
                       <Button
                         variant="ghost"
-                        className="w-full justify-start text-muted-foreground h-10 px-3"
+                        className="w-full justify-start text-muted-foreground h-10 px-0"
                         onClick={handleAddSubtask}
                       >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add subtask...
+                        <Plus className="h-4 w-4" />
+                        Add subtask
                       </Button>
                     </motion.div>
                   </div>

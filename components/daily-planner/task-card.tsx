@@ -59,7 +59,8 @@ export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }
 
     const updatedTask: Task = {
       ...task,
-      subtasks: updatedSubtasks
+      subtasks: updatedSubtasks,
+      completed: !updatedSubtasks.find(st => st.id === subtaskId)?.completed ? false : task.completed
     }
 
     onTaskUpdate?.(updatedTask)
@@ -78,22 +79,45 @@ export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }
         {...listeners}
       >
         <CardHeader className="p-4 pb-2">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h3 className="font-medium leading-none">{task.title}</h3>
-              <p className="text-xs text-muted-foreground">ID: {task.id}</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsEditDialogOpen(true)
+          <div className="flex items-start gap-2">
+            <CustomCheckbox 
+              id={task.id}
+              className="h-6 w-6 mt-0.5"
+              checked={task.completed}
+              onCheckedChange={(checked) => {
+                if (!task) return
+                const updatedTask = {
+                  ...task,
+                  completed: checked === "indeterminate" ? undefined : checked
+                }
+                
+                if (checked) {
+                  updatedTask.subtasks = task.subtasks?.map(subtask => ({
+                    ...subtask,
+                    completed: true
+                  }))
+                }
+                
+                onTaskUpdate?.(updatedTask)
               }}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
+            />
+            <div className="flex-1 flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <h3 className="font-medium leading-none">{task.title}</h3>
+                {task.description && <p className="text-xs text-muted-foreground">{task.description}</p>}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 -mt-1.5 -mr-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEditDialogOpen(true)
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 pt-2">
@@ -123,10 +147,14 @@ export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }
                 {task.time}
               </div>
             )}
-            {task.tag && (
-              <Badge variant="secondary" className="text-xs">
-                {task.tag}
-              </Badge>
+            {task.tags && task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {task.tags.map((tag: string) => (
+                  <Badge variant="secondary" className="text-xs" key={tag}>
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
             )}
           </div>
         </CardContent>

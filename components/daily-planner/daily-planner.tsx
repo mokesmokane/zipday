@@ -556,7 +556,7 @@ export default function DailyPlanner() {
               time: "",
               subtasks: [],
               completed: false,
-              tag: "work",
+              tags: ["work"],
               order: localDailyTasks[newTaskDate]?.tasks?.length || 0,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
