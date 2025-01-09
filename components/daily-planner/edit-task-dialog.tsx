@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Plus, GripVertical, Trash2, Clock } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,7 @@ const TIME_OPTIONS = [
 
 export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask, onDelete }: EditTaskDialogProps) {
   const [editedTask, setEditedTask] = useState<Task>({ ...task })
+  const newSubtaskRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setEditedTask({ ...task })
@@ -61,6 +62,10 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
       ...prev,
       subtasks: [...prev.subtasks, subtask]
     }))
+
+    setTimeout(() => {
+      newSubtaskRef.current?.focus()
+    }, 0)
   }
 
   const handleRemoveSubtask = (subtaskId: string) => {
@@ -194,6 +199,7 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
                                 className="h-4 w-4 rounded border-gray-300"
                               />
                               <Input
+                                ref={index === editedTask.subtasks.length - 1 ? newSubtaskRef : null}
                                 value={subtask.text}
                                 onChange={(e) => {
                                   setEditedTask(prev => ({
