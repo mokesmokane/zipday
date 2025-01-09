@@ -410,6 +410,67 @@ export default function DailyPlanner() {
       dragStartDate
     })
   }, [isDragging, isOverDeleteZone, activeId, dragStartDate])
+  
+
+  // Add a constant for column width and number of columns to scroll
+  const COLUMN_WIDTH = 300 // Width of each column (matches the w-[300px] class)
+  const COLUMN_GAP = 24 // Gap between columns (matches the gap-6 class which is 1.5rem = 24px)
+  const COLUMNS_TO_SCROLL = 3
+
+  // Modify the chevron click handlers to scroll by 3 columns
+  function handleLeftClick() {
+    const container = containerRef.current
+    if (container) {
+      const scrollAmount = (COLUMN_WIDTH + COLUMN_GAP) * COLUMNS_TO_SCROLL
+      const targetScroll = Math.max(0, container.scrollLeft - scrollAmount)
+      
+      container.scrollTo({ 
+        left: targetScroll, 
+        behavior: "smooth" 
+      })
+
+      // Check if we're near the start and need more data
+      if (container.scrollLeft < scrollAmount) {
+        addToStartOfDateWindow()
+      }
+    }
+  }
+
+  function handleRightClick() {
+    const container = containerRef.current
+    if (container) {
+      const scrollAmount = (COLUMN_WIDTH + COLUMN_GAP) * COLUMNS_TO_SCROLL
+      const targetScroll = container.scrollLeft + scrollAmount
+      
+      container.scrollTo({ 
+        left: targetScroll, 
+        behavior: "smooth" 
+      })
+
+      // Check if we're near the end and need more data
+      if (container.scrollLeft + container.offsetWidth + scrollAmount > container.scrollWidth - 100) {
+        addToEndOfDateWindow()
+      }
+    }
+  }
+
+  // Add a scroll event listener to load more data when needed
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      // Load more data when scrolling near the edges
+      if (container.scrollLeft < 100) {
+        addToStartOfDateWindow()
+      } else if (container.scrollLeft + container.offsetWidth > container.scrollWidth - 100) {
+        addToEndOfDateWindow()
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [addToEndOfDateWindow, addToStartOfDateWindow])
 
   // --------------------------------
   // RENDER
@@ -429,7 +490,7 @@ export default function DailyPlanner() {
             variant="ghost"
             size="icon"
             className="bg-background/80 absolute left-0 top-1/2 z-10 -translate-y-1/2 backdrop-blur-sm"
-            onClick={() => addToStartOfDateWindow()}
+            onClick={handleLeftClick}
             disabled={isLoading}
           >
             <ChevronLeft className="size-4" />
@@ -439,7 +500,7 @@ export default function DailyPlanner() {
             variant="ghost"
             size="icon"
             className="bg-background/80 absolute right-0 top-1/2 z-10 -translate-y-1/2 backdrop-blur-sm"
-            onClick={() => addToEndOfDateWindow()}
+            onClick={handleRightClick}
             disabled={isLoading}
           >
             <ChevronRight className="size-4" />
