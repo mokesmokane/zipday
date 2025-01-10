@@ -5,6 +5,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { getServerUser } from "@/lib/firebaseAdmin"
 import { FilterProvider } from "@/lib/context/filter-context"
+import { CurrentViewProvider } from "@/lib/context/current-view-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -30,7 +31,9 @@ export default async function RootLayout({
       >
         <RootProvider serverUser={user}>
           <FilterProvider>
-            {children}
+            <CurrentViewProvider>
+              {children}
+            </CurrentViewProvider>
           </FilterProvider>
         </RootProvider>
       </body>

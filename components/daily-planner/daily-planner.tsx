@@ -34,6 +34,8 @@ import {
 import type { Day, Task, DailyTasks } from "@/types/daily-task-types"
 import { EditTaskDialog } from "./edit-task-dialog"
 import { useFilter } from "@/lib/context/filter-context"
+import { CalendarView } from "./calendar-view"
+import { useCurrentView } from "@/lib/context/current-view-context"
 
 const SCROLL_PADDING = 40
 
@@ -83,6 +85,7 @@ export default function DailyPlanner() {
   const [isDragging, setIsDragging] = useState(false)
   const [isOverDeleteZone, setIsOverDeleteZone] = useState(false)
   const { selectedDate, setSelectedDate } = useDate()
+  const { currentView, setCurrentView } = useCurrentView()
 
   // Whenever `dailyTasks` changes, sync local state
   useEffect(() => {
@@ -157,13 +160,11 @@ export default function DailyPlanner() {
     // Check for delete zone first
     if (over.id === `${dragStartDate}-delete-zone`) {
       setIsOverDeleteZone(true)
-      return // Return early to prevent other updates
+      return
     }
     
-    // Reset delete zone state if we're not over it
     setIsOverDeleteZone(false)
 
-    // Rest of the existing drag over logic...
     const newCol = columns.find(
       col => col.date === overId || col.tasks.some(t => t.id === overId)
     )
@@ -173,16 +174,30 @@ export default function DailyPlanner() {
     const currentIndex = newCol.tasks.findIndex(t => t.id === activeId)
     const indexToInsert = overIndex >= 0 ? overIndex : newCol.tasks.length
 
+    // Add this check to prevent unnecessary updates
     if (currentIndex === indexToInsert && newCol.date === dragStartDate) {
       return
     }
 
+    // Batch the state update
     setLocalDailyTasks(prev => {
+      // Check if the state would actually change
+      const isTaskInSamePosition = 
+        prev[newCol.date]?.tasks[indexToInsert]?.id === activeId &&
+        newCol.date === dragStartDate
+
+      if (isTaskInSamePosition) {
+        return prev
+      }
+
       const updated = structuredClone(prev)
+      
+      // Remove task from all dates
       Object.keys(updated).forEach(date => {
         updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
       })
 
+      // Initialize target date if needed
       if (!updated[newCol.date]) {
         updated[newCol.date] = {
           tasks: [],
@@ -193,6 +208,7 @@ export default function DailyPlanner() {
         }
       }
 
+      // Insert task at new position
       updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
       return updated
     })
@@ -495,6 +511,8 @@ export default function DailyPlanner() {
       >
        
         <div className="relative h-full">
+          {currentView === "board" ? (
+            <>
           <Button
             variant="ghost"
             size="icon"
@@ -597,9 +615,20 @@ export default function DailyPlanner() {
                   <Plus className="mr-2 size-4" />
                   Add task
                 </Button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <CalendarView
+              days={localDailyTasks}
+              onAddTask={(date, hour) => {
+                const dateStr = format(date, 'yyyy-MM-dd')
+                setNewTaskDate(dateStr)
+                setIsNewTaskDialogOpen(true)
+              }}
+            />
+          )}
         </div>
 
         <DragOverlay>{dragOverlayContent}</DragOverlay>
@@ -655,7 +684,7 @@ export default function DailyPlanner() {
             }}
           />
         )}
-      </DndContext>
+      </DndContext> 
     </div>
   )
 }

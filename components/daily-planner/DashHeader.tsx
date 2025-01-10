@@ -20,6 +20,7 @@ import { SubscriptionBadge } from "@/components/site/SubscriptionBadge"
 import { getAuth, signOut } from "firebase/auth"
 import { useFilter } from "@/lib/context/filter-context"
 import { Badge } from "@/components/ui/badge"
+import { useCurrentView } from "@/lib/context/current-view-context"
 
 type ViewType = "board" | "calendar"
 
@@ -27,7 +28,7 @@ export function DashHeader() {
   const { user, isAuthenticated } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { isExpanded, toggleSidebar } = useSidebar()
-  const [currentView, setCurrentView] = useState<ViewType>("board")
+  const { currentView, setCurrentView } = useCurrentView()
   const { activeFilters, recentTags, availableTags, addFilter, removeFilter, clearFilters } = useFilter()
 
   const handleSignOut = async () => {
