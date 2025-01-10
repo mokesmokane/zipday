@@ -6,10 +6,12 @@ import { useChat } from "ai/react"
 import {
   ArrowUpIcon,
   MessageCircle,
+
   Play,
   Square,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Bot
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,6 +33,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AIVoiceVisualizer } from "@/components/ai-chat/ai-voice-visualizer"
 import { useRealtimeAudio } from "@/lib/hooks/use-realtime-audio"
+import { useSidebar } from "@/lib/context/sidebar-context"
 
 export function ChatForm({
   className,
@@ -49,6 +52,7 @@ export function ChatForm({
   const resizeDirection = useRef<string | null>(null)
   const initialSize = useRef({ width: 0, height: 0 })
   const initialPosition = useRef({ x: 0, y: 0 })
+  const { isExpanded } = useSidebar()
 
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false)
 
@@ -405,6 +409,21 @@ export function ChatForm({
 
   if (!isPoppedOut) {
     // Inline mode
+    if(!isExpanded) {
+      return (
+        <div className="flex justify-center p-2">
+
+        <Button
+          variant="ghost" 
+          size="icon"
+          className="text-muted-foreground hover:text-foreground hover:bg-accent size-10 p-0"
+          onClick={() => setIsPoppedOut(true)}
+        >
+          <Bot className="size-4" />
+        </Button>
+        </div>
+      )
+    }
     return (
       <Card
         className="relative flex flex-col border-none shadow-none"
@@ -420,8 +439,8 @@ export function ChatForm({
               variant="ghost"
               size="icon"
               onClick={handlePopOutToggle}
-              className="size-8 rounded-full hover:bg-blue-100 hover:text-blue-600"
-            >
+              className="size-7 opacity-50 hover:opacity-100"
+              >
               <Maximize2 className="size-4" />
             </Button>
           </div>
@@ -462,8 +481,8 @@ export function ChatForm({
           variant="ghost"
           size="icon"
           onClick={handlePopOutToggle}
-          className="size-8 rounded-full hover:bg-blue-100 hover:text-blue-600"
-        >
+          className="size-7 opacity-50 hover:opacity-100"
+          >
           <Minimize2 className="size-4" />
         </Button>
       </div>

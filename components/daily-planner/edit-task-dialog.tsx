@@ -100,10 +100,6 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
           <div className="flex items-center justify-between">
             <TagSelector 
               tags={editedTask.tags || []}
-              recentTags={[
-                // You'll need to pass recently used tags from your data store
-                "work", "personal", "urgent", "meeting", "followup"
-              ]}
               onTagsChange={(newTags) => 
                 setEditedTask(prev => ({ ...prev, tags: newTags }))
               }

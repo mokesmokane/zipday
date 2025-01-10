@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { getServerUser, getUserTodos } from "@/lib/firebaseAdmin"
 import DailyPlanner from "@/components/daily-planner/daily-planner"
+import { DashHeader } from "@/components/daily-planner/DashHeader"
 
 export default async function TodoPage() {
   const user = await getServerUser()
@@ -16,6 +17,7 @@ export default async function TodoPage() {
 
   return (
     <div className="size-full">
+      <DashHeader />
       <DailyPlanner />
     </div>
   )

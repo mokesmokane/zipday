@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { getServerUser } from "@/lib/firebaseAdmin"
+import { FilterProvider } from "@/lib/context/filter-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -27,7 +28,11 @@ export default async function RootLayout({
           inter.className
         )}
       >
-        <RootProvider serverUser={user}>{children}</RootProvider>
+        <RootProvider serverUser={user}>
+          <FilterProvider>
+            {children}
+          </FilterProvider>
+        </RootProvider>
       </body>
     </html>
   )

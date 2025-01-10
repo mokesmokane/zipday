@@ -28,3 +28,5 @@ export interface DateWindow {
   startDate: Date
   endDate: Date
 }
+
+export type DailyTasks = Record<string, Day>

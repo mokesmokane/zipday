@@ -31,8 +31,9 @@ import {
   addTaskAction,
   deleteTaskAction
 } from "@/actions/db/tasks-actions"
-import type { Day, Task } from "@/types/daily-task-types"
+import type { Day, Task, DailyTasks } from "@/types/daily-task-types"
 import { EditTaskDialog } from "./edit-task-dialog"
+import { useFilter } from "@/lib/context/filter-context"
 
 const SCROLL_PADDING = 40
 
@@ -46,9 +47,23 @@ export default function DailyPlanner() {
   } = useDate()
 
   const {
-    dailyTasks, // Record<string, Day>
+    dailyTasks,
     isLoading: isLoadingTasks
   } = useTasks()
+
+  const { setAvailableTags } = useFilter()
+  const { activeFilters } = useFilter()
+
+  // Update available tags whenever dailyTasks changes
+  useEffect(() => {
+    const allTags = new Set<string>()
+    Object.values(dailyTasks as DailyTasks).forEach(dailyDoc => {
+      dailyDoc.tasks.forEach(task => {
+        task.tags?.forEach(tag => allTags.add(tag))
+      })
+    })
+    setAvailableTags(Array.from(allTags))
+  }, [dailyTasks, setAvailableTags])
 
   // --------------------------------
   // 1) LOCAL STATE for DRAG & DROP
@@ -74,12 +89,17 @@ export default function DailyPlanner() {
     setLocalDailyTasks(dailyTasks)
   }, [dailyTasks])
 
-  // Build columns from localDailyTasks
+  // Build columns from localDailyTasks with filtering
   const columns = days.map(dateStr => {
     const doc = localDailyTasks[dateStr] ?? { tasks: [] }
+    const filteredTasks = activeFilters.length > 0
+      ? doc.tasks.filter(task => 
+          task.tags?.some(tag => activeFilters.includes(tag))
+        )
+      : doc.tasks
     return {
       date: dateStr,
-      tasks: doc.tasks || [],
+      tasks: filteredTasks || [],
       id: doc.id,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt

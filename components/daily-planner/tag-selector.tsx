@@ -9,16 +9,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { useFilter } from "@/lib/context/filter-context"
 
 interface TagSelectorProps {
   tags: string[]
-  recentTags: string[]
   onTagsChange: (tags: string[]) => void
 }
 
-export function TagSelector({ tags, recentTags, onTagsChange }: TagSelectorProps) {
+export function TagSelector({ tags, onTagsChange }: TagSelectorProps) {
+  const { recentTags } = useFilter()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -40,9 +42,11 @@ export function TagSelector({ tags, recentTags, onTagsChange }: TagSelectorProps
     onTagsChange(tags.filter(tag => tag !== tagToRemove))
   }
 
-  const filteredTags = recentTags.filter(tag => 
-    tag.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredTags = search
+    ? recentTags.filter(tag => 
+        tag.toLowerCase().includes(search.toLowerCase())
+      )
+    : recentTags
 
   return (
     <div className="flex flex-wrap gap-2 p-2">
@@ -77,7 +81,7 @@ export function TagSelector({ tags, recentTags, onTagsChange }: TagSelectorProps
               className="h-7 text-s border-none focus:ring-0 focus-visible:ring-0 focus:outline-none outline-none px-2 w-[120px]" /* Added fixed width */
             />
             <Command.List className="py-2">
-              {search && !filteredTags.includes(search) && (
+              {search && (
                 <Command.Item 
                   value={`create-${search}`}
                   onSelect={() => handleSelect(search)}
