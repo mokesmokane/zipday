@@ -154,3 +154,18 @@ Global styles for the app.
     display: none;  /* Chrome, Safari and Opera */
   }
 }
+
+.calendar-column {
+  height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.calendar-hour {
+  min-height: 60px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.calendar-hour:hover {
+  background-color: var(--accent);
+}

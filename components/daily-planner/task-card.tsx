@@ -15,12 +15,12 @@ import { cn } from "@/lib/utils"
 interface TaskCardProps {
   task: Task | undefined
   day?: Day
-  isOverDeleteZone: boolean
+  isOverCalendarZone: boolean
   onDelete?: (taskId: string) => void
   onTaskUpdate?: (updatedTask: Task) => void
 }
 
-export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }: TaskCardProps) {
+export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate }: TaskCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   if (!task) {
@@ -39,8 +39,8 @@ export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    backgroundColor: isOverDeleteZone ? 'rgb(239, 68, 68, 0.1)' : undefined,
-    borderColor: isOverDeleteZone ? 'rgb(239, 68, 68)' : undefined,
+    backgroundColor: isOverCalendarZone ? 'rgb(59, 130, 246, 0.1)' : undefined,
+    borderColor: isOverCalendarZone ? 'rgb(59, 130, 246)' : undefined,
     opacity: isDragging ? 0.5 : 1
   }
 
@@ -73,7 +73,7 @@ export function TaskCard({ task, day, isOverDeleteZone, onDelete, onTaskUpdate }
         style={style}
         className={cn(
           "bg-card relative cursor-grab touch-none active:cursor-grabbing transition-colors duration-200",
-          isOverDeleteZone && "border-destructive"
+          isOverCalendarZone && "border-blue-500"
         )}
         {...attributes}
         {...listeners}

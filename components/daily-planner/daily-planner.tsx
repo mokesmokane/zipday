@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable"
 import { format } from "date-fns"
 import { Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
 import { TaskColumn } from "./task-column"
@@ -34,10 +34,43 @@ import {
 import type { Day, Task, DailyTasks } from "@/types/daily-task-types"
 import { EditTaskDialog } from "./edit-task-dialog"
 import { useFilter } from "@/lib/context/filter-context"
-import { CalendarView } from "./calendar-view"
 import { useCurrentView } from "@/lib/context/current-view-context"
+import { CalendarColumn } from "./calendar-column"
+import { useDebounce } from "@/lib/hooks/use-debounce"
 
 const SCROLL_PADDING = 40
+
+const dropAnimationConfig = {
+  duration: 200,
+  easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)"
+}
+
+// Add this utility function outside the component
+const dateCache = new Map<string, string>()
+
+function getTargetDate(id: string, columns: Array<{ date: string; tasks: Task[] }>) {
+  // First check if this is a direct date match
+  if (columns.some(col => col.date === id)) {
+    return id
+  }
+
+  // Check cache for calendar IDs
+  if (dateCache.has(id)) {
+    return dateCache.get(id)
+  }
+
+  // Check if it's a calendar ID
+  if (id.startsWith('calendar-')) {
+    const [_, year, month, day] = id.split('-')
+    const date = `${year}-${month}-${day}`
+    dateCache.set(id, date)
+    return date
+  }
+
+  // Check if it's a task ID
+  const column = columns.find(col => col.tasks.some(t => t.id === id))
+  return column?.date
+}
 
 export default function DailyPlanner() {
   const {
@@ -83,9 +116,22 @@ export default function DailyPlanner() {
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   const [newTaskDate, setNewTaskDate] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [isOverDeleteZone, setIsOverDeleteZone] = useState(false)
+  const [isOverCalendarZone, setIsOverCalendarZone] = useState<string | null>(null)
+  const [previewColumnDate, setPreviewColumnDate] = useState<string | null>(null)
+  const [showCalendarAfterDrop, setShowCalendarAfterDrop] = useState(false)
   const { selectedDate, setSelectedDate } = useDate()
   const { currentView, setCurrentView } = useCurrentView()
+  const [showCalendar, setShowCalendar] = useState<string | null>(null)
+  const debouncedCalendarZone = useDebounce(isOverCalendarZone, 2000)
+
+  // Add effect to handle debounced calendar zone
+  useEffect(() => {
+    if (debouncedCalendarZone) {
+      setShowCalendar(debouncedCalendarZone)
+    } else {
+      setShowCalendar(null)
+    }
+  }, [debouncedCalendarZone])
 
   // Whenever `dailyTasks` changes, sync local state
   useEffect(() => {
@@ -127,27 +173,25 @@ export default function DailyPlanner() {
     return null
   }
 
+  const findColumnIndexByDate = (date: string) => {
+    return columns.findIndex(col => col.date === date)
+  }
+
   // --------------------------------
   // 2) DRAG & DROP EVENT HANDLERS
   // --------------------------------
-  function handleDragStart(event: DragStartEvent) {
-    console.log("🟦 Drag Start:", {
-      activeId: event.active.id,
-      event
-    })
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
     setIsDragging(true)
-    setActiveId(event.active.id as string)
-
-    // Store a snapshot of localDailyTasks in case we need to revert
-    prevLocalDailyTasksRef.current = structuredClone(localDailyTasks)
-
-    // Find the dragged task + date
-    const found = findTaskById(event.active.id as string)
-    if (!found) return
-    const { date: fromDate, task } = found
-
-    setActiveTask(task)
-    setDragStartDate(fromDate)
+    setActiveId(active.id as string)
+    const task = findTaskById(active.id as string)
+    if (task) {
+      setActiveTask(task.task)
+      setDragStartDate(task.date)
+      setPreviewColumnDate(task.date)
+      // Save the current state before any changes
+      prevLocalDailyTasksRef.current = structuredClone(localDailyTasks)
+    }
   }
 
   async function handleDragOver(event: DragOverEvent) {
@@ -158,13 +202,65 @@ export default function DailyPlanner() {
     const overId = over.id as string
     
     // Check for delete zone first
-    if (over.id === `${dragStartDate}-delete-zone`) {
-      setIsOverDeleteZone(true)
+    if (over.id === `${dragStartDate}-calendar-zone`) {
+      setIsOverCalendarZone(dragStartDate)
       return
     }
     
-    setIsOverDeleteZone(false)
+    setIsOverCalendarZone(null)
 
+    // Check if dropping into a calendar hour slot
+    const hourMatch = overId.match(/calendar-(.+)-hour-(\d+)/)
+    if (hourMatch) {
+      const [_, targetDate, hourStr] = hourMatch
+      const hour = parseInt(hourStr, 10)
+      
+      // Update the task with the new time
+      const updatedTask = {
+        ...activeTask,
+        time: `${hour.toString().padStart(2, "0")}:00`
+      }
+
+      // Update local state more efficiently
+      setLocalDailyTasks(prev => {
+        // Only clone the dates we need to modify
+        const updated = { ...prev }
+        
+        // Remove task from source date if it exists
+        if (dragStartDate) {
+          if (updated[dragStartDate]) {
+            updated[dragStartDate] = {
+              ...updated[dragStartDate],
+              tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeId)
+            }
+          }
+        }
+
+        // Initialize or update target date
+        if (!updated[targetDate]) {
+          updated[targetDate] = {
+            tasks: [],
+            date: targetDate,
+            id: "",
+            createdAt: "",
+            updatedAt: ""
+          }
+        } else {
+          updated[targetDate] = { ...updated[targetDate] }
+        }
+        
+        // Check if task already exists in target date before adding
+        const taskExists = updated[targetDate].tasks.some(t => t.id === activeId)
+        if (!taskExists) {
+          updated[targetDate].tasks = [...updated[targetDate].tasks, updatedTask]
+        }
+
+        return updated
+      })
+      return
+    }
+
+    // Handle regular column drops
     const newCol = columns.find(
       col => col.date === overId || col.tasks.some(t => t.id === overId)
     )
@@ -208,8 +304,12 @@ export default function DailyPlanner() {
         }
       }
 
-      // Insert task at new position
-      updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
+      // Check if task already exists before inserting
+      const taskExists = updated[newCol.date].tasks.some(t => t.id === activeId)
+      if (!taskExists) {
+        updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
+      }
+      
       return updated
     })
   }
@@ -234,9 +334,12 @@ export default function DailyPlanner() {
       isOverDeleteZone: over?.id === `${dragStartDate}-delete-zone`
     })
 
+    setPreviewColumnDate(null) // Clear preview column
     setIsDragging(false)
-    setIsOverDeleteZone(false)
     setActiveId(null)
+    setActiveTask(null)
+    setDragStartDate(null)
+    setShowCalendar(null)
 
     // 1) If dropped on the delete zone, do final delete
     if (over?.id === `${dragStartDate}-delete-zone` && dragStartDate && active) {
@@ -282,9 +385,16 @@ export default function DailyPlanner() {
     }
 
     // 3) Determine the final target date from the columns
-    const targetDate = columns.find(
-      col => col.date === over.id || col.tasks.some(t => t.id === over.id)
-    )?.date
+    console.log("Over:", over)
+    //calendar id : "calendar-2025-01-11-hour-8"
+    function getDateFromCalendarId(id: string) {
+      var year =  id.split("-")[1]
+      var month = id.split("-")[2]
+      var day = id.split("-")[3]
+      return `${year}-${month}-${day}`
+    }
+    //day column id : "2025-01-11"
+    const targetDate = over ? getTargetDate(over.id.toString(), columns) : null
 
     if (!targetDate) {
       console.error("Could not find target date; revert local state.")
@@ -338,7 +448,7 @@ export default function DailyPlanner() {
   // --------------------------------
   // DRAG OVERLAY
   // --------------------------------
-  const dragOverlayContent = activeTask ? <TaskCard task={activeTask} isOverDeleteZone={isOverDeleteZone} /> : null
+  const dragOverlayContent = activeTask ? <TaskCard task={activeTask} isOverCalendarZone={isOverCalendarZone !== null} /> : null
 
   // --------------------------------
   // SCROLL TO A DATE
@@ -382,28 +492,17 @@ export default function DailyPlanner() {
     try {
       console.log("Saving day to Firestore:", { dateStr, dayData })
 
+      // Get the previous state of tasks for this date
       const prevDay = prevLocalDailyTasksRef.current?.[dateStr]
-      // Filter out any undefined tasks before mapping
-      const prevTasks = new Set(
-        (prevDay?.tasks || []).filter(Boolean).map(t => t.id)
-      )
-      const currentTasks = new Set(
-        (dayData?.tasks || []).filter(Boolean).map(t => t.id)
-      )
+      
+      // Create sets of task IDs for comparison
+      const prevTaskIds = new Set(prevDay?.tasks?.map(t => t.id) || [])
+      const currentTaskIds = new Set(dayData?.tasks?.map(t => t.id) || [])
 
-      // Ensure tasks array exists and filter out undefined tasks
-      const validTasks = (dayData?.tasks || []).filter(Boolean)
-
-      // For task updates, only update tasks that already exist
-      const tasksToUpdate = validTasks.filter(t => prevTasks.has(t.id))
-
-      // Only add tasks that don't exist yet
-      const tasksToAdd = validTasks.filter(t => !prevTasks.has(t.id))
-
-      // Find tasks that were removed
-      const tasksToDelete = (prevDay?.tasks || [])
-        .filter(Boolean)
-        .filter(t => !currentTasks.has(t.id))
+      // Determine which tasks need to be processed
+      const tasksToUpdate = dayData?.tasks?.filter(t => prevTaskIds.has(t.id)) || []
+      const tasksToAdd = dayData?.tasks?.filter(t => !prevTaskIds.has(t.id)) || []
+      const tasksToDelete = prevDay?.tasks?.filter(t => !currentTaskIds.has(t.id)) || []
 
       console.log("Tasks to process:", {
         update: tasksToUpdate.length,
@@ -411,29 +510,26 @@ export default function DailyPlanner() {
         delete: tasksToDelete.length
       })
 
-      // Handle updates first
+      // Process updates
       for (const task of tasksToUpdate) {
-        console.log("Updating task:", task.id)
         const { id, createdAt, updatedAt, ...updates } = task
-        await updateTaskAction(dateStr, id, { ...updates })
+        await updateTaskAction(dateStr, id, updates)
       }
 
-      // Handle new tasks
+      // Process additions
       for (const task of tasksToAdd) {
-        console.log("Creating task:", task)
-        await addTaskAction(dateStr, { ...task })
+        await addTaskAction(dateStr, task)
       }
 
-      // Handle deletions
+      // Process deletions
       for (const task of tasksToDelete) {
-        console.log("Deleting task:", task.id)
         await deleteTaskAction(dateStr, task.id)
       }
 
       console.log("Successfully saved day to Firestore:", dateStr)
     } catch (error) {
       console.error("Error saving day to Firestore:", error)
-      throw error // Re-throw to handle in the caller
+      throw error
     }
   }
 
@@ -441,11 +537,11 @@ export default function DailyPlanner() {
   useEffect(() => {
     console.log("🔄 State Update:", {
       isDragging,
-      isOverDeleteZone,
+      isOverCalendarZone,
       activeId,
       dragStartDate
     })
-  }, [isDragging, isOverDeleteZone, activeId, dragStartDate])
+  }, [isDragging, isOverCalendarZone, activeId, dragStartDate])
   
 
   // Constants for date navigation
@@ -511,8 +607,6 @@ export default function DailyPlanner() {
       >
        
         <div className="relative h-full">
-          {currentView === "board" ? (
-            <>
           <Button
             variant="ghost"
             size="icon"
@@ -541,44 +635,93 @@ export default function DailyPlanner() {
               scrollPaddingRight: SCROLL_PADDING
             }}
           >
-            {columns.map(column => (
-              <div
-                key={column.date}
-                id={column.date}
-                className="w-[300px] shrink-0 snap-center"
-              >
-                <div className="mb-4 space-y-1.5">
-                  <h2 className="text-lg font-semibold">
-                    {format(new Date(column.date), "EEEE")}
-                    <span className="text-muted-foreground text-sm ml-2">
-                      {format(new Date(column.date), "MMM d")}
-                    </span>
-                  </h2>
-                </div>
-
-                <SortableContext
-                  items={column.tasks.map(t => t.id)}
-                  strategy={verticalListSortingStrategy}
+            {columns.map((column) => (
+              <div key={column.date} className="flex gap-6">
+                <div 
+                  id={column.date}
+                  className="w-[300px] shrink-0 snap-center"
                 >
-                  <TaskColumn
-                    id={column.date}
-                    isDragging={isDragging}
-                    isOverDeleteZone={isOverDeleteZone}
-                    showDeleteZone={dragStartDate === column.date && (!activeId || findTaskById(activeId)?.date === column.date)}
-                  >
-                    {column.tasks.map(task => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        day={column}
-                        isOverDeleteZone={isOverDeleteZone && activeTask?.id === task.id}
-                        onDelete={async (taskId) => {
-                          await deleteTask(taskId, column.date)
-                        }}
-                        onTaskUpdate={async updatedTask => {
+                  <div className="mb-4 space-y-1.5">
+                    <h2 className="text-lg font-semibold">
+                      {format(new Date(column.date), "EEEE")}
+                      <span className="text-muted-foreground text-sm ml-2">
+                        {format(new Date(column.date), "MMM d")}
+                      </span>
+                    </h2>
+                  </div>
+
+                  {currentView === 'board' && showCalendar !== column.date ? (
+                    <>
+                      <SortableContext
+                        items={column.tasks.map(t => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <TaskColumn
+                          id={column.date}
+                          isDragging={isDragging}
+                          isOverCalendarZone={isOverCalendarZone === column.date}
+                          showCalendarZone={dragStartDate === column.date && (!activeId || findTaskById(activeId)?.date === column.date)}
+                        >
+                          {column.tasks.map(task => (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              day={column}
+                              isOverCalendarZone={isOverCalendarZone === column.date && activeTask?.id === task.id}
+                              onDelete={async (taskId) => {
+                                await deleteTask(taskId, column.date)
+                              }}
+                              onTaskUpdate={async updatedTask => {
+                                try {
+                                  setLocalDailyTasks(prev => {
+                                    const updated = structuredClone(prev)
+                                    if (!updated[column.date]) {
+                                      updated[column.date] = {
+                                        tasks: [],
+                                        date: column.date,
+                                        id: "",
+                                        createdAt: "",
+                                        updatedAt: ""
+                                      }
+                                    }
+                                    updated[column.date].tasks =
+                                      updated[column.date].tasks.map(t =>
+                                        t.id === updatedTask.id ? updatedTask : t
+                                      )
+                                    return updated
+                                  })
+                                  await updateTaskAction(column.date, updatedTask.id, { ...updatedTask })
+                                } catch (error) {
+                                  console.error("Failed to update task:", error)
+                                }
+                              }}
+                            />
+                          ))}
+                        </TaskColumn>
+                      </SortableContext>
+
+                      <Button
+                        variant="outline"
+                        className="mt-4 w-full justify-start"
+                        onClick={() => addTask(column.date)}
+                      >
+                        <Plus className="mr-2 size-4" />
+                        Add task
+                      </Button>
+                    </>
+                  ) : (
+                    <CalendarColumn
+                      id={`calendar-${column.date}`}
+                      date={column.date}
+                      tasks={column.tasks}
+                      onAddTask={async (hour) => {
+                        if (activeTask) {
+                          const updatedTask = {
+                            ...activeTask,
+                            time: `${hour.toString().padStart(2, "0")}:00`
+                          }
                           try {
-                            console.log("Task update triggered:", updatedTask)
-                            // Update local state
+                            await updateTaskAction(column.date, activeTask.id, updatedTask)
                             setLocalDailyTasks(prev => {
                               const updated = structuredClone(prev)
                               if (!updated[column.date]) {
@@ -590,48 +733,33 @@ export default function DailyPlanner() {
                                   updatedAt: ""
                                 }
                               }
-                              updated[column.date].tasks =
-                                updated[column.date].tasks.map(t =>
-                                  t.id === updatedTask.id ? updatedTask : t
-                                )
+                              updated[column.date].tasks = updated[column.date].tasks.map(t =>
+                                t.id === activeTask.id ? updatedTask : t
+                              )
                               return updated
                             })
-
-                            await updateTaskAction(column.date, updatedTask.id, { ...updatedTask })
                           } catch (error) {
-                            console.error("Failed to update task:", error)
+                            console.error("Failed to update task time:", error)
                           }
-                        }}
-                      />
-                    ))}
-                  </TaskColumn>
-                </SortableContext>
-
-                <Button
-                  variant="outline"
-                  className="mt-4 w-full justify-start"
-                  onClick={() => addTask(column.date)}
-                >
-                  <Plus className="mr-2 size-4" />
-                  Add task
-                </Button>
-                  </div>
-                ))}
+                        }
+                      }}
+                    />
+                  )}
+                </div>
               </div>
-            </>
-          ) : (
-            <CalendarView
-              days={localDailyTasks}
-              onAddTask={(date, hour) => {
-                const dateStr = format(date, 'yyyy-MM-dd')
-                setNewTaskDate(dateStr)
-                setIsNewTaskDialogOpen(true)
-              }}
-            />
-          )}
+            ))}
+          </div>
         </div>
 
-        <DragOverlay>{dragOverlayContent}</DragOverlay>
+        <DragOverlay dropAnimation={dropAnimationConfig}>
+          {activeId && activeTask && dragStartDate ? (
+            <TaskCard
+              task={activeTask}
+              day={columns[findColumnIndexByDate(dragStartDate)]}
+              isOverCalendarZone={isOverCalendarZone === dragStartDate}
+            />
+          ) : null}
+        </DragOverlay>
 
         {newTaskDate && (
           <EditTaskDialog
