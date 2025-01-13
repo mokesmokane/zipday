@@ -9,21 +9,15 @@ export interface Task {
   userId?: string
   title: string
   description?: string
-  /** 
-   * Store the start time as an ISO 8601 string (e.g. "2025-01-13T09:00:00Z")
-   * for consistent handling.
-   */
-  startTime?: string
-  /**
-   * Store the duration in minutes (e.g. 90 for 1h 30m).
-   */
-  durationMinutes?: number
   completed: boolean
+  startTime?: string
+  durationMinutes?: number
   subtasks: Subtask[]
   tags?: string[]
-  order?: number
+  order: number
   createdAt: string
   updatedAt: string
+  gcalEventId?: string // ID of the corresponding Google Calendar event
 }
 
 export interface Day {
@@ -32,10 +26,6 @@ export interface Day {
   tasks: Task[]
   createdAt: string
   updatedAt: string
-}
-export interface DateWindow {
-  startDate: Date
-  endDate: Date
 }
 
 export type DailyTasks = Record<string, Day>
