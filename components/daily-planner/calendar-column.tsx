@@ -1,4 +1,6 @@
 import { useDroppable } from "@dnd-kit/core"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { format, isToday } from "date-fns"
 import { Resizable, ResizeDirection } from "re-resizable"
 import type { Task } from "@/types/daily-task-types"
@@ -45,9 +47,33 @@ function CalendarTask({ task, onResize }: {
   const style = getTaskStyle(task)
   if (!style) return null
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ 
+    id: task.id,
+    data: {
+      type: 'calendar-task',
+      task
+    }
+  })
+
+  const dragStyle = {
+    ...style,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: 'grab',
+    touchAction: 'none'
+  }
+
   return (
     <Resizable
-      style={style}
+      style={dragStyle}
       defaultSize={{
         width: 'auto',
         height: `${(task.durationMinutes || 60) / 60 * HOUR_HEIGHT}px`
@@ -62,7 +88,12 @@ function CalendarTask({ task, onResize }: {
         onResize?.(task.id, newDurationMinutes)
       }}
     >
-      <div className="bg-primary/10 rounded p-2 text-xs h-full overflow-hidden">
+      <div 
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        className="bg-primary/10 rounded p-2 text-xs h-full overflow-hidden select-none"
+      >
         <div className="font-medium">{task.title}</div>
         {task.description && (
           <div className="text-muted-foreground mt-1 line-clamp-2">
@@ -79,14 +110,14 @@ function HourDroppable({ id, hour, isOver }: {
   hour: number
   isOver: boolean
 }) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver: isOverHour } = useDroppable({
     id: `${id}-hour-${hour}`
   })
 
   return (
     <div
       ref={setNodeRef}
-      className={`relative border-b transition-colors ${isOver ? 'bg-accent' : 'hover:bg-accent/50'}`}
+      className={`relative border-b transition-colors ${isOverHour ? 'bg-accent' : 'hover:bg-accent/50'}`}
       style={{ height: `${HOUR_HEIGHT}px` }}
     >
       <div className="absolute left-2 top-0 text-xs text-muted-foreground">

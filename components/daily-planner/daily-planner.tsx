@@ -192,29 +192,31 @@ export default function DailyPlanner() {
       setIsOverCalendarZone(null)
     }
 
-    // Dropping into a calendar hour
+    // Preview dropping into a calendar hour
     if (isOverCalendarHour) {
       const [_, fullDate, hourStr] = isOverCalendarHour
       const hour = parseInt(hourStr, 10)
 
-      // Update the task startTime
+      // Update the task startTime for preview
       const updatedTask = {
         ...activeTask,
         startTime: createStartTimeISO(fullDate, hour)
       }
 
       setLocalDailyTasks(prev => {
-        const updated = { ...prev }
+        const updated = structuredClone(prev)
 
-        if (dragStartDate) {
-          if (updated[dragStartDate]) {
-            updated[dragStartDate] = {
-              ...updated[dragStartDate],
-              tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeId)
+        // Remove from all dates for preview
+        Object.keys(updated).forEach(date => {
+          if (date !== fullDate) {
+            updated[date] = {
+              ...updated[date],
+              tasks: updated[date].tasks.filter(t => t.id !== activeId)
             }
           }
-        }
+        })
 
+        // Add to preview date
         if (!updated[fullDate]) {
           updated[fullDate] = {
             tasks: [],
@@ -223,42 +225,42 @@ export default function DailyPlanner() {
             createdAt: "",
             updatedAt: ""
           }
-        } else {
-          updated[fullDate] = { ...updated[fullDate] }
         }
 
-        const taskExists = updated[fullDate].tasks.some(t => t.id === activeId)
-        if (!taskExists) {
+        const existingTaskIndex = updated[fullDate].tasks.findIndex(t => t.id === activeId)
+        if (existingTaskIndex !== -1) {
+          updated[fullDate].tasks[existingTaskIndex] = updatedTask
+        } else {
           updated[fullDate].tasks = [...updated[fullDate].tasks, updatedTask]
         }
 
         return updated
       })
+
+      setPreviewColumnDate(fullDate)
       return
     }
 
-    // Handle normal column drops
+    // Preview normal column drops
     const newCol = columns.find(
       col => col.date === overId || col.tasks.some(t => t.id === overId)
     )
     if (!newCol) return
 
-    const overIndex = newCol.tasks.findIndex(t => t.id === overId)
-    const currentIndex = newCol.tasks.findIndex(t => t.id === activeId)
-    const indexToInsert = overIndex >= 0 ? overIndex : newCol.tasks.length
-
-    if (currentIndex === indexToInsert && newCol.date === dragStartDate) {
-      return
-    }
-
     setLocalDailyTasks(prev => {
       const updated = structuredClone(prev)
 
-      // Remove from all dates
+      // Remove from all dates for preview
       Object.keys(updated).forEach(date => {
-        updated[date].tasks = updated[date].tasks.filter(t => t.id !== activeId)
+        if (date !== newCol.date) {
+          updated[date] = {
+            ...updated[date],
+            tasks: updated[date].tasks.filter(t => t.id !== activeId)
+          }
+        }
       })
 
+      // Add to preview date
       if (!updated[newCol.date]) {
         updated[newCol.date] = {
           tasks: [],
@@ -269,13 +271,20 @@ export default function DailyPlanner() {
         }
       }
 
-      const taskExists = updated[newCol.date].tasks.some(t => t.id === activeId)
-      if (!taskExists) {
+      const overIndex = newCol.tasks.findIndex(t => t.id === overId)
+      const indexToInsert = overIndex >= 0 ? overIndex : updated[newCol.date].tasks.length
+
+      const existingTaskIndex = updated[newCol.date].tasks.findIndex(t => t.id === activeId)
+      if (existingTaskIndex !== -1) {
+        updated[newCol.date].tasks[existingTaskIndex] = activeTask
+      } else {
         updated[newCol.date].tasks.splice(indexToInsert, 0, activeTask)
       }
 
       return updated
     })
+
+    setPreviewColumnDate(newCol.date)
   }
 
   async function deleteTask(taskId: string, date: string) {
@@ -297,48 +306,111 @@ export default function DailyPlanner() {
     setDragStartDate(null)
     setIsOverCalendarZone(null)
 
-    if (over?.id === `${dragStartDate}-delete-zone` && dragStartDate && active) {
-      const taskToDelete = findTaskById(active.id as string)
-      if (taskToDelete) {
-        try {
-          setLocalDailyTasks(prev => {
-            const updated = structuredClone(prev)
-            updated[taskToDelete.date].tasks = updated[taskToDelete.date].tasks.filter(
-              t => t.id !== taskToDelete.task.id
-            )
-            return updated
-          })
-          const result = await deleteTaskAction(taskToDelete.date, taskToDelete.task.id)
-          if (!result.isSuccess) {
-            console.error("Failed to delete task:", result.message)
-            if (prevLocalDailyTasksRef.current) {
-              setLocalDailyTasks(prevLocalDailyTasksRef.current)
-            }
-          }
-        } catch (error) {
-          console.error("Error deleting task:", error)
-          if (prevLocalDailyTasksRef.current) {
-            setLocalDailyTasks(prevLocalDailyTasksRef.current)
-          }
-        }
-      }
-      return
-    }
-
     if (!over || !activeTask || !dragStartDate) {
       return
     }
 
-    const targetDate = getTargetDate(over.id.toString(), columns)
-    if (!targetDate) {
-      console.error("Could not find target date; revert local state.")
-      if (prevLocalDailyTasksRef.current) {
-        setLocalDailyTasks(prevLocalDailyTasksRef.current)
-      }
-      return
-    }
+    const overId = over.id.toString()
+    const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
 
     try {
+      // Handle calendar hour drop
+      if (isOverCalendarHour) {
+        const [_, fullDate, hourStr] = isOverCalendarHour
+        const hour = parseInt(hourStr, 10)
+        const updatedTask = {
+          ...activeTask,
+          startTime: createStartTimeISO(fullDate, hour)
+        }
+
+        // Update local state first
+        setLocalDailyTasks(prev => {
+          const updated = structuredClone(prev)
+
+          // Remove from original date
+          if (dragStartDate && updated[dragStartDate]) {
+            updated[dragStartDate] = {
+              ...updated[dragStartDate],
+              tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeTask.id)
+            }
+          }
+
+          // Add to new date
+          if (!updated[fullDate]) {
+            updated[fullDate] = {
+              tasks: [],
+              date: fullDate,
+              id: "",
+              createdAt: "",
+              updatedAt: ""
+            }
+          }
+
+          const existingTaskIndex = updated[fullDate].tasks.findIndex(t => t.id === activeTask.id)
+          if (existingTaskIndex !== -1) {
+            updated[fullDate].tasks[existingTaskIndex] = updatedTask
+          } else {
+            updated[fullDate].tasks = [...updated[fullDate].tasks, updatedTask]
+          }
+
+          return updated
+        })
+
+        // Then update Firestore
+        if (dragStartDate === fullDate) {
+          // Same day, just update the task
+          await updateTaskAction(fullDate, updatedTask.id, updatedTask)
+        } else {
+          // Different day, delete from old and add to new
+          await deleteTaskAction(dragStartDate, updatedTask.id)
+          await addTaskAction(fullDate, updatedTask)
+        }
+        return
+      }
+
+      // Handle normal column drops
+      const targetDate = getTargetDate(overId, columns)
+      if (!targetDate) {
+        throw new Error("Could not find target date")
+      }
+
+      // Update local state first
+      setLocalDailyTasks(prev => {
+        const updated = structuredClone(prev)
+
+        // Remove from original date
+        if (dragStartDate && updated[dragStartDate]) {
+          updated[dragStartDate] = {
+            ...updated[dragStartDate],
+            tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeTask.id)
+          }
+        }
+
+        // Add to new date
+        if (!updated[targetDate]) {
+          updated[targetDate] = {
+            tasks: [],
+            date: targetDate,
+            id: "",
+            createdAt: "",
+            updatedAt: ""
+          }
+        }
+
+        const overIndex = columns.find(col => col.date === targetDate)?.tasks.findIndex(t => t.id === overId) ?? -1
+        const indexToInsert = overIndex >= 0 ? overIndex : updated[targetDate].tasks.length
+
+        const existingTaskIndex = updated[targetDate].tasks.findIndex(t => t.id === activeTask.id)
+        if (existingTaskIndex !== -1) {
+          updated[targetDate].tasks[existingTaskIndex] = activeTask
+        } else {
+          updated[targetDate].tasks.splice(indexToInsert, 0, activeTask)
+        }
+
+        return updated
+      })
+
+      // Then update Firestore
       if (dragStartDate === targetDate) {
         await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
       } else {
@@ -348,7 +420,7 @@ export default function DailyPlanner() {
         }
       }
     } catch (error) {
-      console.error("Failed to save reordering/move to Firestore:", error)
+      console.error("Failed to save changes:", error)
       if (prevLocalDailyTasksRef.current) {
         setLocalDailyTasks(prevLocalDailyTasksRef.current)
       }
