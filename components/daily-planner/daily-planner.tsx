@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable"
 import { format } from "date-fns"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
 import { TaskColumn } from "./task-column"
@@ -92,7 +92,7 @@ export default function DailyPlanner() {
   const [previewColumnDate, setPreviewColumnDate] = useState<string | null>(null)
   const [showCalendar, setShowCalendar] = useState<string | null>(null)
   const { selectedDate, setSelectedDate } = useDate()
-  const debouncedCalendarZone = useDebounce(isOverCalendarZone, 2000)
+  const debouncedCalendarZone = useDebounce(isOverCalendarZone, 1000)
 
   useEffect(() => {
     if (debouncedCalendarZone) {
@@ -504,107 +504,154 @@ export default function DailyPlanner() {
                     </h2>
                   </div>
 
-                  {currentView === "board" && showCalendar !== column.date ? (
-                    <>
-                      <SortableContext
-                        items={column.tasks.map(t => t.id)}
-                        strategy={verticalListSortingStrategy}
+                  <AnimatePresence mode="wait">
+                    {currentView === "board" && showCalendar !== column.date ? (
+                      <motion.div
+                        key="board"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
                       >
-                        <TaskColumn
-                          id={column.date}
-                          isDragging={isDragging}
-                          isOverCalendarZone={isOverCalendarZone === column.date}
-                          showCalendarZone={
-                            dragStartDate === column.date &&
-                            (!activeId || findTaskById(activeId)?.date === column.date)
-                          }
+                        <SortableContext
+                          items={column.tasks.map(t => t.id)}
+                          strategy={verticalListSortingStrategy}
                         >
-                          {column.tasks.map(task => (
-                            <TaskCard
-                              key={task.id}
-                              task={task}
-                              day={column}
-                              isOverCalendarZone={
-                                isOverCalendarZone === column.date && activeTask?.id === task.id
-                              }
-                              onDelete={async taskId => {
-                                await deleteTask(taskId, column.date)
-                              }}
-                              onTaskUpdate={async updatedTask => {
-                                try {
-                                  setLocalDailyTasks(prev => {
-                                    const updated = structuredClone(prev)
-                                    if (!updated[column.date]) {
-                                      updated[column.date] = {
-                                        tasks: [],
-                                        date: column.date,
-                                        id: "",
-                                        createdAt: "",
-                                        updatedAt: ""
+                          <TaskColumn
+                            id={column.date}
+                            isDragging={isDragging}
+                            isOverCalendarZone={isOverCalendarZone === column.date}
+                            showCalendarZone={
+                              dragStartDate === column.date &&
+                              (!activeId || findTaskById(activeId)?.date === column.date)
+                            }
+                          >
+                            {column.tasks.map(task => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                day={column}
+                                isOverCalendarZone={
+                                  isOverCalendarZone === column.date && activeTask?.id === task.id
+                                }
+                                onDelete={async taskId => {
+                                  await deleteTask(taskId, column.date)
+                                }}
+                                onTaskUpdate={async updatedTask => {
+                                  try {
+                                    setLocalDailyTasks(prev => {
+                                      const updated = structuredClone(prev)
+                                      if (!updated[column.date]) {
+                                        updated[column.date] = {
+                                          tasks: [],
+                                          date: column.date,
+                                          id: "",
+                                          createdAt: "",
+                                          updatedAt: ""
+                                        }
                                       }
-                                    }
-                                    updated[column.date].tasks = updated[column.date].tasks.map(
-                                      t => (t.id === updatedTask.id ? updatedTask : t)
-                                    )
-                                    return updated
-                                  })
-                                  await updateTaskAction(column.date, updatedTask.id, {
-                                    ...updatedTask
-                                  })
-                                } catch (error) {
-                                  console.error("Failed to update task:", error)
-                                }
-                              }}
-                            />
-                          ))}
-                        </TaskColumn>
-                      </SortableContext>
+                                      updated[column.date].tasks = updated[column.date].tasks.map(
+                                        t => (t.id === updatedTask.id ? updatedTask : t)
+                                      )
+                                      return updated
+                                    })
+                                    await updateTaskAction(column.date, updatedTask.id, {
+                                      ...updatedTask
+                                    })
+                                  } catch (error) {
+                                    console.error("Failed to update task:", error)
+                                  }
+                                }}
+                              />
+                            ))}
+                          </TaskColumn>
+                        </SortableContext>
 
-                      <Button
-                        variant="outline"
-                        className="mt-4 w-full justify-start"
-                        onClick={() => addTask(column.date)}
+                        <Button
+                          variant="outline"
+                          className="mt-4 w-full justify-start"
+                          onClick={() => addTask(column.date)}
+                        >
+                          <Plus className="mr-2 size-4" />
+                          Add task
+                        </Button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="calendar"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
                       >
-                        <Plus className="mr-2 size-4" />
-                        Add task
-                      </Button>
-                    </>
-                  ) : (
-                    <CalendarColumn
-                      id={`calendar-${column.date}`}
-                      date={column.date}
-                      tasks={column.tasks}
-                      onAddTask={async hour => {
-                        if (activeTask) {
-                          const updatedTask = {
-                            ...activeTask,
-                            startTime: createStartTimeISO(column.date, hour)
-                          }
-                          try {
-                            await updateTaskAction(column.date, activeTask.id, updatedTask)
-                            setLocalDailyTasks(prev => {
-                              const updated = structuredClone(prev)
-                              if (!updated[column.date]) {
-                                updated[column.date] = {
-                                  tasks: [],
-                                  date: column.date,
-                                  id: "",
-                                  createdAt: "",
-                                  updatedAt: ""
-                                }
+                        <CalendarColumn
+                          id={`calendar-${column.date}`}
+                          date={column.date}
+                          tasks={column.tasks}
+                          onAddTask={async hour => {
+                            if (activeTask) {
+                              const updatedTask = {
+                                ...activeTask,
+                                startTime: createStartTimeISO(column.date, hour)
                               }
-                              updated[column.date].tasks = updated[column.date].tasks.map(t =>
-                                t.id === activeTask.id ? updatedTask : t
-                              )
-                              return updated
-                            })
-                          } catch (error) {
-                            console.error("Failed to update task time:", error)
-                          }
-                        }
-                      }}
-                    />
-                  )}
+                              try {
+                                await updateTaskAction(column.date, activeTask.id, updatedTask)
+                                setLocalDailyTasks(prev => {
+                                  const updated = structuredClone(prev)
+                                  if (!updated[column.date]) {
+                                    updated[column.date] = {
+                                      tasks: [],
+                                      date: column.date,
+                                      id: "",
+                                      createdAt: "",
+                                      updatedAt: ""
+                                    }
+                                  }
+                                  updated[column.date].tasks = updated[column.date].tasks.map(t =>
+                                    t.id === activeTask.id ? updatedTask : t
+                                  )
+                                  return updated
+                                })
+                              } catch (error) {
+                                console.error("Failed to update task time:", error)
+                              }
+                            }
+                          }}
+                          onResizeTask={async (taskId, durationMinutes) => {
+                            const task = column.tasks.find(t => t.id === taskId)
+                            if (!task) return
+                            
+                            const updatedTask = {
+                              ...task,
+                              durationMinutes
+                            }
+                            
+                            try {
+                              setLocalDailyTasks(prev => {
+                                const updated = structuredClone(prev)
+                                if (!updated[column.date]) {
+                                  updated[column.date] = {
+                                    tasks: [],
+                                    date: column.date,
+                                    id: "",
+                                    createdAt: "",
+                                    updatedAt: ""
+                                  }
+                                }
+                                updated[column.date].tasks = updated[column.date].tasks.map(t =>
+                                  t.id === taskId ? updatedTask : t
+                                )
+                                return updated
+                              })
+                              await updateTaskAction(column.date, taskId, updatedTask)
+                            } catch (error) {
+                              console.error("Failed to update task duration:", error)
+                            }
+                          }}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             ))}
