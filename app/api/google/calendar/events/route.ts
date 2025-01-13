@@ -40,28 +40,32 @@ export async function GET(request: Request) {
     oauth2Client.setCredentials(tokens)
     const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 
-    // Get events for the next 7 days
+    // Get events for the current month
     const now = new Date()
-    const oneWeekFromNow = new Date()
-    oneWeekFromNow.setDate(now.getDate() + 7)
+    now.setHours(0, 0, 0, 0)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
     const response = await calendar.events.list({
       calendarId: "primary",
-      timeMin: now.toISOString(),
-      timeMax: oneWeekFromNow.toISOString(),
+      timeMin: startOfMonth.toISOString(),
+      timeMax: endOfMonth.toISOString(),
       singleEvents: true,
       orderBy: "startTime"
     })
 
     // Transform events to our format
-    const events = response.data.items?.map(event => ({
-      id: event.id,
-      title: event.summary || "Untitled Event",
-      description: event.description,
-      startTime: event.start?.dateTime || event.start?.date,
-      endTime: event.end?.dateTime || event.end?.date,
-      allDay: !event.start?.dateTime
-    })) || []
+    const events = response.data.items?.map(event => {
+      const isAllDay = !event.start?.dateTime
+      return {
+        id: event.id,
+        title: event.summary || "Untitled Event",
+        description: event.description,
+        startTime: isAllDay ? `${event.start?.date}T00:00:00` : event.start?.dateTime,
+        endTime: isAllDay ? `${event.end?.date}T23:59:59` : event.end?.dateTime,
+        allDay: isAllDay
+      }
+    }) || []
 
     return NextResponse.json({ events })
   } catch (error) {

@@ -135,13 +135,22 @@ function CalendarTask({ task, onResize }: {
   )
 }
 
-function GoogleCalendarEvent({ title, startTime, endTime }: {
+function GoogleCalendarEvent({ title, startTime, endTime, allDay }: {
   title: string
   startTime: string
   endTime: string
+  allDay?: boolean
 }) {
-  const style = getEventStyle(startTime, endTime)
+  if (allDay) {
+    return (
+      <div className="px-2 py-1 mb-2 bg-accent/20 border border-dashed border-accent rounded-md">
+        <Badge variant="outline" className="text-xs mb-1">All Day</Badge>
+        <div className="font-medium line-clamp-2 text-xs">{title}</div>
+      </div>
+    )
+  }
 
+  const style = getEventStyle(startTime, endTime)
   return (
     <div style={style}>
       <Badge variant="outline" className="text-xs mb-1">Google Calendar</Badge>
@@ -217,15 +226,32 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: Cal
     return format(eventDate, "yyyy-MM-dd") === date
   })
 
+  // Separate all-day and timed events
+  const allDayEvents = dayEvents.filter(event => event.allDay)
+  const timedEvents = dayEvents.filter(event => !event.allDay)
+
   return (
     <div className="bg-muted/50 flex h-full w-full flex-col rounded-lg border">
-      <div className="border-b p-2 text-center">
-        <div className="font-semibold">
+      <div className="border-b p-2">
+        <div className="font-semibold text-center">
           {format(new Date(date), "EEEE")}
         </div>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground text-center">
           {format(new Date(date), "MMM d")}
         </div>
+        {allDayEvents.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {allDayEvents.map(event => (
+              <GoogleCalendarEvent
+                key={event.id}
+                title={event.title}
+                startTime={event.startTime}
+                endTime={event.endTime}
+                allDay={true}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto relative">
@@ -246,12 +272,13 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: Cal
           />
         ))}
 
-        {dayEvents.map(event => (
+        {timedEvents.map(event => (
           <GoogleCalendarEvent
             key={event.id}
             title={event.title}
             startTime={event.startTime}
             endTime={event.endTime}
+            allDay={false}
           />
         ))}
 
