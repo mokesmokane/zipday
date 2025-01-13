@@ -21,6 +21,7 @@ import { getAuth, signOut } from "firebase/auth"
 import { useFilter } from "@/lib/context/filter-context"
 import { Badge } from "@/components/ui/badge"
 import { useCurrentView } from "@/lib/context/current-view-context"
+import { GoogleCalendarButton } from "./google-calendar-button"
 
 type ViewType = "board" | "calendar"
 
@@ -39,6 +40,24 @@ export function DashHeader() {
       window.location.href = "/"
     } catch (error) {
       console.error("Error signing out:", error)
+    }
+  }
+
+  const handleConnectCalendar = async () => {
+    try {
+      // TODO: Implement Google Calendar OAuth flow
+      window.location.href = "/api/google/calendar/connect"
+    } catch (error) {
+      console.error("Failed to connect Google Calendar:", error)
+    }
+  }
+
+  const handleDisconnectCalendar = async () => {
+    try {
+      // TODO: Implement Google Calendar disconnect
+      await fetch("/api/google/calendar/disconnect", { method: "POST" })
+    } catch (error) {
+      console.error("Failed to disconnect Google Calendar:", error)
     }
   }
 
@@ -153,6 +172,11 @@ export function DashHeader() {
         </DropdownMenu>
 
         <div className="ml-auto flex items-center gap-2">
+          <GoogleCalendarButton
+            onConnect={handleConnectCalendar}
+            onDisconnect={handleDisconnectCalendar}
+          />
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">

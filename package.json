@@ -58,6 +58,7 @@
     "firebase": "^9.23.0",
     "firebase-admin": "^13.0.1",
     "framer-motion": "^11.11.8",
+    "googleapis": "^144.0.0",
     "input-otp": "^1.4.1",
     "lucide-react": "^0.436.0",
     "next": "^15.1.1",

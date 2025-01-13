@@ -1,11 +1,13 @@
 import { useDroppable } from "@dnd-kit/core"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { format, isToday } from "date-fns"
+import { format, isToday, parseISO } from "date-fns"
 import { Resizable, ResizeDirection } from "re-resizable"
 import type { Task } from "@/types/daily-task-types"
 import type { CSSProperties } from "react"
 import { useEffect, useState } from "react"
+import { useGoogleCalendar } from "@/lib/context/google-calendar-context"
+import { Badge } from "@/components/ui/badge"
 
 interface CalendarColumnProps {
   id: string
@@ -37,6 +39,34 @@ function getTaskStyle(task: Task): CSSProperties | null {
     right: '8px',
     height: `${height}px`,
     minHeight: '30px'
+  }
+}
+
+// Helper to calculate Google Calendar event position and height
+function getEventStyle(startTime: string, endTime: string): CSSProperties {
+  const startDate = parseISO(startTime)
+  const endDate = parseISO(endTime)
+  
+  const startHour = startDate.getHours()
+  const startMinute = startDate.getMinutes()
+  const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
+  
+  const top = (startHour * HOUR_HEIGHT) + (startMinute / 60 * HOUR_HEIGHT)
+  const height = (durationMinutes / 60) * HOUR_HEIGHT
+  
+  return {
+    position: 'absolute' as const,
+    top: `${top}px`,
+    left: '8px',
+    right: '32px',
+    height: `${height}px`,
+    minHeight: '30px',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    border: '1px dashed rgb(59, 130, 246)',
+    borderRadius: '4px',
+    padding: '4px',
+    fontSize: '12px',
+    pointerEvents: 'none'
   }
 }
 
@@ -105,6 +135,21 @@ function CalendarTask({ task, onResize }: {
   )
 }
 
+function GoogleCalendarEvent({ title, startTime, endTime }: {
+  title: string
+  startTime: string
+  endTime: string
+}) {
+  const style = getEventStyle(startTime, endTime)
+
+  return (
+    <div style={style}>
+      <Badge variant="outline" className="text-xs mb-1">Google Calendar</Badge>
+      <div className="font-medium line-clamp-2">{title}</div>
+    </div>
+  )
+}
+
 function HourDroppable({ id, hour, isOver }: {
   id: string
   hour: number
@@ -164,6 +209,13 @@ function CurrentTimeLine() {
 
 export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: CalendarColumnProps) {
   const isCurrentDay = isToday(new Date(date))
+  const { events } = useGoogleCalendar()
+
+  // Filter events for this day
+  const dayEvents = events.filter(event => {
+    const eventDate = parseISO(event.startTime)
+    return format(eventDate, "yyyy-MM-dd") === date
+  })
 
   return (
     <div className="bg-muted/50 flex h-full w-full flex-col rounded-lg border">
@@ -191,6 +243,15 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: Cal
             key={task.id} 
             task={task}
             onResize={onResizeTask}
+          />
+        ))}
+
+        {dayEvents.map(event => (
+          <GoogleCalendarEvent
+            key={event.id}
+            title={event.title}
+            startTime={event.startTime}
+            endTime={event.endTime}
           />
         ))}
 
