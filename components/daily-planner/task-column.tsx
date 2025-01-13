@@ -2,7 +2,7 @@
 
 import { useDroppable } from "@dnd-kit/core"
 import { motion } from "framer-motion"
-import { Trash2 } from "lucide-react"
+import { Calendar } from "lucide-react"
 
 interface TaskColumnProps {
   id: string
@@ -53,7 +53,7 @@ export function TaskColumn({
             }}
             transition={{ duration: 0.2 }}
           >
-            <Trash2 className="h-6 w-6" />
+            <Calendar className="h-6 w-6" />
           </motion.div>
         </motion.div>
       )}

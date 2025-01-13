@@ -41,6 +41,14 @@ const TIME_OPTIONS = [
   { label: '8 hours', value: '8h' },
 ]
 
+const formatDuration = (minutes: number): string => {
+  if (!minutes) return ""
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+}
+
 export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask, onDelete }: EditTaskDialogProps) {
   const [editedTask, setEditedTask] = useState<Task>({ ...task })
   const newSubtaskRef = useRef<HTMLInputElement>(null)
@@ -119,10 +127,10 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
             <div className="relative flex items-center w-32">
               <Input
                 id="time"
-                value={editedTask.durationMinutes || ""}
-                onChange={(e) => setEditedTask(prev => ({ ...prev, durationMinutes: parseInt(e.target.value) }))}
+                value={editedTask.durationMinutes ? formatDuration(editedTask.durationMinutes) : ""}
                 placeholder="Duration"
                 className="text-sm pr-8"
+                readOnly
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -138,7 +146,10 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
                   {TIME_OPTIONS.map((option) => (
                     <DropdownMenuItem
                       key={option.value}
-                      onClick={() => setEditedTask(prev => ({ ...prev, durationMinutes: parseInt(option.value) }))}
+                      onClick={() => {
+                        const minutes = parseInt(option.value.replace('h', '')) * (option.value.includes('h') ? 60 : 1)
+                        setEditedTask(prev => ({ ...prev, durationMinutes: minutes }))
+                      }}
                     >
                       {option.label}
                     </DropdownMenuItem>

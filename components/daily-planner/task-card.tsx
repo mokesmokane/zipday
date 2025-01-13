@@ -172,7 +172,7 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
           <div className="mt-4 flex items-center justify-between">
             {(task.startTime || task.durationMinutes) ? (
               <div className="text-muted-foreground flex items-center text-sm">
-                <Clock className="mr-1 size-3" />
+                {task.startTime && <Clock className="mr-1 size-3" />}
                 {task.startTime && task.durationMinutes
                   ? `${formatStartTime(task.startTime)} - ${formatDuration(
                       task.durationMinutes
