@@ -201,13 +201,25 @@ export default function DailyPlanner() {
     const activeId = active.id as string
     const overId = over.id as string
     
-    // Check for delete zone first
+    // Check for calendar zone first
     if (over.id === `${dragStartDate}-calendar-zone`) {
       setIsOverCalendarZone(dragStartDate)
       return
     }
+
+    // Check if we're over a calendar column or hour slot
+    const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
+    const isOverCalendarColumn = overId.startsWith('calendar-')
     
-    setIsOverCalendarZone(null)
+    if (isOverCalendarHour || isOverCalendarColumn) {
+      // Keep the calendar zone active for the current column
+      const targetDate = isOverCalendarHour ? 
+        isOverCalendarHour[1] : 
+        overId.split('-').slice(1, 4).join('-')
+      setIsOverCalendarZone(targetDate)
+    } else {
+      setIsOverCalendarZone(null)
+    }
 
     // Check if dropping into a calendar hour slot
     const hourMatch = overId.match(/calendar-(.+)-hour-(\d+)/)
@@ -218,7 +230,7 @@ export default function DailyPlanner() {
       // Update the task with the new time
       const updatedTask = {
         ...activeTask,
-        time: `${hour.toString().padStart(2, "0")}:00`
+        start: `${hour.toString().padStart(2, "0")}:00`
       }
 
       // Update local state more efficiently
@@ -228,10 +240,11 @@ export default function DailyPlanner() {
         
         // Remove task from source date if it exists
         if (dragStartDate) {
-          if (updated[dragStartDate]) {
-            updated[dragStartDate] = {
-              ...updated[dragStartDate],
-              tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeId)
+          const dragStartDateStr = dragStartDate
+          if (updated[dragStartDateStr]) {
+            updated[dragStartDateStr] = {
+              ...updated[dragStartDateStr],
+              tasks: updated[dragStartDateStr].tasks.filter(t => t.id !== activeId)
             }
           }
         }
@@ -278,9 +291,10 @@ export default function DailyPlanner() {
     // Batch the state update
     setLocalDailyTasks(prev => {
       // Check if the state would actually change
+      const newColDateStr = newCol.date
       const isTaskInSamePosition = 
         prev[newCol.date]?.tasks[indexToInsert]?.id === activeId &&
-        newCol.date === dragStartDate
+        newColDateStr === dragStartDate
 
       if (isTaskInSamePosition) {
         return prev
@@ -339,7 +353,8 @@ export default function DailyPlanner() {
     setActiveId(null)
     setActiveTask(null)
     setDragStartDate(null)
-    setShowCalendar(null)
+    setIsOverCalendarZone(null) // Clear calendar zone immediately on drag end
+    // showCalendar will be cleared after 2 seconds due to debounce
 
     // 1) If dropped on the delete zone, do final delete
     if (over?.id === `${dragStartDate}-delete-zone` && dragStartDate && active) {
@@ -408,20 +423,14 @@ export default function DailyPlanner() {
 
     // 4) If we moved or reordered
     try {
+      const dragStartDateStr = dragStartDate
       // a) Reordering / moving within the same date
-      if (dragStartDate === targetDate) {
-        // The local state is already up-to-date from handleDragOver
-        // => Just save to Firestore
+      if (dragStartDateStr === targetDate) {
         await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
       } else {
-        // b) Moved to a different date
-        // The local state is updated from handleDragOver to reflect new day
-        // => We just do the Firestore calls
-        // Save new day
         await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
-        // Save old day
-        if (localDailyTasks[dragStartDate]) {
-          await saveDayChangesToFirestore(dragStartDate, localDailyTasks[dragStartDate])
+        if (localDailyTasks[dragStartDateStr]) {
+          await saveDayChangesToFirestore(dragStartDateStr, localDailyTasks[dragStartDateStr])
         }
       }
     } catch (error) {

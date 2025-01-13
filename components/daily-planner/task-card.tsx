@@ -141,10 +141,12 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
             </div>
           )}
           <div className="mt-4 flex items-center justify-between">
-            {task.time && (
+          {(task.start   || task.time) && (
               <div className="text-muted-foreground flex items-center text-sm">
                 <Clock className="mr-1 size-3" />
-                {task.time}
+                {task.start && task.time ? 
+                    `${task.start} - ${task.time}` : 
+                    task.start || task.time}
               </div>
             )}
             {task.tags && task.tags.length > 0 && (
