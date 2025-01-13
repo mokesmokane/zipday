@@ -5,12 +5,35 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, GripVertical, Pencil } from "lucide-react"
+import { Clock, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CustomCheckbox } from "@/components/ui/custom-checkbox"
 import { EditTaskDialog } from "./edit-task-dialog"
 import type { Task, Subtask, Day } from "@/types/daily-task-types"
 import { cn } from "@/lib/utils"
+
+// Helper function to format ISO date to "HH:mm"
+function formatStartTime(isoString?: string): string {
+  if (!isoString) return ""
+  const date = new Date(isoString)
+  const hours = date.getHours().toString().padStart(2, "0")
+  const minutes = date.getMinutes().toString().padStart(2, "0")
+  return `${hours}:${minutes}`
+}
+
+// Helper function to format duration in minutes to "Hh Mm" or "Xh" or "Xm"
+function formatDuration(durationMinutes?: number): string {
+  if (!durationMinutes || durationMinutes <= 0) return ""
+  const hours = Math.floor(durationMinutes / 60)
+  const minutes = durationMinutes % 60
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`
+  } else if (hours > 0) {
+    return `${hours}h`
+  } else {
+    return `${minutes}m`
+  }
+}
 
 interface TaskCardProps {
   task: Task | undefined
@@ -39,8 +62,8 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    backgroundColor: isOverCalendarZone ? 'rgb(59, 130, 246, 0.1)' : undefined,
-    borderColor: isOverCalendarZone ? 'rgb(59, 130, 246)' : undefined,
+    backgroundColor: isOverCalendarZone ? "rgb(59, 130, 246, 0.1)" : undefined,
+    borderColor: isOverCalendarZone ? "rgb(59, 130, 246)" : undefined,
     opacity: isDragging ? 0.5 : 1
   }
 
@@ -51,8 +74,8 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
   const handleSubtaskToggle = (subtaskId: string) => {
     if (!task) return
 
-    const updatedSubtasks = task.subtasks.map(subtask => 
-      subtask.id === subtaskId 
+    const updatedSubtasks = task.subtasks.map(subtask =>
+      subtask.id === subtaskId
         ? { ...subtask, completed: !subtask.completed }
         : subtask
     )
@@ -60,7 +83,9 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
     const updatedTask: Task = {
       ...task,
       subtasks: updatedSubtasks,
-      completed: !updatedSubtasks.find(st => st.id === subtaskId)?.completed ? false : task.completed
+      completed: !updatedSubtasks.find(st => st.id === subtaskId)?.completed
+        ? false
+        : task.completed
     }
 
     onTaskUpdate?.(updatedTask)
@@ -80,37 +105,41 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
       >
         <CardHeader className="p-4 pb-2">
           <div className="flex items-start gap-2">
-            <CustomCheckbox 
+            <CustomCheckbox
               id={task.id}
               className="h-6 w-6 mt-0.5"
               checked={task.completed}
-              onCheckedChange={(checked) => {
+              onCheckedChange={checked => {
                 if (!task) return
                 const updatedTask = {
                   ...task,
-                  completed: checked === "indeterminate" ? undefined : checked
+                  completed: checked === true
                 }
-                
+
                 if (checked) {
                   updatedTask.subtasks = task.subtasks?.map(subtask => ({
                     ...subtask,
                     completed: true
                   }))
                 }
-                
+
                 onTaskUpdate?.(updatedTask)
               }}
             />
             <div className="flex-1 flex items-start justify-between gap-2">
               <div className="space-y-1">
                 <h3 className="font-medium leading-none">{task.title}</h3>
-                {task.description && <p className="text-xs text-muted-foreground">{task.description}</p>}
+                {task.description && (
+                  <p className="text-xs text-muted-foreground">
+                    {task.description}
+                  </p>
+                )}
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 -mt-1.5 -mr-1"
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation()
                   setIsEditDialogOpen(true)
                 }}
@@ -125,8 +154,8 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
             <div className="space-y-2">
               {task.subtasks.map((subtask: Subtask) => (
                 <div key={subtask.id} className="flex items-center space-x-2">
-                  <CustomCheckbox 
-                    id={subtask.id} 
+                  <CustomCheckbox
+                    id={subtask.id}
                     checked={subtask.completed}
                     onCheckedChange={() => handleSubtaskToggle(subtask.id)}
                   />
@@ -141,14 +170,18 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
             </div>
           )}
           <div className="mt-4 flex items-center justify-between">
-          {(task.start   || task.time) && (
+            {(task.startTime || task.durationMinutes) ? (
               <div className="text-muted-foreground flex items-center text-sm">
                 <Clock className="mr-1 size-3" />
-                {task.start && task.time ? 
-                    `${task.start} - ${task.time}` : 
-                    task.start || task.time}
+                {task.startTime && task.durationMinutes
+                  ? `${formatStartTime(task.startTime)} - ${formatDuration(
+                      task.durationMinutes
+                    )}`
+                  : task.startTime
+                  ? formatStartTime(task.startTime)
+                  : formatDuration(task.durationMinutes)}
               </div>
-            )}
+            ) : <div className="w-6" />}
             {task.tags && task.tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {task.tags.map((tag: string) => (

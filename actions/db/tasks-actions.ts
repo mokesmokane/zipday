@@ -14,7 +14,6 @@ async function getAuthenticatedUserId(): Promise<string> {
   if (!sessionCookie) {
     throw new Error("No session cookie found")
   }
-
   const decodedClaims = await auth().verifySessionCookie(sessionCookie)
   return decodedClaims.uid
 }
@@ -75,14 +74,12 @@ export async function getDaysByDateRangeAction(
  * Creates a single task in userDays/{userId}/dailyTasks/{dateDoc}.
  * If the daily doc doesn't exist, it is created. The tasks array is then updated.
  */
-
 export async function addTaskAction(
   dateDoc: string,
   task: Task
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
-
     const docRef = db
       .collection("userDays")
       .doc(userId)
@@ -98,7 +95,6 @@ export async function addTaskAction(
     }
 
     tasks.push(task)
-
     await docRef.set({ tasks }, { merge: true })
 
     return {
@@ -114,8 +110,6 @@ export async function addTaskAction(
 
 /**
  * Updates a single task in userDays/{userId}/dailyTasks/{dateDoc}.
- * If the date is changed, the caller is responsible for removing from the old date doc
- * and calling createTaskAction on the new date doc.
  */
 export async function updateTaskAction(
   dateDoc: string,
@@ -189,7 +183,6 @@ export async function deleteTaskAction(
 
     const dailyData = docSnap.data() as { tasks: Task[] }
     let tasks = dailyData.tasks || []
-
     tasks = tasks.filter(t => t.id !== taskId)
 
     await docRef.set({ tasks }, { merge: true })

@@ -53,9 +53,7 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
     const subtask: Subtask = {
       id: `subtask-${Date.now()}`,
       text: "",
-      completed: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      completed: false
     }
 
     setEditedTask(prev => ({
@@ -121,8 +119,8 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
             <div className="relative flex items-center w-32">
               <Input
                 id="time"
-                value={editedTask.time || ""}
-                onChange={(e) => setEditedTask(prev => ({ ...prev, time: e.target.value }))}
+                value={editedTask.durationMinutes || ""}
+                onChange={(e) => setEditedTask(prev => ({ ...prev, durationMinutes: parseInt(e.target.value) }))}
                 placeholder="Duration"
                 className="text-sm pr-8"
               />
@@ -140,7 +138,7 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
                   {TIME_OPTIONS.map((option) => (
                     <DropdownMenuItem
                       key={option.value}
-                      onClick={() => setEditedTask(prev => ({ ...prev, time: option.label }))}
+                      onClick={() => setEditedTask(prev => ({ ...prev, durationMinutes: parseInt(option.value) }))}
                     >
                       {option.label}
                     </DropdownMenuItem>

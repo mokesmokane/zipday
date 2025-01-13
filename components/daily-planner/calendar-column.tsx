@@ -60,9 +60,9 @@ export function CalendarColumn({ id, date, tasks, onAddTask }: CalendarColumnPro
       <div className="flex-1 overflow-y-auto">
         {HOURS.map(hour => {
           const hourTasks = tasks.filter(task => {
-            if (!task.start) return false
-            const taskHour = parseInt(task.start?.split(":")[0] || "0", 10)
-            return taskHour === hour
+            if (!task.startTime) return false
+            const taskDate = new Date(task.startTime)
+            return taskDate.getHours() === hour
           })
 
           return (
