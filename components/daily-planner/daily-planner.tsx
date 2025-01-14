@@ -689,6 +689,10 @@ export default function DailyPlanner() {
                               }
                             }
                           }}
+                          onEventUpdate={async (eventId, updates) => {
+                            //save to google calendar
+                            
+                          }}
                           onResizeTask={async (taskId, durationMinutes) => {
                             const task = column.tasks.find(t => t.id === taskId)
                             if (!task) return
