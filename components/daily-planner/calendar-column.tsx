@@ -21,29 +21,32 @@ const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 // Helper to calculate task position and height
-function getTaskStyle(task: Task): CSSProperties | null {
+function getTaskStyle(task: Task, index: number, total: number): CSSProperties | null {
   if (!task.startTime) return null
   
   const startDate = new Date(task.startTime)
   const startHour = startDate.getHours()
   const startMinute = startDate.getMinutes()
-  const durationMinutes = task.durationMinutes || 60 // Default 1 hour if not specified
+  const durationMinutes = task.durationMinutes || 60
   
   const top = (startHour * HOUR_HEIGHT) + (startMinute / 60 * HOUR_HEIGHT)
   const height = (durationMinutes / 60) * HOUR_HEIGHT
   
+  const width = `${100 / total}%`
+  const left = `calc(32px + ${(index * 100) / total}%)`
+  
   return {
     position: 'absolute' as const,
     top: `${top}px`,
-    left: '32px',
-    right: '8px',
+    left,
+    width,
     height: `${height}px`,
     minHeight: '30px'
   }
 }
 
 // Helper to calculate Google Calendar event position and height
-function getEventStyle(startTime: string, endTime: string): CSSProperties {
+function getEventStyle(startTime: string, endTime: string, index: number, total: number): CSSProperties {
   const startDate = parseISO(startTime)
   const endDate = parseISO(endTime)
   
@@ -54,15 +57,18 @@ function getEventStyle(startTime: string, endTime: string): CSSProperties {
   const top = (startHour * HOUR_HEIGHT) + (startMinute / 60 * HOUR_HEIGHT)
   const height = (durationMinutes / 60) * HOUR_HEIGHT
   
+  const width = `${100 / total}%`
+  const left = `calc(8px + ${(index * 100) / total}%)`
+  
   return {
     position: 'absolute' as const,
     top: `${top}px`,
-    left: '8px',
-    right: '32px',
+    left,
+    width,
     height: `${height}px`,
     minHeight: '30px',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    border: '1px dashed rgb(59, 130, 246)',
+    backgroundColor: 'lightgreen',
+    border: '1px dashed grey',
     borderRadius: '4px',
     padding: '4px',
     fontSize: '12px',
@@ -70,11 +76,12 @@ function getEventStyle(startTime: string, endTime: string): CSSProperties {
   }
 }
 
-function CalendarTask({ task, onResize }: { 
+function CalendarTask({ task, onResize, position }: { 
   task: Task
   onResize?: (taskId: string, durationMinutes: number) => void 
+  position: {index: number, total: number}
 }) {
-  const style = getTaskStyle(task)
+  const style = getTaskStyle(task, position.index, position.total)
   if (!style) return null
 
   const {
@@ -135,11 +142,12 @@ function CalendarTask({ task, onResize }: {
   )
 }
 
-function GoogleCalendarEvent({ title, startTime, endTime, allDay }: {
+function GoogleCalendarEvent({ title, startTime, endTime, allDay, position }: {
   title: string
   startTime: string
   endTime: string
   allDay?: boolean
+  position: {index: number, total: number}
 }) {
   if (allDay) {
     return (
@@ -150,10 +158,9 @@ function GoogleCalendarEvent({ title, startTime, endTime, allDay }: {
     )
   }
 
-  const style = getEventStyle(startTime, endTime)
+  const style = getEventStyle(startTime, endTime, position.index, position.total)
   return (
     <div style={style}>
-      <Badge variant="outline" className="text-xs mb-1">Google Calendar</Badge>
       <div className="font-medium line-clamp-2">{title}</div>
     </div>
   )
@@ -216,19 +223,62 @@ function CurrentTimeLine() {
   )
 }
 
+// Add this helper function to calculate overlapping groups
+function getOverlappingGroups(items: Array<{startTime?: string, endTime?: string, durationMinutes?: number}>) {
+  const groups: Array<Array<number>> = []
+  
+  items.filter(item => item.startTime).forEach((item, index) => {
+    const itemStart = new Date(item.startTime!).getTime()
+    let foundGroup = false
+    
+    for (const group of groups) {
+      const firstItemInGroup = items[group[0]]
+      const groupStartTime = new Date(firstItemInGroup.startTime!).getTime()
+      
+      // Only group items with exactly the same start time
+      if (itemStart === groupStartTime) {
+        group.push(index)
+        foundGroup = true
+        break
+      }
+    }
+    
+    if (!foundGroup) {
+      groups.push([index])
+    }
+  })
+  
+  return groups
+}
+
 export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: CalendarColumnProps) {
   const isCurrentDay = isToday(new Date(date))
   const { events } = useGoogleCalendar()
 
   // Filter events for this day
-  const dayEvents = events.filter(event => {
+  const dayEvents = events?.filter(event => {
     const eventDate = parseISO(event.startTime)
     return format(eventDate, "yyyy-MM-dd") === date
-  })
+  }) || []
 
   // Separate all-day and timed events
   const allDayEvents = dayEvents.filter(event => event.allDay)
   const timedEvents = dayEvents.filter(event => !event.allDay)
+
+  // Combine tasks and events for overlap calculation
+  const allItems = [...tasks, ...timedEvents]
+  const overlappingGroups = getOverlappingGroups(allItems)
+  
+  // Create a map of item index to its position info
+  const positionMap = new Map<number, {index: number, total: number}>()
+  overlappingGroups.forEach(group => {
+    group.forEach((itemIndex, positionIndex) => {
+      positionMap.set(itemIndex, {
+        index: positionIndex,
+        total: group.length
+      })
+    })
+  })
 
   return (
     <div className="bg-muted/50 flex h-full w-full flex-col rounded-lg border">
@@ -248,6 +298,7 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: Cal
                 startTime={event.startTime}
                 endTime={event.endTime}
                 allDay={true}
+                position={{ index: 0, total: 1 }}
               />
             ))}
           </div>
@@ -264,23 +315,31 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask }: Cal
           />
         ))}
         
-        {tasks.map(task => (
-          <CalendarTask 
-            key={task.id} 
-            task={task}
-            onResize={onResizeTask}
-          />
-        ))}
+        {tasks.map((task, idx) => {
+          const position = positionMap.get(idx) || { index: 0, total: 1 }
+          return (
+            <CalendarTask 
+              key={task.id} 
+              task={task}
+              onResize={onResizeTask}
+              position={position}
+            />
+          )
+        })}
 
-        {timedEvents.map(event => (
-          <GoogleCalendarEvent
-            key={event.id}
-            title={event.title}
-            startTime={event.startTime}
-            endTime={event.endTime}
-            allDay={false}
-          />
-        ))}
+        {timedEvents.map((event, idx) => {
+          const position = positionMap.get(idx + tasks.length) || { index: 0, total: 1 }
+          return (
+            <GoogleCalendarEvent
+              key={event.id}
+              title={event.title}
+              startTime={event.startTime}
+              endTime={event.endTime}
+              allDay={false}
+              position={position}
+            />
+          )
+        })}
 
         {isCurrentDay && <CurrentTimeLine />}
       </div>
