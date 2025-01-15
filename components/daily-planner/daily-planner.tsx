@@ -19,6 +19,7 @@ import {
 import { format } from "date-fns"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { v4 as uuidv4 } from "uuid"
 
 import { Button } from "@/components/ui/button"
 import { TaskColumn } from "./task-column"
@@ -31,7 +32,8 @@ import {
   addTaskAction,
   deleteTaskAction
 } from "@/actions/db/tasks-actions"
-import type { Day, Task, DailyTasks } from "@/types/daily-task-types"
+import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
+import type { Day, Task, DailyTasks, CalendarItem } from "@/types/daily-task-types"
 import { EditTaskDialog } from "./edit-task-dialog"
 import { useFilter } from "@/lib/context/filter-context"
 import { useCurrentView } from "@/lib/context/current-view-context"
@@ -191,14 +193,17 @@ export default function DailyPlanner() {
       setActiveTask({
         id: event.id,
         title: event.title,
-        startTime: event.startTime,
-        endTime: event.endTime,
+        calendarItem: {
+          start: {
+            date: format(new Date(event.startTime), "yyyy-MM-dd"),
+            dateTime: event.startTime,
+          }
+        },
         description: event.description,
         durationMinutes: Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000),
         completed: false,
         tags: [],
         subtasks: [],
-        order: 0,
         createdAt: "",
         updatedAt: ""
       })
@@ -239,9 +244,14 @@ export default function DailyPlanner() {
       const hour = parseInt(hourStr, 10)
 
       // Update the task startTime for preview
-      const updatedTask = {
+      const updatedTask:Task = {
         ...activeTask,
-        startTime: createStartTimeISO(fullDate, hour)
+        calendarItem: {
+          start: {
+            date: fullDate,
+            dateTime: createStartTimeISO(fullDate, hour)
+          }
+        }
       }
 
       setLocalDailyTasks(prev => {
@@ -384,27 +394,43 @@ export default function DailyPlanner() {
           return
         }
 
-        // Handle task drop (existing code)
-        const updatedTask = {
-          ...activeTask,
-          startTime: createStartTimeISO(fullDate, hour)
+        // Handle task drop to calendar
+        const dateTime = createStartTimeISO(fullDate, hour)
+        var calendarItem: CalendarItem = {
+          gcalEventId: activeTask.calendarItem?.gcalEventId?.replace(/-/g, '') || uuidv4().replace(/-/g, ''),
+          start: {
+            date: fullDate,
+            dateTime: dateTime
+          }
+        }
+
+        // Add end time if task already had end time
+        if (activeTask.calendarItem?.end) {
+          const endDate = new Date(activeTask.calendarItem.end.dateTime!)
+          const durationMinutes = Math.round((endDate.getTime() - new Date(activeTask.calendarItem.start.dateTime!).getTime()) / 60000)
+          const newEndTime = new Date(new Date(dateTime).getTime() + durationMinutes * 60000).toISOString()
+          calendarItem = {
+            ...calendarItem,
+            end: {
+              date: fullDate,
+              dateTime: newEndTime
+            }
+          }
         }
 
         // Update local state first
         setLocalDailyTasks(prev => {
           const updated = structuredClone(prev)
 
-          // Remove from original date
-          if (dragStartDate && updated[dragStartDate]) {
+          // Remove from original date if different
+          if (dragStartDate && dragStartDate !== fullDate && updated[dragStartDate]) {
             updated[dragStartDate] = {
               ...updated[dragStartDate],
-              tasks: updated[dragStartDate].tasks.filter(
-                t => t.id !== activeTask.id
-              )
+              tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeTask.id)
             }
           }
 
-          // Add to new date
+          // Add/update in new date
           if (!updated[fullDate]) {
             updated[fullDate] = {
               tasks: [],
@@ -413,6 +439,11 @@ export default function DailyPlanner() {
               createdAt: "",
               updatedAt: ""
             }
+          }
+
+          const updatedTask = {
+            ...activeTask,
+            calendarItem
           }
 
           const existingTaskIndex = updated[fullDate].tasks.findIndex(
@@ -427,14 +458,19 @@ export default function DailyPlanner() {
           return updated
         })
 
-        // Then update Firestore
+        // Update task and calendar separately
         if (dragStartDate === fullDate) {
-          // Same day, just update the task
-          await updateTaskAction(fullDate, updatedTask.id, updatedTask)
+          // Same day - update task and calendar
+          await updateTaskAction(fullDate, activeTask.id, activeTask)
+          await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
         } else {
-          // Different day, delete from old and add to new
-          await deleteTaskAction(dragStartDate, updatedTask.id)
-          await addTaskAction(fullDate, updatedTask)
+          // Different day - delete from old, add to new, and update calendar
+          await deleteTaskAction(dragStartDate, activeTask.id)
+          await addTaskAction(fullDate, {
+            ...activeTask,
+            calendarItem
+          })
+          await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
         }
         return
       }
@@ -757,7 +793,18 @@ export default function DailyPlanner() {
                           id={`calendar-${column.date}`}
                           date={column.date}
                           tasks={column.tasks}
-                          onAddTask={async hour => {
+                          onDeleteTask={async taskId => {
+                            await deleteTask(taskId, column.date)
+                          }}
+                          onAddTask={async task => {
+                            setLocalDailyTasks(prev => {
+                              const updated = structuredClone(prev)
+                              updated[column.date].tasks.push(task)
+                              return updated
+                            })
+                            await addTaskAction(column.date, task)
+                          }}
+                          onScheduleTask={async hour => {
                             if (activeTask) {
                               const updatedTask = {
                                 ...activeTask,
@@ -874,13 +921,10 @@ export default function DailyPlanner() {
               id: crypto.randomUUID(),
               title: "New Task",
               description: "",
-              // Set default for new tasks
-              startTime: "",
               durationMinutes: 0,
               subtasks: [],
               completed: false,
               tags: ["work"],
-              order: localDailyTasks[newTaskDate]?.tasks?.length || 0,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             }}

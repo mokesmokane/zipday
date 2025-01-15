@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Plus, GripVertical, Trash2, Clock } from 'lucide-react'
+import { Plus, GripVertical, Trash2, Clock, Zap } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -100,9 +100,7 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] [&>button]:hidden">
         <DialogHeader className="space-y-2">
-          <span className="sr-only">
-            <DialogTitle>Edit Task</DialogTitle>
-          </span>
+            <DialogTitle>Edit Task - {task.calendarItem?.gcalEventId}</DialogTitle>
           <div className="flex items-center justify-between">
             <TagSelector 
               tags={editedTask.tags || []}
@@ -250,6 +248,44 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
               </Droppable>
             </DragDropContext>
           </div>
+
+          {(editedTask.calendarItem) && (
+            <div className="mt-4 bg-muted/80 rounded-md p-3 flex items-center gap-3">
+              {editedTask.calendarItem?.gcalEventId ? (
+                <img src="/logos/google-calendar-color/google-calendar-36.png" alt="Google Calendar" className="h-8 w-8" />
+              ) : (
+                <Zap className="h-5 w-5" />
+              )}
+              <div className="flex flex-col">
+                <div className="text-sm font-medium">
+                  {new Date(editedTask.calendarItem?.start.dateTime || `${day.date}T00:00:00`).toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {new Date(editedTask.calendarItem?.start.dateTime || `${day.date}T00:00:00`).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit'
+                  })}
+                  {editedTask.calendarItem?.end?.dateTime && ' - '} 
+                  {editedTask.calendarItem?.end?.dateTime && (
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(editedTask.calendarItem?.end.dateTime).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  )}
+                </div>
+                {
+                editedTask.calendarItem?.end?.dateTime && editedTask.calendarItem?.start?.dateTime &&
+                <div> `${formatDuration(Math.floor((new Date(editedTask.calendarItem?.end?.dateTime).getTime() - new Date(editedTask.calendarItem?.start?.dateTime).getTime()) / 60000))}`</div>
+                }
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between items-center mt-6">

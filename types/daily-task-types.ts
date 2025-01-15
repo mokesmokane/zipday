@@ -4,21 +4,30 @@ export interface Subtask {
   completed: boolean
 }
 
+export interface CalendarDateTime {
+  date?: string
+  dateTime?: string
+  timeZone?: string  
+}
+
+export interface CalendarItem {
+  gcalEventId?: string
+  start: CalendarDateTime
+  end?: CalendarDateTime
+}
+
 export interface Task {
   id: string
   userId?: string
   title: string
   description?: string
   completed: boolean
-  startTime?: string
-  endTime?: string
   durationMinutes?: number
   subtasks: Subtask[]
   tags?: string[]
-  order: number
   createdAt: string
   updatedAt: string
-  gcalEventId?: string // ID of the corresponding Google Calendar event
+  calendarItem?: CalendarItem
 }
 
 export interface Day {

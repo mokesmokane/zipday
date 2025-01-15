@@ -53,16 +53,22 @@ export async function GET(request: Request) {
       singleEvents: true,
       orderBy: "startTime"
     })
-
-    // Transform events to our format
+    
     const events = response.data.items?.map(event => {
       const isAllDay = !event.start?.dateTime
       return {
         id: event.id,
         title: event.summary || "Untitled Event",
         description: event.description,
-        startTime: isAllDay ? `${event.start?.date}T00:00:00` : event.start?.dateTime,
-        endTime: isAllDay ? `${event.end?.date}T23:59:59` : event.end?.dateTime,
+        calendarItem: {
+          gcalEventId: event.id,
+          start: {
+            dateTime: isAllDay ? `${event.start?.date}T00:00:00` : event.start?.dateTime,
+          },
+          end: {
+            dateTime: isAllDay ? `${event.end?.date}T23:59:59` : event.end?.dateTime,
+          }
+        },
         allDay: isAllDay
       }
     }) || []

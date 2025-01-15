@@ -7,8 +7,6 @@ import { EditEventDialog } from "./edit-event-dialog"
 interface AllDayEventProps {
   id: string
   title: string
-  startTime: string
-  endTime: string
   description?: string
   onEventUpdate?: (id: string, updates: Partial<{ title: string, startTime: string, endTime: string, description: string }>) => void
 }
@@ -16,8 +14,6 @@ interface AllDayEventProps {
 export function AllDayEvent({ 
   id, 
   title, 
-  startTime, 
-  endTime, 
   description,
   onEventUpdate 
 }: AllDayEventProps) {
@@ -34,7 +30,7 @@ export function AllDayEvent({
       </Badge>
 
       <EditEventDialog
-        event={isDialogOpen ? { id, title, startTime, endTime, description } : null}
+        event={isDialogOpen ? { id, title,  description } : null}
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onSave={(updates) => {

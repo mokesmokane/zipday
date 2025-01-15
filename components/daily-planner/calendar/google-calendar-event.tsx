@@ -2,12 +2,13 @@
 
 import { useState, useContext } from "react"
 import { Resizable, ResizeCallback } from "re-resizable"
-import { Badge } from "@/components/ui/badge"
 import { EditEventDialog } from "./edit-event-dialog"
 import { GoogleCalendarContext } from "@/lib/context/google-calendar-context"
 import type { CSSProperties } from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { addTaskAction } from "@/actions/db/tasks-actions"
+import { Task } from "@/types/daily-task-types"
 
 const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
 
@@ -67,6 +68,7 @@ interface GoogleCalendarEventProps {
       description: string
     }>
   ) => void
+  onAddTask: (task: Task) => void
 }
 
 /**
@@ -80,12 +82,12 @@ export function GoogleCalendarEvent({
   endTime,
   position,
   description,
+  onAddTask,
   onEventUpdate
 }: GoogleCalendarEventProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [localEndTime, setLocalEndTime] = useState(endTime)
   const { updateEvent, deleteEvent } = useContext(GoogleCalendarContext)
-
   const style = getEventStyle(startTime, localEndTime, position.index, position.total)
 
   const {
@@ -121,6 +123,39 @@ export function GoogleCalendarEvent({
     setLocalEndTime(updatedEndTime)
     await updateEvent(id, { endTime: updatedEndTime })
     onEventUpdate?.(id, { endTime: updatedEndTime })
+  }
+
+  const handleConvertToTask = async (eventData: { 
+    title: string
+    startTime: string
+    endTime: string
+    description: string 
+  }) => {
+    const startDate = new Date(eventData.startTime)
+    const endDate = new Date(eventData.endTime)
+    const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (60 * 1000))
+
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      title: eventData.title,
+      description: eventData.description,
+      completed: false,
+      durationMinutes,
+      subtasks: [],
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      calendarItem: {
+        gcalEventId: id,
+        start: {
+          dateTime: eventData.startTime
+        },
+        end: {
+          dateTime: eventData.endTime
+        }
+      }
+    }
+    onAddTask?.(newTask)
   }
 
   return (
@@ -171,6 +206,7 @@ export function GoogleCalendarEvent({
             await deleteEvent(id)
             setIsDialogOpen(false)
           }}
+          onConvertToTask={handleConvertToTask}
         />
       )}
     </>

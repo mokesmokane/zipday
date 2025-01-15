@@ -5,6 +5,7 @@ import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
 import { Day, Task } from "@/types/daily-task-types"
 import { addDays, format } from "date-fns"
+
 const db = firestore()
 
 // Helper function to get authenticated user ID
@@ -110,7 +111,7 @@ export async function addTaskAction(
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
-
+    
     const docRef = db
       .collection("userDays")
       .doc(userId)
@@ -129,7 +130,9 @@ export async function addTaskAction(
     await docRef.set({ tasks }, { merge: true })
 
     // Sync with Google Calendar
-    await syncWithGoogleCalendar(userId, task, 'create')
+    if (task.calendarItem) {
+      await syncWithGoogleCalendar(userId, task, 'create')
+    }
 
     return {
       isSuccess: true,
@@ -137,7 +140,7 @@ export async function addTaskAction(
       data: task
     }
   } catch (error) {
-    console.error("Error creating task:", error)
+    console.error("Failed to create task:", error)
     return { isSuccess: false, message: "Failed to create task" }
   }
 }

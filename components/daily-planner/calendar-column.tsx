@@ -2,8 +2,6 @@
 
 import { format, isToday, parseISO } from "date-fns"
 import type { Task } from "@/types/daily-task-types"
-import type { CSSProperties } from "react"
-import { useEffect, useState } from "react"
 import { useGoogleCalendar } from "@/lib/context/google-calendar-context"
 import { CalendarTask } from "./calendar/calendar-task"
 import { GoogleCalendarEvent } from "./calendar/google-calendar-event"
@@ -17,24 +15,27 @@ interface CalendarColumnProps {
   id: string
   date: string
   tasks: Task[]
-  onAddTask: (hour: number) => void
+  onScheduleTask?: (hour: number) => void
+  onAddTask: (task: Task) => void
+  onDeleteTask: (taskId: string) => void
   onResizeTask?: (taskId: string, durationMinutes: number) => void
-  onEventUpdate?: (eventId: string, updates: Partial<{ title: string, startTime: string, endTime: string }>) => void
+  onEventUpdate?: (id: string, updates: Partial<{ title: string, startTime: string, endTime: string, description: string }>) => void
+  onTaskUpdate?: (task: Task) => void
 }
 
-export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask, onEventUpdate }: CalendarColumnProps) {
+export function CalendarColumn({ id, date, tasks, onScheduleTask, onAddTask, onDeleteTask, onResizeTask, onEventUpdate, onTaskUpdate }: CalendarColumnProps) {
   const isCurrentDay = isToday(new Date(date))
   const { events } = useGoogleCalendar()
 
   // Filter events for this day
   const dayEvents = events?.filter(event => {
-    const eventDate = parseISO(event.startTime)
+    const eventDate = parseISO(event.calendarItem?.start?.dateTime!)
     return format(eventDate, "yyyy-MM-dd") === date
   }) || []
 
   // Separate all-day and timed events
   const allDayEvents = dayEvents.filter(event => event.allDay)
-  const timedEvents = dayEvents.filter(event => !event.allDay)
+  const timedEvents = dayEvents.filter(event => !event.allDay).filter(event => !tasks.some(task => task.calendarItem?.gcalEventId === event.id))
 
   // Combine tasks and events for overlap calculation
   const allItems = [...tasks, ...timedEvents]
@@ -61,8 +62,6 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask, onEve
                 key={event.id}
                 id={event.id}
                 title={event.title}
-                startTime={event.startTime}
-                endTime={event.endTime}
                 description={event.description}
                 onEventUpdate={onEventUpdate}
               />
@@ -92,8 +91,17 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask, onEve
               <CalendarTask 
                 key={task.id} 
                 task={task}
-                onResize={onResizeTask}
                 position={position}
+                onResize={onResizeTask}
+                day={{
+                  date,
+                  tasks,
+                  id: "",
+                  createdAt: "",
+                  updatedAt: ""
+                }}
+                onTaskUpdate={onTaskUpdate}
+                onDeleteTask={onDeleteTask}
               />
             )
           })}
@@ -105,10 +113,11 @@ export function CalendarColumn({ id, date, tasks, onAddTask, onResizeTask, onEve
                 key={event.id}
                 id={event.id}
                 title={event.title}
-                startTime={event.startTime}
-                endTime={event.endTime}
+                startTime={event.calendarItem?.start?.dateTime!}
+                endTime={event.calendarItem?.end?.dateTime!}
                 position={position}
                 onEventUpdate={onEventUpdate}
+                onAddTask={onAddTask}
               />
             )
           })}

@@ -13,14 +13,22 @@ interface GoogleCalendarEvent {
   id: string
   title: string
   description?: string
-  startTime: string
-  endTime: string
+  calendarItem?: {
+    gcalEventId?: string
+    start?: {
+      dateTime?: string
+    }
+    end?: {
+      dateTime?: string
+    }
+  }
   allDay?: boolean
 }
 
 interface GoogleCalendarContextType {
   isConnected: boolean
   events: GoogleCalendarEvent[]
+  
   isLoading: boolean
   error: string | null
   refreshEvents: () => Promise<void>

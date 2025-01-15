@@ -51,11 +51,15 @@ export async function POST(request: Request) {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 
     // Calculate end time based on duration
-    const startTime = new Date(task.startTime)
-    const endTime = new Date(startTime.getTime() + (task.durationMinutes * 60 * 1000))
+    const calendarItem = task.calendarItem
+    const startTime = new Date(calendarItem?.start?.dateTime)
+    const endTime = calendarItem?.end?.dateTime ? new Date(calendarItem?.end?.dateTime) : task.durationMinutes ? new Date(startTime.getTime() + (task.durationMinutes * 60 * 1000)) : new Date(startTime.getTime() + (15 * 60 * 1000))
 
     // Format event data
     const eventData = {
+      ...(operation === 'create' && {
+        id: task.id
+      }),
       summary: task.title,
       description: task.description || "",
       start: {
@@ -72,22 +76,28 @@ export async function POST(request: Request) {
 
     switch (operation) {
       case "create":
-      case "update":
-        // If task has a gcalEventId, update it, otherwise create new
-        if (task.gcalEventId) {
-          response = await calendar.events.update({
+          response = await calendar.events.insert({
             calendarId: "primary",
-            eventId: task.gcalEventId,
             requestBody: eventData
           })
-        } else {
+        break
+      case "update":
+        try{
+        response = await calendar.events.update({
+          calendarId: "primary",
+          eventId: task.calendarItem?.gcalEventId,
+          requestBody: eventData
+          })
+        } catch (error) {
+          console.info("Failed to update event trying insert instead", error)
+          console.info("Event data:", eventData)
+          eventData.id = task.calendarItem?.gcalEventId
           response = await calendar.events.insert({
             calendarId: "primary",
             requestBody: eventData
           })
         }
         break
-
       case "delete":
         if (task.gcalEventId) {
           response = await calendar.events.delete({
