@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { EditEventDialog } from "./edit-event-dialog"
 import { GoogleCalendarContext } from "@/lib/context/google-calendar-context"
 import type { CSSProperties } from "react"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
 
@@ -86,6 +88,30 @@ export function GoogleCalendarEvent({
 
   const style = getEventStyle(startTime, localEndTime, position.index, position.total)
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({
+    id,
+    data: {
+      type: "calendar-event",
+      event: { id, title, startTime, endTime: localEndTime, description }
+    }
+  })
+
+  const dragStyle = {
+    ...style,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: "grab",
+    touchAction: "none"
+  }
+
   const handleResizeStop: ResizeCallback = async (_e, _direction, ref) => {
     const newHeight = parseInt(ref.style.height)
     const startDate = new Date(startTime)
@@ -100,7 +126,7 @@ export function GoogleCalendarEvent({
   return (
     <>
       <Resizable
-        style={style}
+        style={dragStyle}
         size={{
           width: style.width,
           height: style.height
@@ -112,6 +138,9 @@ export function GoogleCalendarEvent({
         onResizeStop={handleResizeStop}
       >
         <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
           onClick={() => setIsDialogOpen(true)}
           className="h-full w-full overflow-hidden select-none cursor-pointer p-1 text-sm flex flex-col justify-between"
         >

@@ -37,6 +37,7 @@ import { useFilter } from "@/lib/context/filter-context"
 import { useCurrentView } from "@/lib/context/current-view-context"
 import { CalendarColumn } from "./calendar-column"
 import { useDebounce } from "@/lib/hooks/use-debounce"
+import { useGoogleCalendar } from "@/lib/context/google-calendar-context"
 
 const SCROLL_PADDING = 40
 
@@ -88,6 +89,7 @@ export default function DailyPlanner() {
   const { setAvailableTags } = useFilter()
   const { activeFilters } = useFilter()
   const { currentView } = useCurrentView()
+  const { updateEvent } = useGoogleCalendar()
   const [localDailyTasks, setLocalDailyTasks] = useState<Record<string, Day>>({})
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragStartDate, setDragStartDate] = useState<string | null>(null)
@@ -171,12 +173,37 @@ export default function DailyPlanner() {
     const { active } = event
     setIsDragging(true)
     setActiveId(active.id as string)
+
+    // Handle task dragging
     const task = findTaskById(active.id as string)
     if (task) {
       setActiveTask(task.task)
       setDragStartDate(task.date)
       setPreviewColumnDate(task.date)
       prevLocalDailyTasksRef.current = structuredClone(localDailyTasks)
+      return
+    }
+
+    // Handle calendar event dragging
+    const activeData = active.data.current
+    if (activeData?.type === "calendar-event") {
+      const event = activeData.event
+      setActiveTask({
+        id: event.id,
+        title: event.title,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        description: event.description,
+        durationMinutes: Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000),
+        completed: false,
+        tags: [],
+        subtasks: [],
+        order: 0,
+        createdAt: "",
+        updatedAt: ""
+      })
+      setDragStartDate(format(new Date(event.startTime), "yyyy-MM-dd"))
+      setPreviewColumnDate(format(new Date(event.startTime), "yyyy-MM-dd"))
     }
   }
 
@@ -337,6 +364,27 @@ export default function DailyPlanner() {
       if (isOverCalendarHour) {
         const [, fullDate, hourStr] = isOverCalendarHour
         const hour = parseInt(hourStr, 10)
+
+        // If dragging a calendar event
+        const activeData = active.data.current
+        if (activeData?.type === "calendar-event") {
+          const event = activeData.event
+          const startDate = new Date(event.startTime)
+          const endDate = new Date(event.endTime)
+          const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+
+          const newStartTime = createStartTimeISO(fullDate, hour)
+          const newEndTime = new Date(new Date(newStartTime).getTime() + durationMinutes * 60000).toISOString()
+
+          // Update the event through the context
+          await updateEvent(event.id, {
+            startTime: newStartTime,
+            endTime: newEndTime
+          })
+          return
+        }
+
+        // Handle task drop (existing code)
         const updatedTask = {
           ...activeTask,
           startTime: createStartTimeISO(fullDate, hour)
@@ -391,7 +439,7 @@ export default function DailyPlanner() {
         return
       }
 
-      // Handle normal column drops
+      // Handle normal column drops (existing code)
       const targetDate = getTargetDate(overId, columns)
       if (!targetDate) {
         throw new Error("Could not find target date")
