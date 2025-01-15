@@ -139,10 +139,17 @@ export function GoogleCalendarProvider({
 
     try {
       const response = await fetch(`/api/google/calendar/events/${eventId}`, {
-        method: "PUT",
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(updates)
       })
       
+      if (!response.ok) {
+        throw new Error("Failed to update event")
+      }
+
       // Refresh events after update
       await refreshEvents()
     } catch (error) {
