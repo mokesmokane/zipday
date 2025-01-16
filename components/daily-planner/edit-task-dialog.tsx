@@ -100,7 +100,9 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] [&>button]:hidden">
         <DialogHeader className="space-y-2">
-            <DialogTitle>Edit Task - {task.calendarItem?.gcalEventId}</DialogTitle>
+          <span className="sr-only">
+            <DialogTitle>Edit Task</DialogTitle>
+          </span>
           <div className="flex items-center justify-between">
             <TagSelector 
               tags={editedTask.tags || []}
@@ -250,7 +252,7 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
           </div>
 
           {(editedTask.calendarItem) && (
-            <div className="mt-4 bg-muted/80 rounded-md p-3 flex items-center gap-3">
+            <div className="mt-4 bg-muted/80 rounded-md p-3 flex items-start gap-3">
               {editedTask.calendarItem?.gcalEventId ? (
                 <img src="/logos/google-calendar-color/google-calendar-36.png" alt="Google Calendar" className="h-8 w-8" />
               ) : (
@@ -271,17 +273,17 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
                   })}
                   {editedTask.calendarItem?.end?.dateTime && ' - '} 
                   {editedTask.calendarItem?.end?.dateTime && (
-                    <div className="text-sm text-muted-foreground">
-                      {new Date(editedTask.calendarItem?.end.dateTime).toLocaleTimeString([], {
+                      new Date(editedTask.calendarItem?.end.dateTime).toLocaleTimeString([], {
                         hour: 'numeric',
                         minute: '2-digit'
-                      })}
-                    </div>
+                      })
                   )}
                 </div>
                 {
                 editedTask.calendarItem?.end?.dateTime && editedTask.calendarItem?.start?.dateTime &&
-                <div> `${formatDuration(Math.floor((new Date(editedTask.calendarItem?.end?.dateTime).getTime() - new Date(editedTask.calendarItem?.start?.dateTime).getTime()) / 60000))}`</div>
+                <div>
+                  {formatDuration(Math.floor((new Date(editedTask.calendarItem?.end?.dateTime).getTime() - new Date(editedTask.calendarItem?.start?.dateTime).getTime()) / 60000))}
+                </div>
                 }
               </div>
             </div>
