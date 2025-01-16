@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { getDaysByDateRangeAction, getBacklogTasksAction } from "@/actions/db/tasks-actions"
+import { getDaysByDateRangeAction, getBacklogTasksAction, getIncompleteTasksAction } from "@/actions/db/tasks-actions"
 import { useDate } from "./date-context"
 import { useAuth } from "./auth-context"
 import { Day, Task } from "@/types/daily-task-types"
@@ -59,32 +59,33 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     if (result.isSuccess) {
       // Convert the array of days to a dictionary keyed by date
       const daysByDate: Record<string, Day> = {}
-      const incomplete: Task[] = []
       const future: Task[] = []
 
       for (const day of result.data || []) {
         daysByDate[day.date] = day
         
-        // Categorize tasks
-        if (day.date < today) {
-          // Past tasks that are incomplete
-          incomplete.push(...day.tasks.filter(t => !t.completed))
-        } else if (day.date > today) {
-          // Future tasks
+        // Only categorize future tasks now
+        if (day.date > today) {
           future.push(...day.tasks)
         }
       }
 
       setDailyTasks(daysByDate)
-      setIncompleteTasks(incomplete)
       setFutureTasks(future)
-      setError(null)
 
-      // Fetch backlog tasks
+      // Get incomplete tasks in a separate call - from start of range to today
+      const incompleteResult = await getIncompleteTasksAction(startDateStr, today)
+      if (incompleteResult.isSuccess) {
+        setIncompleteTasks(incompleteResult.data || [])
+      }
+
+      // Get backlog tasks
       const backlogResult = await getBacklogTasksAction()
       if (backlogResult.isSuccess) {
         setBacklogTasks(backlogResult.data || [])
       }
+
+      setError(null)
     } else {
       setError(result.message)
       setDailyTasks({})

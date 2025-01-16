@@ -425,3 +425,44 @@ export async function deleteBacklogTaskAction(taskId: string): Promise<ActionSta
     return { isSuccess: false, message: "Failed to delete task from backlog" }
   }
 }
+
+/**
+ * Gets all incomplete tasks between a date range.
+ */
+export async function getIncompleteTasksAction(
+  startDate: string,
+  endDate: string
+): Promise<ActionState<Task[]>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    console.log("Getting incomplete tasks for date range:", startDate, endDate)
+    // Get all documents in the date range by their IDs
+    const snapshot = await db
+      .collection("userDays")
+      .doc(userId)
+      .collection("dailyTasks")
+      .orderBy(firestore.FieldPath.documentId())
+      .startAt(startDate)
+      .endBefore(endDate)
+      .get()
+
+    const incompleteTasks: Task[] = []
+    
+    for (const doc of snapshot.docs) {
+      const data = doc.data()
+      const tasks = data.tasks as Task[] || []
+      incompleteTasks.push(...tasks.filter(t => !t.completed))
+    }
+
+    console.log("Incomplete tasks:", incompleteTasks)
+
+    return {
+      isSuccess: true,
+      message: "Incomplete tasks retrieved successfully",
+      data: incompleteTasks
+    }
+  } catch (error) {
+    console.error("Error getting incomplete tasks:", error)
+    return { isSuccess: false, message: "Failed to get incomplete tasks" }
+  }
+}

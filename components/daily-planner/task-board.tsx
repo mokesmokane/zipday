@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import { format, isToday } from "date-fns"
+import { format, isToday, subDays, subMonths, subYears } from "date-fns"
 import { Plus } from "lucide-react"
 
 import { TaskColumn } from "./task-column"
@@ -31,7 +31,28 @@ export function TaskBoard({ today, selectedDate, setSelectedDate, onTaskUpdate, 
   const [isOverCalendarZone, setIsOverCalendarZone] = useState<string | null>(null)
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+  const [incompleteTimeRange, setIncompleteTimeRange] = useState<"week" | "month" | "year" | "all">("week")
+
   const { incompleteTasks, futureTasks, backlogTasks, dailyTasks } = useTasks()
+
+  // Filter incomplete tasks based on time range
+  const filteredIncompleteTasks = incompleteTasks.filter(task => {
+    const taskDate = new Date(task.createdAt)
+    const now = new Date()
+
+    switch (incompleteTimeRange) {
+      case "week":
+        return taskDate >= subDays(now, 7)
+      case "month":
+        return taskDate >= subMonths(now, 1)
+      case "year":
+        return taskDate >= subYears(now, 1)
+      case "all":
+        return true
+      default:
+        return true
+    }
+  })
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -44,10 +65,118 @@ export function TaskBoard({ today, selectedDate, setSelectedDate, onTaskUpdate, 
   const todayTasks = dailyTasks[today.date]?.tasks || []
 
   const columns = [
-    { id: "backlog", title: "Backlog", tasks: backlogTasks },
-    { id: "incomplete", title: "Incomplete", tasks: incompleteTasks },
-    { id: "today", title: "Today", tasks: todayTasks },
-    { id: "future", title: "Future", tasks: futureTasks },
+    { 
+        id: "backlog", 
+        title: (
+            <>
+                <div className="space-y-1.5">
+                <h2 className="text-lg font-semibold">
+                Backlog
+                </h2>
+                </div>
+                <Button
+                variant="outline"
+                size="icon"
+                className="size-7 rounded-lg"
+                onClick={() => setIsNewTaskDialogOpen(true)}
+                >
+                <Plus className="size-4" />
+                </Button>
+            </>
+        ), 
+        tasks: backlogTasks 
+    },
+    { 
+      id: "incomplete", 
+      title: (
+      <>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold">Incomplete</h2>
+        </div>
+          <div className="flex gap-1 text-xs">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs", 
+                incompleteTimeRange === "week" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setIncompleteTimeRange("week")}
+            >
+              Week
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs",
+                incompleteTimeRange === "month" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setIncompleteTimeRange("month")}
+            >
+              Month
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs",
+                incompleteTimeRange === "year" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setIncompleteTimeRange("year")}
+            >
+              Year
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs",
+                incompleteTimeRange === "all" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setIncompleteTimeRange("all")}
+            >
+              All
+            </Button>
+            
+          </div>
+        
+      </>
+      ), 
+      tasks: filteredIncompleteTasks 
+    },
+    { 
+      id: "today", 
+      title: (
+      <>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold">
+            Today
+          </h2>
+        </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-7 rounded-lg"
+            onClick={() => setIsNewTaskDialogOpen(true)}
+          >
+            <Plus className="size-4" />
+          </Button>
+        </>
+      ), 
+      tasks: todayTasks 
+    },
+    { 
+      id: "future", 
+      title: (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold">
+            Future
+          </h2>
+        </div>
+      ), 
+      tasks: futureTasks 
+    },
   ]
 
   function handleDragStart(event: DragStartEvent) {
@@ -99,123 +228,108 @@ export function TaskBoard({ today, selectedDate, setSelectedDate, onTaskUpdate, 
 
   return (
     <div className="relative size-full">
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-6 h-full  px-6">
-        {columns.map(column => (
-          <div key={column.id} className="w-[300px]">
-            <div className="mb-4 flex justify-between items-center">
-                    <div className="space-y-1.5">
-                      <h2 className="text-lg font-semibold">
-                        {column.title}
-                      </h2>
-                    </div>            
-                    {(column.id === "backlog" || column.id === "today") && (
-
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="size-7 rounded-lg"
-                      onClick={() => setIsNewTaskDialogOpen(true)}
-                    >
-                      <Plus className="size-4" />
-                    </Button>
-                  )}
-                  </div>
-            <SortableContext
-              items={column.tasks.map(t => t.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <TaskColumn
-                id={column.id}
-                isDragging={isDragging}
-                isOverCalendarZone={isOverCalendarZone === column.id}
-                showCalendarZone={true}
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-6 h-full px-6">
+          {columns.map(column => (
+            <div key={column.id} className="w-[300px]">
+              <div className="mb-4 flex justify-between items-center">
+                {column.title}
+                
+              </div>
+              <SortableContext
+                items={column.tasks.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
               >
-                {column.tasks.map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    day={today}
-                    isOverCalendarZone={isOverCalendarZone === column.id && activeTask?.id === task.id}
-                    onDelete={onDeleteTask}
-                    onTaskUpdate={onTaskUpdate}
+                <TaskColumn
+                  id={column.id}
+                  isDragging={isDragging}
+                  isOverCalendarZone={isOverCalendarZone === column.id}
+                  showCalendarZone={true}
+                >
+                  {column.tasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      day={today}
+                      isOverCalendarZone={isOverCalendarZone === column.id && activeTask?.id === task.id}
+                      onDelete={onDeleteTask}
+                      onTaskUpdate={onTaskUpdate}
+                    />
+                  ))}
+                </TaskColumn>
+              </SortableContext>
+            </div>
+          ))}
+
+          <div className="flex-1">
+            <div className="mb-4 flex justify-between items-center">
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <div className="space-y-1.5">
+                    <h2 className="text-lg font-semibold hover:cursor-pointer">
+                      Calendar
+                      <span className="text-muted-foreground text-sm ml-2">
+                        {format(selectedDate, "MMM d")}
+                      </span>
+                    </h2>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(date)
+                        setIsDatePickerOpen(false)
+                      }
+                    }}
+                    initialFocus
                   />
-                ))}
-              </TaskColumn>
-            </SortableContext>
-
+                </PopoverContent>
+              </Popover>
+            </div>
+            <CalendarColumn
+              id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
+              date={format(selectedDate, "yyyy-MM-dd")}
+              tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
+              onDeleteTask={onDeleteTask}
+              onTaskUpdate={onTaskUpdate}
+              onAddTask={task => {
+                const updatedTask = { ...task }
+                onTaskUpdate(updatedTask)
+              }}
+            />
           </div>
-        ))}
-
-        <div className="flex-1">
-          <div className="mb-4 flex justify-between items-center">
-            <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-              <PopoverTrigger asChild>
-                <div className="space-y-1.5">
-                  <h2 className="text-lg font-semibold hover:cursor-pointer">
-                    Calendar
-                    <span className="text-muted-foreground text-sm ml-2">
-                      {format(selectedDate, "MMM d")}
-                    </span>
-                  </h2>
-                </div>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (date) {
-                      setSelectedDate(date)
-                      setIsDatePickerOpen(false)
-                    }
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <CalendarColumn
-            id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
-            date={format(selectedDate, "yyyy-MM-dd")}
-            tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
-            onDeleteTask={onDeleteTask}
-            onTaskUpdate={onTaskUpdate}
-            onAddTask={task => {
-              const updatedTask = { ...task }
-              onTaskUpdate(updatedTask)
-            }}
-          />
         </div>
-      </div>
 
-      <EditTaskDialog
-        day={today}
-        isNewTask={true}
-        task={{
-          id: crypto.randomUUID(),
-          title: "New Task",
-          description: "",
-          durationMinutes: 0,
-          subtasks: [],
-          completed: false,
-          tags: ["work"],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }}
-        open={isNewTaskDialogOpen}
-        onOpenChange={setIsNewTaskDialogOpen}
-        onSave={task => {
-          onTaskUpdate(task)
-          setIsNewTaskDialogOpen(false)
-        }}
-      />
-    </DndContext>
+        <EditTaskDialog
+          day={today}
+          isNewTask={true}
+          task={{
+            id: crypto.randomUUID(),
+            title: "New Task",
+            description: "",
+            durationMinutes: 0,
+            subtasks: [],
+            completed: false,
+            tags: ["work"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }}
+          open={isNewTaskDialogOpen}
+          onOpenChange={setIsNewTaskDialogOpen}
+          onSave={task => {
+            onTaskUpdate(task)
+            setIsNewTaskDialogOpen(false)
+          }}
+        />
+      </DndContext>
     </div>
   )
 } 
