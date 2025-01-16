@@ -7,7 +7,7 @@ import { useSidebar } from "@/lib/context/sidebar-context"
 import { ChatForm } from "../ai-chat/chat"
 import { SidebarCalendar } from "./calendar"
 import Link from "next/link"
-import { ChevronLeft, Zap } from "lucide-react"
+import { ChevronLeft, KanbanSquare, LayoutDashboard, Zap } from "lucide-react"
 
 export function Sidebar() {
   const { isExpanded, toggleSidebar } = useSidebar()
@@ -50,18 +50,24 @@ export function Sidebar() {
       )}
       {isExpanded && (
       <nav className="flex-1 space-y-2 overflow-auto p-2">
-        <Button
-          variant="ghost"
-          className="hover:bg-accent w-full justify-start"
-        >
-          Dashboard
-        </Button>
-        <Button
-          variant="ghost"
-          className="hover:bg-accent w-full justify-start"
-        >
-          Projects
-        </Button>
+        <Link href="/dashboard">
+          <Button
+            variant="ghost"
+            className="hover:bg-accent w-full justify-start"
+          >
+            <LayoutDashboard className="mr-2 h-4 w-4" />
+            Dashboard
+          </Button>
+        </Link>
+        <Link href="/board">
+          <Button
+            variant="ghost"
+            className="hover:bg-accent w-full justify-start"
+          >
+            <KanbanSquare className="mr-2 h-4 w-4" />
+            Board
+          </Button>
+        </Link>
         </nav>
       )}
 

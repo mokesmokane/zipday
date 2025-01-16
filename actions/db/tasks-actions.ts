@@ -246,3 +246,39 @@ export async function deleteTaskAction(
     return { isSuccess: false, message: "Failed to delete task" }
   }
 }
+
+/**
+ * Gets today's tasks by reading the daily doc for today's date.
+ */
+export async function getTodayAction(): Promise<ActionState<Day>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const today = format(new Date(), "yyyy-MM-dd")
+
+    const docRef = db
+      .collection("userDays")
+      .doc(userId)
+      .collection("dailyTasks")
+      .doc(today)
+
+    const snapshot = await docRef.get()
+    const data = snapshot.data()
+
+    const day: Day = {
+      id: snapshot.id,
+      createdAt: snapshot.createTime?.toDate().toISOString() || "",
+      updatedAt: snapshot.updateTime?.toDate().toISOString() || "",
+      date: today,
+      tasks: data?.tasks as Task[] || []
+    }
+
+    return {
+      isSuccess: true,
+      message: "Today's tasks retrieved successfully",
+      data: day
+    }
+  } catch (error) {
+    console.error("Error getting today's tasks:", error)
+    return { isSuccess: false, message: "Failed to get today's tasks" }
+  }
+}
