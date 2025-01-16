@@ -1,10 +1,10 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { getDaysByDateRangeAction } from "@/actions/db/tasks-actions"
+import { getDaysByDateRangeAction, getBacklogTasksAction } from "@/actions/db/tasks-actions"
 import { useDate } from "./date-context"
 import { useAuth } from "./auth-context"
-import { Day } from "@/types/daily-task-types"
+import { Day, Task } from "@/types/daily-task-types"
 
 /** 
  * If you only need a flat list of tasks, you can keep 'tasks' the same. 
@@ -12,6 +12,9 @@ import { Day } from "@/types/daily-task-types"
  */
 interface TasksContextType {
   dailyTasks: Record<string, Day>
+  incompleteTasks: Task[] // Past incomplete tasks
+  futureTasks: Task[] // Tasks from tomorrow onwards
+  backlogTasks: Task[] // Tasks from backlog collection
   isLoading: boolean
   error: string | null
   refreshTasks: () => Promise<void>
@@ -21,6 +24,9 @@ const TasksContext = createContext<TasksContextType | undefined>(undefined)
 
 export function TasksProvider({ children }: { children: React.ReactNode }) {
   const [dailyTasks, setDailyTasks] = useState<Record<string, Day>>({})
+  const [incompleteTasks, setIncompleteTasks] = useState<Task[]>([])
+  const [futureTasks, setFutureTasks] = useState<Task[]>([])
+  const [backlogTasks, setBacklogTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,6 +40,9 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const refreshTasks = async () => {
     if (!user) {
       setDailyTasks({})
+      setIncompleteTasks([])
+      setFutureTasks([])
+      setBacklogTasks([])
       setIsLoading(false)
       return
     }
@@ -42,20 +51,46 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
     const startDateStr = dateWindow.startDate.toISOString().split("T")[0]
     const endDateStr = dateWindow.endDate.toISOString().split("T")[0]
+    const today = new Date().toISOString().split("T")[0]
+
+    // Get tasks for date range
     const result = await getDaysByDateRangeAction(startDateStr, endDateStr)
 
     if (result.isSuccess) {
-      console.log("result.data", result.data)
       // Convert the array of days to a dictionary keyed by date
       const daysByDate: Record<string, Day> = {}
+      const incomplete: Task[] = []
+      const future: Task[] = []
+
       for (const day of result.data || []) {
         daysByDate[day.date] = day
+        
+        // Categorize tasks
+        if (day.date < today) {
+          // Past tasks that are incomplete
+          incomplete.push(...day.tasks.filter(t => !t.completed))
+        } else if (day.date > today) {
+          // Future tasks
+          future.push(...day.tasks)
+        }
       }
+
       setDailyTasks(daysByDate)
+      setIncompleteTasks(incomplete)
+      setFutureTasks(future)
       setError(null)
+
+      // Fetch backlog tasks
+      const backlogResult = await getBacklogTasksAction()
+      if (backlogResult.isSuccess) {
+        setBacklogTasks(backlogResult.data || [])
+      }
     } else {
-      setError(result.message)  
+      setError(result.message)
       setDailyTasks({})
+      setIncompleteTasks([])
+      setFutureTasks([])
+      setBacklogTasks([])
     }
 
     setIsLoading(false)
@@ -70,6 +105,9 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     <TasksContext.Provider
       value={{
         dailyTasks,
+        incompleteTasks,
+        futureTasks,
+        backlogTasks,
         isLoading,
         error,
         refreshTasks

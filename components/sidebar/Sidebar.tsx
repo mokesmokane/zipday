@@ -43,14 +43,10 @@ export function Sidebar() {
           </Button>
         )}
       </div>
+      
       {isExpanded && (
-        <div className="p-2">
-          <SearchForm />
-        </div>
-      )}
-      {isExpanded && (
-      <nav className="flex-1 space-y-2 overflow-auto p-2">
-        <Link href="/dashboard">
+      <nav className="flex-1 space-y-2 overflow-auto p-2 min-h-[100px]">
+        <Link href="/dashboard/todo">
           <Button
             variant="ghost"
             className="hover:bg-accent w-full justify-start"
@@ -65,10 +61,14 @@ export function Sidebar() {
             className="hover:bg-accent w-full justify-start"
           >
             <KanbanSquare className="mr-2 h-4 w-4" />
-            Board
+            Plan
           </Button>
         </Link>
-        </nav>
+      </nav>
+      )}
+
+      {isExpanded && (
+        <div className="border-t border-zinc-300/50 dark:border-zinc-800/50" />
       )}
 
       <div className="w-full px-2">

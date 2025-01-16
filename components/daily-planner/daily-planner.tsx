@@ -691,13 +691,23 @@ export default function DailyPlanner() {
                   id={column.date}
                   className="w-[300px] shrink-0 snap-center"
                 >
-                  <div className="mb-4 space-y-1.5">
-                    <h2 className="text-lg font-semibold">
-                      {format(new Date(column.date), "EEEE")}
-                      <span className="text-muted-foreground text-sm ml-2">
-                        {format(new Date(column.date), "MMM d")}
-                      </span>
-                    </h2>
+                  <div className="mb-4 flex justify-between items-center">
+                    <div className="space-y-1.5">
+                      <h2 className="text-lg font-semibold">
+                        {format(new Date(column.date), "EEEE")}
+                        <span className="text-muted-foreground text-sm ml-2">
+                          {format(new Date(column.date), "MMM d")}
+                        </span>
+                      </h2>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="size-8 rounded-lg"
+                      onClick={() => addTask(column.date)}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
                   </div>
 
                   <AnimatePresence mode="wait">
@@ -771,15 +781,6 @@ export default function DailyPlanner() {
                             ))}
                           </TaskColumn>
                         </SortableContext>
-
-                        <Button
-                          variant="outline"
-                          className="mt-4 w-full justify-start"
-                          onClick={() => addTask(column.date)}
-                        >
-                          <Plus className="mr-2 size-4" />
-                          Add task
-                        </Button>
                       </motion.div>
                     ) : (
                       <motion.div

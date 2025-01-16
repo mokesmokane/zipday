@@ -12,20 +12,26 @@ import { CalendarColumn } from "./calendar-column"
 import { Button } from "@/components/ui/button"
 import { EditTaskDialog } from "./edit-task-dialog"
 import type { Task, Day } from "@/types/daily-task-types"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { useTasks } from "@/lib/context/tasks-context"
 
 interface TaskBoardProps {
-  tasks: Task[]
   today: Day
   selectedDate: Date
+  setSelectedDate: (date: Date) => void
   onTaskUpdate: (task: Task) => void
   onDeleteTask: (taskId: string) => void
 }
 
-export function TaskBoard({ tasks, today, selectedDate, onTaskUpdate, onDeleteTask }: TaskBoardProps) {
+export function TaskBoard({ today, selectedDate, setSelectedDate, onTaskUpdate, onDeleteTask }: TaskBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isOverCalendarZone, setIsOverCalendarZone] = useState<string | null>(null)
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+  const { incompleteTasks, futureTasks, backlogTasks, dailyTasks } = useTasks()
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -35,25 +41,18 @@ export function TaskBoard({ tasks, today, selectedDate, onTaskUpdate, onDeleteTa
     })
   )
 
-  // Filter tasks into columns
-  const backlogTasks = tasks.filter(task => !task.calendarItem && !task.completed)
-  const incompleteTasks = tasks.filter(task => task.calendarItem && !task.completed)
-  const scheduledTasks = tasks.filter(task => task.calendarItem && !task.completed)
-  const todayTasks = tasks.filter(task => {
-    if (!task.calendarItem?.start?.dateTime) return false
-    return isToday(new Date(task.calendarItem.start.dateTime))
-  })
+  const todayTasks = dailyTasks[today.date]?.tasks || []
 
   const columns = [
     { id: "backlog", title: "Backlog", tasks: backlogTasks },
     { id: "incomplete", title: "Incomplete", tasks: incompleteTasks },
-    { id: "scheduled", title: "Scheduled", tasks: scheduledTasks },
-    { id: "today", title: "Today", tasks: todayTasks }
+    { id: "today", title: "Today", tasks: todayTasks },
+    { id: "future", title: "Future", tasks: futureTasks },
   ]
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event
-    const task = tasks.find(t => t.id === active.id)
+    const task = todayTasks.find(t => t.id === active.id)
     if (task) {
       setActiveTask(task)
       setIsDragging(true)
@@ -109,7 +108,24 @@ export function TaskBoard({ tasks, today, selectedDate, onTaskUpdate, onDeleteTa
       <div className="flex gap-6 h-full  px-6">
         {columns.map(column => (
           <div key={column.id} className="w-[300px]">
-            <h2 className="font-semibold mb-4">{column.title}</h2>
+            <div className="mb-4 flex justify-between items-center">
+                    <div className="space-y-1.5">
+                      <h2 className="text-lg font-semibold">
+                        {column.title}
+                      </h2>
+                    </div>            
+                    {(column.id === "backlog" || column.id === "today") && (
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="size-7 rounded-lg"
+                      onClick={() => setIsNewTaskDialogOpen(true)}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  )}
+                  </div>
             <SortableContext
               items={column.tasks.map(t => t.id)}
               strategy={verticalListSortingStrategy}
@@ -133,34 +149,41 @@ export function TaskBoard({ tasks, today, selectedDate, onTaskUpdate, onDeleteTa
               </TaskColumn>
             </SortableContext>
 
-            {column.id === "backlog" && (
-              <Button
-                variant="outline"
-                className="mt-4 w-full justify-start"
-                onClick={() => setIsNewTaskDialogOpen(true)}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add task
-              </Button>
-            )}
           </div>
         ))}
 
         <div className="flex-1">
-          <h2 className="font-semibold mb-4">
-            Calendar
-            <span className="text-muted-foreground text-sm ml-2">
-              {format(selectedDate, "MMM d")}
-            </span>
-          </h2>
+          <div className="mb-4 flex justify-between items-center">
+            <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <div className="space-y-1.5">
+                  <h2 className="text-lg font-semibold hover:cursor-pointer">
+                    Calendar
+                    <span className="text-muted-foreground text-sm ml-2">
+                      {format(selectedDate, "MMM d")}
+                    </span>
+                  </h2>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date)
+                      setIsDatePickerOpen(false)
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
           <CalendarColumn
             id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
             date={format(selectedDate, "yyyy-MM-dd")}
-            tasks={tasks.filter(task => {
-              if (!task.calendarItem?.start?.dateTime) return false
-              const taskDate = new Date(task.calendarItem.start.dateTime)
-              return format(taskDate, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd")
-            })}
+            tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
             onDeleteTask={onDeleteTask}
             onTaskUpdate={onTaskUpdate}
             onAddTask={task => {

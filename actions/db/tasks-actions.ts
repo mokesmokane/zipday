@@ -282,3 +282,146 @@ export async function getTodayAction(): Promise<ActionState<Day>> {
     return { isSuccess: false, message: "Failed to get today's tasks" }
   }
 }
+
+/**
+ * Gets tasks from the backlog collection.
+ */
+export async function getBacklogTasksAction(): Promise<ActionState<Task[]>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+
+    const snapshot = await db
+      .collection("users")
+      .doc(userId)
+      .collection("backlog")
+      .get()
+
+    const tasks: Task[] = []
+    snapshot.forEach((doc) => {
+      const data = doc.data() as Task
+      tasks.push({
+        ...data,
+        id: doc.id
+      })
+    })
+
+    return {
+      isSuccess: true,
+      message: "Backlog tasks retrieved successfully",
+      data: tasks
+    }
+  } catch (error) {
+    console.error("Error getting backlog tasks:", error)
+    return { isSuccess: false, message: "Failed to get backlog tasks" }
+  }
+}
+
+/**
+ * Adds a task to the backlog collection.
+ */
+export async function addBacklogTaskAction(task: Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">): Promise<ActionState<Task>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const now = new Date().toISOString()
+
+    const docRef = await db
+      .collection("users")
+      .doc(userId)
+      .collection("backlog")
+      .add({
+        ...task,
+        userId,
+        createdAt: now,
+        updatedAt: now
+      })
+
+    const newTask: Task = {
+      id: docRef.id,
+      userId,
+      ...task,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return {
+      isSuccess: true,
+      message: "Task added to backlog successfully",
+      data: newTask
+    }
+  } catch (error) {
+    console.error("Error adding task to backlog:", error)
+    return { isSuccess: false, message: "Failed to add task to backlog" }
+  }
+}
+
+/**
+ * Updates a task in the backlog collection.
+ */
+export async function updateBacklogTaskAction(
+  taskId: string,
+  updates: Partial<Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">>
+): Promise<ActionState<Task>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const now = new Date().toISOString()
+
+    const docRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("backlog")
+      .doc(taskId)
+
+    const docSnap = await docRef.get()
+    if (!docSnap.exists) {
+      return { isSuccess: false, message: "Task not found in backlog" }
+    }
+
+    const updatedTask = {
+      ...docSnap.data(),
+      ...updates,
+      updatedAt: now
+    } as Task
+
+    // Convert to plain object for Firestore update
+    const updateData = {
+      ...updates,
+      updatedAt: now
+    }
+
+    await docRef.update(updateData)
+
+    return {
+      isSuccess: true,
+      message: "Backlog task updated successfully",
+      data: updatedTask
+    }
+  } catch (error) {
+    console.error("Error updating backlog task:", error)
+    return { isSuccess: false, message: "Failed to update backlog task" }
+  }
+}
+
+/**
+ * Deletes a task from the backlog collection.
+ */
+export async function deleteBacklogTaskAction(taskId: string): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+
+    await db
+      .collection("users")
+      .doc(userId)
+      .collection("backlog")
+      .doc(taskId)
+      .delete()
+
+    return {
+      isSuccess: true,
+      message: "Task deleted from backlog successfully",
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error deleting backlog task:", error)
+    return { isSuccess: false, message: "Failed to delete task from backlog" }
+  }
+}

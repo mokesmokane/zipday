@@ -170,15 +170,15 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
             </div>
           )}
           <div className="mt-4 flex items-center justify-between">
-            {(task.startTime || task.durationMinutes) ? (
+            {(task.calendarItem?.start.dateTime || task.durationMinutes) ? (
               <div className="text-muted-foreground flex items-center text-sm">
-                {task.startTime && <Clock className="mr-1 size-3" />}
-                {task.startTime && task.durationMinutes
-                  ? `${formatStartTime(task.startTime)} - ${formatDuration(
+                {task.calendarItem?.start.dateTime && <Clock className="mr-1 size-3" />}
+                {task.calendarItem?.start.dateTime && task.durationMinutes
+                  ? `${formatStartTime(task.calendarItem?.start.dateTime)} - ${formatDuration(
                       task.durationMinutes
                     )}`
-                  : task.startTime
-                  ? formatStartTime(task.startTime)
+                  : task.calendarItem?.start.dateTime
+                  ? formatStartTime(task.calendarItem?.start.dateTime)
                   : formatDuration(task.durationMinutes)}
               </div>
             ) : <div className="w-6" />}

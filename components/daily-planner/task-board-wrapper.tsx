@@ -11,33 +11,22 @@ interface TaskBoardWrapperProps {
   today: Day
 }
 
-export function TaskBoardWrapper({ initialTasks, today }: TaskBoardWrapperProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const { selectedDate } = useDate()
+export function TaskBoardWrapper({ today }: TaskBoardWrapperProps) {
+  const { selectedDate, setSelectedDate } = useDate()
 
   async function handleTaskUpdate(task: Task) {
-    try {
-      setTasks(prev => prev.map(t => t.id === task.id ? task : t))
-      await updateTaskAction(today.date, task.id, task)
-    } catch (error) {
-      console.error("Failed to update task:", error)
-    }
+  
   }
 
   async function handleDeleteTask(taskId: string) {
-    try {
-      setTasks(prev => prev.filter(t => t.id !== taskId))
-      await deleteTaskAction(today.date, taskId)
-    } catch (error) {
-      console.error("Failed to delete task:", error)
-    }
+    
   }
 
   return (
     <TaskBoard
-      tasks={tasks}
       today={today}
       selectedDate={selectedDate || new Date()}
+      setSelectedDate={setSelectedDate}
       onTaskUpdate={handleTaskUpdate}
       onDeleteTask={handleDeleteTask}
     />
