@@ -288,22 +288,26 @@ export async function getTodayAction(): Promise<ActionState<Day>> {
  */
 export async function getBacklogTasksAction(): Promise<ActionState<Task[]>> {
   try {
+    console.log("Getting backlog tasks")
     const userId = await getAuthenticatedUserId()
 
-    const snapshot = await db
-      .collection("users")
-      .doc(userId)
-      .collection("backlog")
-      .get()
+    const docRef = db.collection("userBacklog").doc(userId)
+    const doc = await docRef.get()
+    
+    if (!doc.exists) {
+      // Initialize empty backlog if it doesn't exist
+      await docRef.set({ tasks: [] })
+      return {
+        isSuccess: true,
+        message: "Backlog tasks retrieved successfully",
+        data: []
+      }
+    }
 
-    const tasks: Task[] = []
-    snapshot.forEach((doc) => {
-      const data = doc.data() as Task
-      tasks.push({
-        ...data,
-        id: doc.id
-      })
-    })
+    const data = doc.data()
+    const tasks = data?.tasks || []
+
+    console.log("Backlog tasks:", tasks)
 
     return {
       isSuccess: true,
@@ -317,39 +321,45 @@ export async function getBacklogTasksAction(): Promise<ActionState<Task[]>> {
 }
 
 /**
- * Adds a task to the backlog collection.
+ * Adds a task to the user's backlog collection.
  */
-export async function addBacklogTaskAction(task: Omit<Task, "id" | "userId" | "createdAt" | "updatedAt">): Promise<ActionState<Task>> {
+export async function addBacklogTaskAction(
+  task: Task
+): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
+    
+    const docRef = db.collection("userBacklog").doc(userId)
+    const doc = await docRef.get()
+
     const now = new Date().toISOString()
-
-    const docRef = await db
-      .collection("users")
-      .doc(userId)
-      .collection("backlog")
-      .add({
-        ...task,
-        userId,
-        createdAt: now,
-        updatedAt: now
-      })
-
-    const newTask: Task = {
-      id: docRef.id,
-      userId,
+    const taskWithTimestamps = {
       ...task,
+      id: crypto.randomUUID(),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      userId
+    }
+
+    if (!doc.exists) {
+      // Initialize with first task if document doesn't exist
+      await docRef.set({
+        tasks: [taskWithTimestamps]
+      })
+    } else {
+      // Append task to existing tasks array
+      await docRef.update({
+        tasks: firestore.FieldValue.arrayUnion(taskWithTimestamps)
+      })
     }
 
     return {
       isSuccess: true,
       message: "Task added to backlog successfully",
-      data: newTask
+      data: taskWithTimestamps
     }
   } catch (error) {
-    console.error("Error adding task to backlog:", error)
+    console.error("Failed to add task to backlog:", error)
     return { isSuccess: false, message: "Failed to add task to backlog" }
   }
 }
@@ -365,30 +375,30 @@ export async function updateBacklogTaskAction(
     const userId = await getAuthenticatedUserId()
     const now = new Date().toISOString()
 
-    const docRef = db
-      .collection("users")
-      .doc(userId)
-      .collection("backlog")
-      .doc(taskId)
+    const docRef = db.collection("userBacklog").doc(userId)
+    const doc = await docRef.get()
 
-    const docSnap = await docRef.get()
-    if (!docSnap.exists) {
+    if (!doc.exists) {
+      return { isSuccess: false, message: "Backlog not found" }
+    }
+
+    const data = doc.data()
+    const tasks = data?.tasks || []
+    const taskIndex = tasks.findIndex((t: Task) => t.id === taskId)
+
+    if (taskIndex === -1) {
       return { isSuccess: false, message: "Task not found in backlog" }
     }
 
     const updatedTask = {
-      ...docSnap.data(),
-      ...updates,
-      updatedAt: now
-    } as Task
-
-    // Convert to plain object for Firestore update
-    const updateData = {
+      ...tasks[taskIndex],
       ...updates,
       updatedAt: now
     }
 
-    await docRef.update(updateData)
+    tasks[taskIndex] = updatedTask
+
+    await docRef.update({ tasks })
 
     return {
       isSuccess: true,
@@ -407,13 +417,19 @@ export async function updateBacklogTaskAction(
 export async function deleteBacklogTaskAction(taskId: string): Promise<ActionState<void>> {
   try {
     const userId = await getAuthenticatedUserId()
+    
+    const docRef = db.collection("userBacklog").doc(userId)
+    const doc = await docRef.get()
 
-    await db
-      .collection("users")
-      .doc(userId)
-      .collection("backlog")
-      .doc(taskId)
-      .delete()
+    if (!doc.exists) {
+      return { isSuccess: false, message: "Backlog not found" }
+    }
+
+    const data = doc.data()
+    const tasks = data?.tasks || []
+    const updatedTasks = tasks.filter((t: Task) => t.id !== taskId)
+
+    await docRef.update({ tasks: updatedTasks })
 
     return {
       isSuccess: true,
@@ -423,6 +439,46 @@ export async function deleteBacklogTaskAction(taskId: string): Promise<ActionSta
   } catch (error) {
     console.error("Error deleting backlog task:", error)
     return { isSuccess: false, message: "Failed to delete task from backlog" }
+  }
+}
+
+/**
+ * Reorders tasks in the backlog by updating their positions.
+ */
+export async function reorderBacklogTasksAction(
+  taskIds: string[]
+): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    
+    const docRef = db.collection("userBacklog").doc(userId)
+    const doc = await docRef.get()
+
+    if (!doc.exists) {
+      return { isSuccess: false, message: "Backlog not found" }
+    }
+
+    const data = doc.data()
+    const currentTasks = data?.tasks || []
+    
+    // Create a map of tasks by ID for easy lookup
+    const tasksMap = new Map(currentTasks.map((t: Task) => [t.id, t]))
+    
+    // Create new ordered array based on taskIds
+    const orderedTasks = taskIds
+      .map(id => tasksMap.get(id))
+      .filter((t): t is Task => t !== undefined)
+
+    await docRef.update({ tasks: orderedTasks })
+
+    return {
+      isSuccess: true,
+      message: "Backlog tasks reordered successfully",
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error reordering backlog tasks:", error)
+    return { isSuccess: false, message: "Failed to reorder backlog tasks" }
   }
 }
 
@@ -453,8 +509,6 @@ export async function getIncompleteTasksAction(
       const tasks = data.tasks as Task[] || []
       incompleteTasks.push(...tasks.filter(t => !t.completed))
     }
-
-    console.log("Incomplete tasks:", incompleteTasks)
 
     return {
       isSuccess: true,

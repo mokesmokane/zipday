@@ -32,7 +32,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const [dateWindow, setDateWindow] = useState<DateWindow>(() => {
     const today = startOfDay(new Date())
     return {
-      startDate: today,
+      startDate: addDays(today, -7),
       endDate: addDays(today, DAYS_TO_LOAD)
     }
   })

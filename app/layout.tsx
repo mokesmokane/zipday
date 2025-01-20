@@ -4,6 +4,8 @@ import { ThemeProvider } from "next-themes"
 import { SidebarProvider } from "@/lib/context/sidebar-context"
 import { DateProvider } from "@/lib/context/date-context"
 import { TasksProvider } from "@/lib/context/tasks-context"
+import { BacklogProvider } from "@/lib/context/backlog-context"
+import { TaskActionsProvider } from "@/lib/context/task-actions-context"
 import { FilterProvider } from "@/lib/context/filter-context"
 import { CurrentViewProvider } from "@/lib/context/current-view-context"
 import { GoogleCalendarProvider } from "@/lib/context/google-calendar-context"
@@ -39,14 +41,18 @@ export default async function RootLayout({
             <SidebarProvider>
               <DateProvider>
                 <TasksProvider>
-                  <FilterProvider>
-                    <CurrentViewProvider>
-                      <GoogleCalendarProvider>
-                        {children}
-                      </GoogleCalendarProvider>
-                    </CurrentViewProvider>
-                  </FilterProvider>
-                </TasksProvider>
+                  <BacklogProvider>
+                  <TaskActionsProvider>
+                    <FilterProvider>
+                      <CurrentViewProvider>
+                        <GoogleCalendarProvider>
+                          {children}
+                        </GoogleCalendarProvider>
+                      </CurrentViewProvider>
+                    </FilterProvider>
+                    </TaskActionsProvider>
+                  </BacklogProvider>
+                  </TasksProvider>
               </DateProvider>
             </SidebarProvider>
           </RootProvider>

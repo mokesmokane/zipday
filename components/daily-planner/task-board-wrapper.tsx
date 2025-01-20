@@ -13,22 +13,11 @@ interface TaskBoardWrapperProps {
 
 export function TaskBoardWrapper({ today }: TaskBoardWrapperProps) {
   const { selectedDate, setSelectedDate } = useDate()
-
-  async function handleTaskUpdate(task: Task) {
-  
-  }
-
-  async function handleDeleteTask(taskId: string) {
-    
-  }
-
   return (
     <TaskBoard
       today={today}
       selectedDate={selectedDate || new Date()}
       setSelectedDate={setSelectedDate}
-      onTaskUpdate={handleTaskUpdate}
-      onDeleteTask={handleDeleteTask}
     />
   )
 } 

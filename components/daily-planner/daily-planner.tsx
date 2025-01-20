@@ -732,6 +732,23 @@ export default function DailyPlanner() {
                               (!activeId ||
                                 findTaskById(activeId)?.date === column.date)
                             }
+                            onAddTask={async task => {
+                              setLocalDailyTasks(prev => {
+                                const updated = structuredClone(prev)
+                                if (!updated[column.date]) {
+                                  updated[column.date] = {
+                                    tasks: [],
+                                    date: column.date,
+                                    id: "",
+                                    createdAt: "",
+                                    updatedAt: ""
+                                  }
+                                }
+                                updated[column.date].tasks.push(task)
+                                return updated
+                              })
+                              await addTaskAction(column.date, task)
+                            }}
                           >
                             {column.tasks.map(task => (
                               <TaskCard
