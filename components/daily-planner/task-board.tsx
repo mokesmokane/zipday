@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, DragOverlay } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { format, isToday, subDays, subMonths, subYears } from "date-fns"
@@ -18,14 +18,15 @@ import { cn } from "@/lib/utils"
 import { useTasks } from "@/lib/context/tasks-context"
 import { useBacklog } from "@/lib/context/backlog-context"
 import { useTaskActions } from "@/lib/context/task-actions-context"
+import { addTaskAction, deleteTaskAction, updateTaskAction } from "@/actions/db/tasks-actions"
 // Add this type definition at the top of the file
 type ColumnId = 'backlog' | 'incomplete' | 'today' | 'future' | 'calendar'
 
 // Add this constant to define allowed drag destinations for each column
 const ALLOWED_DROPS: Record<ColumnId, ColumnId[]> = {
-  'backlog': ['today', 'calendar'],  // Can only drag FROM backlog TO today or calendar
+  'backlog': ['today', 'calendar', 'backlog'],  // Can only drag FROM backlog TO today or calendar
   'incomplete': [], // Cannot drag TO incomplete
-  'today': ['backlog', 'calendar'],
+  'today': ['backlog', 'calendar', 'today'],
   'future': ['backlog', 'calendar', 'today'],
   'calendar': [] // Calendar items can go to backlog, today, or other calendar dates
 }
@@ -41,22 +42,32 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   const [isDragging, setIsDragging] = useState(false)
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+  const [localColumnTasks, setLocalColumnTasks] = useState<Record<string, Task[]>>({})
   const [incompleteTimeRange, setIncompleteTimeRange] = useState<"week" | "month" | "year" | "all">("week")
   const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
+  const [sourceColumnId, setSourceColumnId] = useState<ColumnId | null>(null)
   const { incompleteTasks, futureTasks, dailyTasks } = useTasks()
-  const { backlogTasks, reorderTasks: reorderBacklogTasks, updateBacklogPreview, clearPreviews } = useBacklog()
+  const { backlogTasks, reorderTasks: reorderBacklogTasks, clearPreviews, deleteTask: deleteBacklogTask, updateTask: updateBacklogTask, addTask: addBacklogTask, refreshBacklog } = useBacklog()
+  
   const { 
     addTask, 
     deleteTask, 
     updateTask, 
-    addBacklogTask,
-    deleteBacklogTask,
-    updateBacklogTask,
-    
+    reorderDayTasks,
     refreshTasks,
-    refreshBacklog
-  } = useTaskActions()
+  } = useTasks()
 
+  // Sync local state with global tasks
+  useEffect(() => {
+    console.log("Syncing local state with global tasks")
+    setLocalColumnTasks({
+      backlog: backlogTasks,
+      today: dailyTasks[today.date]?.tasks || [],
+      incomplete: incompleteTasks,
+      future: futureTasks
+    })
+  }, [backlogTasks, dailyTasks, incompleteTasks, futureTasks])
+  
   // Filter incomplete tasks based on time range
   const filteredIncompleteTasks = incompleteTasks.filter(task => {
     const taskDate = new Date(task.createdAt)
@@ -106,7 +117,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           </Button>
         </>
       ), 
-      tasks: backlogTasks,
+      tasks: localColumnTasks.backlog || [],
       onAddTask: async (task: Task) => {
         await addBacklogTask(task)
         await refreshBacklog()
@@ -188,7 +199,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           </Button>
         </>
       ), 
-      tasks: todayTasks,
+      tasks: localColumnTasks.today || [],
       onAddTask: async (task: Task) => {
         const date = format(new Date(), "yyyy-MM-dd")
         await addTask(date, task)
@@ -213,7 +224,8 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
       active: event.active.id
     })
     const { active } = event
-    
+    const columnId = active.data.current?.sortable?.containerId?.split('-')[0] as ColumnId
+    setSourceColumnId(columnId)
     // Check all columns for the task
     const task = 
       backlogTasks.find(t => t.id === active.id) ||
@@ -227,127 +239,202 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     }
   }
 
-  function handleDragOver(event: DragOverEvent) {
+  const handleDragOver = (event: DragOverEvent) => {
+    
     const { active, over } = event
     if (!over || !activeTask) return
 
-    // Get column IDs
-    const activeColumnId = active.data.current?.sortable?.containerId?.split('-')[0]
-    const overColumnId = over.data.current?.sortable?.containerId?.split('-')[0] || over.id
+    console.log("Active task:", activeTask)
+    console.log("Over:", over)
 
-    // Don't show preview if we're still in the source column
-    if (activeColumnId === overColumnId) {
-      setPreviewColumnId(null)
-      return
-    }
+    const activeId = active.id as string
+    const overId = over.id as string
 
-    // Check if this is a valid drop target
-    const sourceColumn = activeColumnId as ColumnId
-    const targetColumn = overColumnId as ColumnId
 
-    // Only show preview if it's a valid drop target and not the source column
-    if (ALLOWED_DROPS[sourceColumn]?.includes(targetColumn)) {
-      setPreviewColumnId(overColumnId.toString())
-      
-      // Create a preview task
-      const previewTask = {
-        ...activeTask,
-        id: `preview-${activeTask.id}`,
-        calendarItem: overColumnId.startsWith('calendar') 
-          ? {
-              start: { date: overColumnId.split('-')[1] },
-              end: { date: overColumnId.split('-')[1] }
-            }
-          : undefined
-      }
+    // Check if over a calendar hour
+    // const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
+    // const isOverCalendarColumn = overId.startsWith("calendar-")
 
-      // Update tasks in context to show preview
-      if (overColumnId === 'backlog') {
-        // Preview in backlog
-        const updatedBacklogTasks = [...backlogTasks, previewTask]
-        // Update backlog context with preview
-        updateBacklogPreview(updatedBacklogTasks)
-      } else if (overColumnId.startsWith('calendar')) {
-        // Preview in calendar
-        const date = overColumnId.split('-')[1]
-        const updatedDailyTasks = {
-          ...dailyTasks,
-          [date]: {
-            date,
-            tasks: [...(dailyTasks[date]?.tasks || []), previewTask]
-          }
+    // if (isOverCalendarHour || isOverCalendarColumn) {
+    //   const targetDate = isOverCalendarHour
+    //     ? getDateFromCalendarId(overId)
+    //     : getDateFromCalendarId(overId)
+    //   setIsOverCalendarZone(targetDate)
+    // } else {
+    //   setIsOverCalendarZone(null)
+    // }
+
+    // Preview dropping into a calendar hour
+    // if (isOverCalendarHour) {
+    //   const [, fullDate, hourStr] = isOverCalendarHour
+    //   const hour = parseInt(hourStr, 10)
+
+    //   // Update the task startTime for preview
+    //   const updatedTask:Task = {
+    //     ...activeTask,
+    //     calendarItem: {
+    //       start: {
+    //         date: fullDate,
+    //         dateTime: createStartTimeISO(fullDate, hour)
+    //       }
+    //     }
+    //   }
+
+    //   setLocalColumnTasks(prev => {
+    //     const updated = structuredClone(prev)
+
+    //     // Remove from all dates for preview
+    //     Object.keys(updated).forEach(date => {
+    //       if (date !== overId) {
+    //         updated[date] = updated[date].filter(t => t.id !== activeId)
+    //       }
+    //     })
+
+    //     // Add to preview date
+    //     if (!updated[overId]) {
+    //         updated[overId] = []
+    //     }
+
+    //     const existingTaskIndex = updated[overId].findIndex(
+    //       t => t.id === activeId
+    //     )
+    //     if (existingTaskIndex !== -1) {
+    //       updated[overId][existingTaskIndex] = activeTask
+    //     } else {
+    //       updated[overId].push(activeTask)
+    //     }
+
+    //     return updated
+    //   })
+
+    //   setPreviewColumnId(overId)
+    //   return
+    // }
+
+    // Preview normal column drops
+    const newCol = columns.find(
+      col => col.id === over.data.current?.sortable?.containerId?.split('-')[0]
+    )
+    if (!newCol) return
+
+    setLocalColumnTasks(prev => {
+      console.log("Updating local column tasks")
+      const updated = structuredClone(prev)
+
+      // Remove from all dates for preview
+      Object.keys(updated).forEach(date => {
+        if (date !== newCol.id) {
+          updated[date] = updated[date].filter(t => t.id !== activeId)
         }
-        // Update tasks context with preview
-        // You'll need to add a method to your context to handle previews
-        // updateTasksPreview(updatedDailyTasks)
+      })
+
+      // Add to preview date
+      if (!updated[newCol.id]) {
+        updated[newCol.id] = []
       }
-    } else {
-      setPreviewColumnId(null)
-      // Clear any previews
-      clearPreviews()
-    }
+
+      const overIndex = newCol.tasks.findIndex(t => t.id === overId)
+      const indexToInsert =
+        overIndex >= 0 ? overIndex : updated[newCol.id].length
+
+      const existingTaskIndex = updated[newCol.id].findIndex(
+        t => t.id === activeId
+      )
+      if (existingTaskIndex !== -1) {
+        updated[newCol.id][existingTaskIndex] = activeTask
+      } else {
+        updated[newCol.id].splice(indexToInsert, 0, activeTask)
+      }
+
+      return updated
+    })
+
+    setPreviewColumnId(newCol.id)
   }
 
   async function handleDragEnd(event: DragEndEvent) {
-    console.log("Drag end event data:", {
-      activeContainer: event.active.data.current?.sortable?.containerId,
-      overContainer: event.over?.data.current?.sortable?.containerId,
-      activeId: event.active.id,
-      overId: event.over?.id
-    })
-    console.log("Active task:", activeTask)
     const { active, over } = event
     setIsDragging(false)
     setActiveTask(null)
-    console.log("Active task:", activeTask)
-    console.log("Over:", over)
     if (!over || !activeTask) return
 
-    // Get the column IDs from the data attributes
-    const activeColumnId = active.data.current?.sortable?.containerId?.split('-')[0]
-    const overColumnId = over.data.current?.sortable?.containerId?.split('-')[0]
+    const targetColumnId = over.data.current?.sortable?.containerId?.split('-')[0] as ColumnId || over.id.toString().split('-')[0] as ColumnId
 
-    // Handle drops between columns
-    const overId = over.id.toString()
-    if (columns.some(col => col.id === overId)) {
-      // Update task status based on column
-      const updatedTask = { ...activeTask }
+    // Handle reordering within the same column
+    const tasks = localColumnTasks[targetColumnId] || []
+    const overIndex = tasks.findIndex(t => t.id === over.id)
+    if (sourceColumnId === targetColumnId) {
+      const oldIndex = tasks.findIndex(t => t.id === active.id)
       
-      if (overId === "backlog") {
-        updatedTask.calendarItem = undefined
+      if (oldIndex !== -1 && overIndex !== -1) {
+        const newTasks = [...tasks]
+        const [movedTask] = newTasks.splice(oldIndex, 1)
+        newTasks.splice(overIndex, 0, movedTask)
+        
+        setLocalColumnTasks(prev => ({
+          ...prev,
+          [targetColumnId]: newTasks
+        }))
+
+        // If in backlog, use backlog reorder function
+        // Then in your reordering code:
+        if (targetColumnId === 'backlog') {
+          await reorderBacklogTasks(newTasks.map(t => t.id))
+        } else if (targetColumnId === 'today') {
+          await reorderDayTasks(today.date, newTasks.map(t => t.id))
+        } 
+      }
+      return
+    }
+
+    // Validate the drop is allowed for cross-column moves
+    const isValidDrop = sourceColumnId && ALLOWED_DROPS[sourceColumnId]?.includes(targetColumnId)
+    if (!isValidDrop) {
+      console.log("Invalid drop target:", { sourceColumnId, targetColumnId })
+      return
+    }
+
+    try {
+      const todayDate = format(new Date(), "yyyy-MM-dd")
+
+      // Moving TO backlog
+      if (targetColumnId === 'backlog') {
+        console.log("Moving to backlog")
+        if (sourceColumnId === 'today') {
+          // Remove from today's tasks
+          await deleteTask(todayDate, activeTask.id)
+          // Add to backlog
+          await addBacklogTask({
+            ...activeTask,
+            calendarItem: undefined
+          }, overIndex)
+        } else if (sourceColumnId === 'calendar') {
+          const sourceDate = active.id.toString().split('-')[1]
+          // Remove from calendar date
+          await deleteTask(sourceDate, activeTask.id)
+          // Add to backlog
+          await addBacklogTask({
+            ...activeTask,
+            calendarItem: undefined
+          }, overIndex)
+        }
       }
       
-      // Handle moving tasks between columns
-      if (activeTask) {
-        const activeColumnId = active.data.current?.sortable?.containerId?.split('-')[0]
-        const overColumnId = overId
-
-        // Moving from backlog to today
-        if (activeColumnId === 'backlog' && overColumnId === 'today') {
-          const todayDate = format(new Date(), "yyyy-MM-dd")
-          
-          // First delete from backlog
+      // Moving FROM backlog
+      else if (sourceColumnId === 'backlog') {
+        if (targetColumnId === 'today') {
+          // Remove from backlog
           await deleteBacklogTask(activeTask.id)
-          
-          // Then add to today
+          // Add to today
           await addTask(todayDate, {
             ...activeTask,
-            calendarItem: undefined // Clear any calendar item
+            calendarItem: undefined
           })
-          
-          // Refresh both contexts
-          await refreshBacklog()
-          await refreshTasks()
-        }
-        
-        // Moving from backlog to calendar
-        else if (activeColumnId === 'backlog' && overColumnId.startsWith('calendar')) {
-          const targetDate = overColumnId.split('-')[1] // Get date from calendar-YYYY-MM-DD
-          
-          // Delete from backlog
+        } else if (targetColumnId === 'calendar') {
+          const targetDate = over.id.toString().split('-')[1]
+          // Remove from backlog
           await deleteBacklogTask(activeTask.id)
-          
-          // Add to target date with calendar item
+          // Add to calendar date
           await addTask(targetDate, {
             ...activeTask,
             calendarItem: {
@@ -355,107 +442,32 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
               end: { date: targetDate }
             }
           })
-          
-          // Refresh both contexts
-          await refreshBacklog()
-          await refreshTasks()
-        }
-        
-        // Moving from future to calendar
-        else if (activeColumnId === 'future' && overColumnId.startsWith('calendar')) {
-          const targetDate = overColumnId.split('-')[1]
-          const sourceDate = Object.entries(dailyTasks).find(
-            ([_, day]) => day.tasks.some(t => t.id === activeTask.id)
-          )?.[0]
-          
-          if (sourceDate) {
-            // Delete from source date
-            await deleteTask(sourceDate, activeTask.id)
-            
-            // Add to target date with calendar item
-            await addTask(targetDate, {
-              ...activeTask,
-              calendarItem: {
-                start: { date: targetDate },
-                end: { date: targetDate }
-              }
-            })
-            
-            // Refresh tasks
-            await refreshTasks()
-          }
-        }
-        
-        // Moving from incomplete to calendar
-        else if (activeColumnId === 'incomplete' && overColumnId.startsWith('calendar')) {
-          const targetDate = overColumnId.split('-')[1]
-          const sourceDate = Object.entries(dailyTasks).find(
-            ([_, day]) => day.tasks.some(t => t.id === activeTask.id)
-          )?.[0]
-          
-          if (sourceDate) {
-            // Delete from source date
-            await deleteTask(sourceDate, activeTask.id)
-            
-            // Add to target date with calendar item
-            await addTask(targetDate, {
-              ...activeTask,
-              calendarItem: {
-                start: { date: targetDate },
-                end: { date: targetDate }
-              }
-            })
-            
-            // Refresh tasks
-            await refreshTasks()
-          }
-        }
-        
-        // Moving between calendar dates
-        else if (activeColumnId.startsWith('calendar') && overColumnId.startsWith('calendar')) {
-          const sourceDate = activeColumnId.split('-')[1]
-          const targetDate = overColumnId.split('-')[1]
-          
-          if (sourceDate !== targetDate) {
-            // Delete from source date
-            await deleteTask(sourceDate, activeTask.id)
-            
-            // Add to target date with updated calendar item
-            await addTask(targetDate, {
-              ...activeTask,
-              calendarItem: {
-                ...activeTask.calendarItem,
-                start: { date: targetDate },
-                end: { date: targetDate }
-              }
-            })
-            
-            // Refresh tasks
-            await refreshTasks()
-          }
         }
       }
-    }
-    
-    // Handle reordering within backlog
-    if (activeColumnId === 'backlog' && overColumnId === 'backlog') {
-      const backlogTaskIds = backlogTasks.map(t => t.id)
-      const oldIndex = backlogTaskIds.indexOf(active.id.toString())
-      const newIndex = backlogTaskIds.indexOf(over.id.toString())
 
-      if (oldIndex !== newIndex) {
-        console.log("Reordering backlog tasks")
-        const newTaskIds = [...backlogTaskIds]
-        newTaskIds.splice(oldIndex, 1)
-        newTaskIds.splice(newIndex, 0, active.id.toString())
-        
-        // Update the order in Firestore through the context
-        await reorderBacklogTasks(newTaskIds)
-        await refreshBacklog()
+      // Moving between calendar dates
+      else if (sourceColumnId === 'calendar' && targetColumnId === 'calendar') {
+        const sourceDate = active.id.toString().split('-')[1]
+        const targetDate = over.id.toString().split('-')[1]
+        if (sourceDate !== targetDate) {
+          // Remove from source date
+          await deleteTask(sourceDate, activeTask.id)
+          // Add to target date
+          await addTask(targetDate, {
+            ...activeTask,
+            calendarItem: {
+              start: { date: targetDate },
+              end: { date: targetDate }
+            }
+          })
+        }
       }
+
+    } catch (error) {
+      console.error("Error handling drag end:", error)
     }
 
-    // Clear previews
+    // Clear previews and states
     clearPreviews()
     setPreviewColumnId(null)
     setIsDragging(false)
@@ -488,20 +500,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
                   isOverCalendarZone={false}
                   showCalendarZone={false}
                   onAddTask={column.onAddTask}
-                  // isValidDropZone={
-                  //   activeTask ? (
-                  //     // Determine source column and check allowed destinations
-                  //     (() => {
-                  //       const sourceColumn = 
-                  //         backlogTasks.find(t => t.id === activeTask.id) ? 'backlog' :
-                  //         incompleteTasks.find(t => t.id === activeTask.id) ? 'incomplete' :
-                  //         todayTasks.find(t => t.id === activeTask.id) ? 'today' :
-                  //         futureTasks.find(t => t.id === activeTask.id) ? 'future' : 'calendar'
-                        
-                  //       return ALLOWED_DROPS[sourceColumn]?.includes(column.id as ColumnId) ?? false
-                  //     })()
-                  //   ) : true
-                  // }
                 >
                   {column.tasks.map(task => (
                     <TaskCard

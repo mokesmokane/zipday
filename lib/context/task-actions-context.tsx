@@ -5,6 +5,9 @@ import {
   addTaskAction as addTaskDb,
   deleteTaskAction as deleteTaskDb,
   updateTaskAction as updateTaskDb,
+  reorderDayTasksAction as reorderDayTasksDb,
+  setDayTasksAction as setDayTasksDb,
+  setBacklogTasksAction as setBacklogTasksDb,
   addBacklogTaskAction as addBacklogTaskDb,
   deleteBacklogTaskAction as deleteBacklogTaskDb,
   updateBacklogTaskAction as updateBacklogTaskDb
@@ -17,9 +20,12 @@ interface TaskActionsContextType {
   addTask: typeof addTaskDb
   deleteTask: typeof deleteTaskDb
   updateTask: typeof updateTaskDb
+  setDayTasks: typeof setDayTasksDb
+  setBacklogTasks: typeof setBacklogTasksDb
   addBacklogTask: typeof addBacklogTaskDb
   deleteBacklogTask: typeof deleteBacklogTaskDb
   updateBacklogTask: typeof updateBacklogTaskDb
+  reorderDayTasks: typeof reorderDayTasksDb
   refreshTasks: () => Promise<void>
   refreshBacklog: () => Promise<void>
 }
@@ -34,9 +40,12 @@ export function TaskActionsProvider({ children }: { children: React.ReactNode })
     addTask: addTaskDb,
     deleteTask: deleteTaskDb,
     updateTask: updateTaskDb,
+    setDayTasks: setDayTasksDb,
+    setBacklogTasks: setBacklogTasksDb,
     addBacklogTask: addBacklogTaskDb,
     deleteBacklogTask: deleteBacklogTaskDb,
     updateBacklogTask: updateBacklogTaskDb,
+    reorderDayTasks: reorderDayTasksDb,
     refreshTasks,
     refreshBacklog
   }

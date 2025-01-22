@@ -89,7 +89,6 @@ export function GoogleCalendarProvider({
         setIsLoading(true)
         const response = await fetch("/api/google/calendar/events")
         const { events } = await response.json()
-        console.log("Initial events loaded:", events)
         setEvents(events)
         setError(null)
       } catch (error) {

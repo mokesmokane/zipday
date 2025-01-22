@@ -126,6 +126,7 @@ export async function addTaskAction(
       tasks = dailyData.tasks || []
     }
 
+    // Add task to the end of the array to maintain order
     tasks.push(task)
     await docRef.set({ tasks }, { merge: true })
 
@@ -482,6 +483,46 @@ export async function reorderBacklogTasksAction(
   }
 }
 
+
+export async function reorderDayTasksAction(
+  dateDoc: string,
+  taskIds: string[]
+): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    
+    const docRef = db.collection("userDays").doc(userId).collection("dailyTasks").doc(dateDoc)
+  const doc = await docRef.get()
+
+  if (!doc.exists) {
+    return { isSuccess: false, message: "Daily doc not found" }
+  }
+
+    const data = doc.data()
+  const currentTasks = data?.tasks || []
+  
+  // Create a map of tasks by ID for easy lookup
+  const tasksMap = new Map(currentTasks.map((t: Task) => [t.id, t]))
+  
+  // Create new ordered array based on taskIds
+  const orderedTasks = taskIds
+    .map(id => tasksMap.get(id))
+    .filter((t): t is Task => t !== undefined)
+
+  await docRef.update({ tasks: orderedTasks })
+
+  return {
+    isSuccess: true,
+    message: "Backlog tasks reordered successfully",
+    data: undefined
+  }
+} catch (error) {
+  console.error("Error reordering backlog tasks:", error)
+    return { isSuccess: false, message: "Failed to reorder backlog tasks" }
+  }
+}
+
+
 /**
  * Gets all incomplete tasks between a date range.
  */
@@ -518,5 +559,54 @@ export async function getIncompleteTasksAction(
   } catch (error) {
     console.error("Error getting incomplete tasks:", error)
     return { isSuccess: false, message: "Failed to get incomplete tasks" }
+  }
+}
+
+/**
+ * Reorders tasks for a specific day by updating their positions.
+ */
+export async function setDayTasksAction(
+  dateDoc: string,
+  tasks: Task[]
+): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    
+    const docRef = db
+      .collection("userDays")
+      .doc(userId)
+      .collection("dailyTasks")
+      .doc(dateDoc)
+
+    await docRef.set({ tasks }, { merge: true })
+
+    return {
+      isSuccess: true,
+      message: "Tasks reordered successfully",
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error reordering tasks:", error)
+    return { isSuccess: false, message: "Failed to reorder tasks" }
+  }
+}
+
+
+export async function setBacklogTasksAction(
+  tasks: Task[]
+): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const docRef = db.collection("userBacklog").doc(userId)
+    await docRef.set({ tasks }, { merge: true })
+
+    return {
+      isSuccess: true,
+      message: "Backlog tasks set successfully",
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error setting backlog tasks:", error)
+    return { isSuccess: false, message: "Failed to set backlog tasks" }
   }
 }
