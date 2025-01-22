@@ -107,7 +107,8 @@ export async function getDaysByDateRangeAction(
  */
 export async function addTaskAction(
   dateDoc: string,
-  task: Task
+  task: Task,
+  insertIndex?: number
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
@@ -127,7 +128,11 @@ export async function addTaskAction(
     }
 
     // Add task to the end of the array to maintain order
-    tasks.push(task)
+    if (insertIndex !== undefined) {
+      tasks.splice(insertIndex, 0, task)
+    } else {
+      tasks.push(task)
+    }
     await docRef.set({ tasks }, { merge: true })
 
     // Sync with Google Calendar

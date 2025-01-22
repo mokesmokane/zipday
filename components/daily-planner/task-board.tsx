@@ -60,6 +60,10 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   // Sync local state with global tasks
   useEffect(() => {
     console.log("Syncing local state with global tasks")
+    console.log("Backlog tasks:", backlogTasks)
+    console.log("Daily tasks:", dailyTasks)
+    console.log("Incomplete tasks:", incompleteTasks)
+    console.log("Future tasks:", futureTasks)
     setLocalColumnTasks({
       backlog: backlogTasks,
       today: dailyTasks[today.date]?.tasks || [],
@@ -354,9 +358,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
+    if (!over || !activeTask) return
     setIsDragging(false)
     setActiveTask(null)
-    if (!over || !activeTask) return
 
     const targetColumnId = over.data.current?.sortable?.containerId?.split('-')[0] as ColumnId || over.id.toString().split('-')[0] as ColumnId
 
@@ -402,18 +406,18 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
         console.log("Moving to backlog")
         if (sourceColumnId === 'today') {
           // Remove from today's tasks
-          await deleteTask(todayDate, activeTask.id)
+          deleteTask(todayDate, activeTask.id)
           // Add to backlog
-          await addBacklogTask({
+          addBacklogTask({
             ...activeTask,
             calendarItem: undefined
           }, overIndex)
         } else if (sourceColumnId === 'calendar') {
           const sourceDate = active.id.toString().split('-')[1]
           // Remove from calendar date
-          await deleteTask(sourceDate, activeTask.id)
+          deleteTask(sourceDate, activeTask.id)
           // Add to backlog
-          await addBacklogTask({
+          addBacklogTask({
             ...activeTask,
             calendarItem: undefined
           }, overIndex)
@@ -424,18 +428,18 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
       else if (sourceColumnId === 'backlog') {
         if (targetColumnId === 'today') {
           // Remove from backlog
-          await deleteBacklogTask(activeTask.id)
+          deleteBacklogTask(activeTask.id)
           // Add to today
-          await addTask(todayDate, {
+          addTask(todayDate, {
             ...activeTask,
             calendarItem: undefined
-          })
+          }, overIndex)
         } else if (targetColumnId === 'calendar') {
           const targetDate = over.id.toString().split('-')[1]
           // Remove from backlog
-          await deleteBacklogTask(activeTask.id)
+          deleteBacklogTask(activeTask.id)
           // Add to calendar date
-          await addTask(targetDate, {
+          addTask(targetDate, {
             ...activeTask,
             calendarItem: {
               start: { date: targetDate },
@@ -451,9 +455,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
         const targetDate = over.id.toString().split('-')[1]
         if (sourceDate !== targetDate) {
           // Remove from source date
-          await deleteTask(sourceDate, activeTask.id)
+          deleteTask(sourceDate, activeTask.id)
           // Add to target date
-          await addTask(targetDate, {
+          addTask(targetDate, {
             ...activeTask,
             calendarItem: {
               start: { date: targetDate },

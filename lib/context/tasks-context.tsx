@@ -19,7 +19,7 @@ interface TasksContextType {
   isLoading: boolean
   error: string | null
   refreshTasks: () => Promise<void>
-  addTask: (date: string, task: Task) => Promise<void>
+  addTask: (date: string, task: Task, insertIndex?: number) => Promise<void>
   updateTask: (date: string, taskId: string, updates: Partial<Task>) => Promise<void>
   deleteTask: (date: string, taskId: string) => Promise<void>
   reorderDayTasks: (date: string, taskIds: string[]) => Promise<void>
@@ -141,7 +141,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const addTask = async (date: string, task: Task) => {
+  const addTask = async (date: string, task: Task, insertIndex?: number) => {
     const tempTask: Task = {
       ...task,
       id: task.id || crypto.randomUUID(),
@@ -155,14 +155,14 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       [date]: {
         id: prev[date]?.id || crypto.randomUUID(),
         date,
-        tasks: [...(prev[date]?.tasks || []), tempTask],
+        tasks: insertIndex !== undefined ? [...(prev[date]?.tasks || []).slice(0, insertIndex), tempTask, ...(prev[date]?.tasks || []).slice(insertIndex)] :  [...(prev[date]?.tasks || []), tempTask],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
     }))
 
     try {
-      const result = await addTaskAction(date, tempTask)
+      const result = await addTaskAction(date, tempTask, insertIndex)
       if (!result.isSuccess) {
         // Revert on failure
         await refreshTasks()
