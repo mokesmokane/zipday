@@ -5,6 +5,7 @@ import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor,
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { format, isToday, subDays, subMonths, subYears } from "date-fns"
 import { Plus } from "lucide-react"
+import { v4 as uuidv4 } from "uuid"
 
 import { TaskColumn } from "./task-column"
 import { TaskCard } from "./task-card"
@@ -238,7 +239,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    
     const { active, over } = event
     if (!over || !activeTask) return
 
@@ -248,75 +248,69 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     const activeId = active.id as string
     const overId = over.id as string
 
-
     // Check if over a calendar hour
-    // const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
-    // const isOverCalendarColumn = overId.startsWith("calendar-")
+    const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
+    const isOverCalendarColumn = overId.startsWith("calendar-")
 
-    // if (isOverCalendarHour || isOverCalendarColumn) {
-    //   const targetDate = isOverCalendarHour
-    //     ? getDateFromCalendarId(overId)
-    //     : getDateFromCalendarId(overId)
-    //   setIsOverCalendarZone(targetDate)
-    // } else {
-    //   setIsOverCalendarZone(null)
-    // }
+    if (isOverCalendarHour || isOverCalendarColumn) {
+      const targetDate = isOverCalendarHour
+        ? overId.split('-')[1]
+        : overId.split('-')[1]
+      
+      // Update the task startTime for preview
+      const updatedTask: Task = {
+        ...activeTask,
+        calendarItem: {
+          start: { date: targetDate },
+          end: { date: targetDate }
+        }
+      }
 
-    // Preview dropping into a calendar hour
-    // if (isOverCalendarHour) {
-    //   const [, fullDate, hourStr] = isOverCalendarHour
-    //   const hour = parseInt(hourStr, 10)
+      if (isOverCalendarHour) {
+        const [, , hourStr] = isOverCalendarHour
+        const hour = parseInt(hourStr, 10)
+        updatedTask.calendarItem = {
+          start: {
+            date: targetDate,
+            dateTime: `${targetDate}T${hour.toString().padStart(2, '0')}:00:00`
+          },
+          end: {
+            date: targetDate,
+            dateTime: `${targetDate}T${(hour + 1).toString().padStart(2, '0')}:00:00`
+          }
+        }
+      }
 
-    //   // Update the task startTime for preview
-    //   const updatedTask:Task = {
-    //     ...activeTask,
-    //     calendarItem: {
-    //       start: {
-    //         date: fullDate,
-    //         dateTime: createStartTimeISO(fullDate, hour)
-    //       }
-    //     }
-    //   }
+      setLocalColumnTasks(prev => {
+        const updated = structuredClone(prev)
 
-    //   setLocalColumnTasks(prev => {
-    //     const updated = structuredClone(prev)
+        // Only remove from preview if not dragging from today column to today's calendar
+        const isTodayCalendar = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+        const isDraggingFromToday = sourceColumnId === 'today'
 
-    //     // Remove from all dates for preview
-    //     Object.keys(updated).forEach(date => {
-    //       if (date !== overId) {
-    //         updated[date] = updated[date].filter(t => t.id !== activeId)
-    //       }
-    //     })
+        if (!(isTodayCalendar && isDraggingFromToday)) {
+          Object.keys(updated).forEach(date => {
+            if (date !== overId) {
+              updated[date] = updated[date].filter(t => t.id !== activeId)
+            }
+          })
+        }
 
-    //     // Add to preview date
-    //     if (!updated[overId]) {
-    //         updated[overId] = []
-    //     }
+        return updated
+      })
 
-    //     const existingTaskIndex = updated[overId].findIndex(
-    //       t => t.id === activeId
-    //     )
-    //     if (existingTaskIndex !== -1) {
-    //       updated[overId][existingTaskIndex] = activeTask
-    //     } else {
-    //       updated[overId].push(activeTask)
-    //     }
-
-    //     return updated
-    //   })
-
-    //   setPreviewColumnId(overId)
-    //   return
-    // }
+      setPreviewColumnId(overId)
+      return
+    }
 
     /// Get target column id either from sortable container or direct column id
-  const targetColumnId = over.data.current?.sortable?.containerId?.split('-')[0] 
-    || (typeof over.id === 'string' && over.id.split('-')[0])
+    const targetColumnId = over.data.current?.sortable?.containerId?.split('-')[0] 
+      || (typeof over.id === 'string' && over.id.split('-')[0])
 
-  // Find the target column
-  const newCol = columns.find(col => col.id === targetColumnId)
+    // Find the target column
+    const newCol = columns.find(col => col.id === targetColumnId)
     
-  if (!newCol) return
+    if (!newCol) return
 
     setLocalColumnTasks(prev => {
       console.log("Updating local column tasks")
@@ -360,6 +354,90 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     setActiveTask(null)
 
     const targetColumnId = over.data.current?.sortable?.containerId?.split('-')[0] as ColumnId || over.id.toString().split('-')[0] as ColumnId
+    const isCalendarTarget = targetColumnId === 'calendar'
+    const targetDate = isCalendarTarget ? format(selectedDate, "yyyy-MM-dd") : null
+    const isOverCalendarHour = over.id.toString().match(/calendar-(.+)-hour-(\d+)/)
+
+    // Handle calendar drops
+    if (isCalendarTarget && targetDate) {
+      try {
+        console.log("Calendar drop - Source column:", sourceColumnId)
+        console.log("Calendar drop - Target date:", targetDate)
+        console.log("Calendar drop - Active task:", activeTask)
+        
+        const isTodayCalendar = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+        const isDraggingFromToday = sourceColumnId === 'today'
+        
+        // Generate the gcalEventId upfront
+        const gcalEventId = activeTask.calendarItem?.gcalEventId?.replace(/-/g, '') || uuidv4().replace(/-/g, '')
+        
+        let updatedTask: Task = {
+          ...activeTask,
+          calendarItem: {
+            gcalEventId,
+            start: { date: targetDate },
+            end: { date: targetDate }
+          }
+        }
+
+        // If dropping on a specific hour, set the time respecting duration
+        if (isOverCalendarHour) {
+          const hour = parseInt(isOverCalendarHour[2], 10)
+          const startDateTime = `${targetDate}T${hour.toString().padStart(2, '0')}:00:00`
+          
+          // Calculate end time based on task duration if it exists
+          const endDateTime = activeTask.durationMinutes 
+            ? new Date(new Date(startDateTime).getTime() + activeTask.durationMinutes * 60000).toISOString()
+            : `${targetDate}T${(hour + 1).toString().padStart(2, '0')}:00:00`
+          
+          updatedTask.calendarItem = {
+            gcalEventId,
+            start: {
+              date: targetDate,
+              dateTime: startDateTime
+            },
+            end: {
+              date: targetDate,
+              dateTime: endDateTime
+            }
+          }
+        }
+
+        // If dragging from backlog
+        if (sourceColumnId === 'backlog') {
+          console.log("Moving from backlog to calendar")
+          await deleteBacklogTask(activeTask.id)
+          await addTask(targetDate, updatedTask)
+        }
+        // If dragging from today to today's calendar, just update the task
+        else if (isTodayCalendar && isDraggingFromToday) {
+          console.log("Updating today's task in calendar")
+          await updateTask(activeTask.id, updatedTask)
+        }
+        // If dragging from incomplete or future
+        else if (sourceColumnId === 'incomplete' || sourceColumnId === 'future') {
+          console.log("Moving from incomplete/future to calendar")
+          // First add to new date, then delete from old
+          await addTask(targetDate, updatedTask)
+          await deleteTask(activeTask.id)
+        }
+        // If dragging from any other day column
+        else {
+          console.log("Moving from other day to calendar")
+          await addTask(targetDate, updatedTask)
+          await deleteTask(activeTask.id)
+        }
+
+        console.log("Refreshing tasks and backlog")
+        await refreshTasks()
+        await refreshBacklog()
+        return
+      } catch (error) {
+        console.error("Error handling calendar drag end:", error)
+        console.error(error)
+        return
+      }
+    }
 
     // Handle reordering within the same column
     const tasks = localColumnTasks[targetColumnId] || []
@@ -409,138 +487,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     } catch (error) {
       console.error("Error handling drag end:", error)
     }
-
-      // Moving TO backlog
-    //   if (targetColumnId === 'backlog') {
-    //     console.log("Moving to backlog from", sourceColumnId)
-    //     console.log("Active task:", activeTask)
-    //     console.log("Over index:", overIndex)
-    //     if (sourceColumnId === 'today') {
-    //       // Remove from today's tasks
-    //       
-    //       // Add to backlog
-    //       addBacklogTask({
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       }, overIndex)
-    //     } else if (sourceColumnId === 'calendar') {
-    //       const sourceDate = active.id.toString().split('-')[1]
-    //       // Remove from calendar date
-    //       deleteTask(sourceDate, activeTask.id)
-    //       // Add to backlog
-    //       addBacklogTask({
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       }, overIndex)
-    //     } else if (sourceColumnId === 'incomplete') {
-    //       // Remove from incomplete
-    //       deleteIncompleteTask(activeTask.id)
-    //       // Add to backlog
-    //       addBacklogTask({
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       }, overIndex)
-    //     } else if (sourceColumnId === 'future') {
-    //       // Remove from future
-    //       deleteTask(active.id.toString().split('-')[1], activeTask.id)
-    //       // Add to backlog
-    //       addBacklogTask({
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       }, overIndex)
-    //     }
-    //   }
-      
-    //   // Moving FROM backlog
-    //   else if (sourceColumnId === 'backlog') {
-    //     if (targetColumnId === 'today') {
-    //       // Remove from backlog
-    //       deleteBacklogTask(activeTask.id)
-    //       // Add to today
-    //       addTask(todayDate, {
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       }, overIndex)
-    //     } else if (targetColumnId === 'calendar') {
-    //       const targetDate = over.id.toString().split('-')[1]
-    //       // Remove from backlog
-    //       deleteBacklogTask(activeTask.id)
-    //       // Add to calendar date
-    //       addTask(targetDate, {
-    //         ...activeTask,
-    //         calendarItem: {
-    //           start: { date: targetDate },
-    //           end: { date: targetDate }
-    //         }
-    //       })
-    //     }
-    //   }
-
-    //   else  if(sourceColumnId === 'incomplete'){
-    //     if (targetColumnId === 'today') {
-    //       // Remove from incomplete
-    //       deleteIncompleteTask(activeTask.id)
-    //       // Add to today
-    //       addTask(todayDate, {
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       })
-    //     }
-    //     else if (targetColumnId === 'backlog') {
-    //       // Remove from incomplete
-    //       deleteIncompleteTask(activeTask.id)
-    //       // Add to backlog
-    //       addBacklogTask({
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       })
-    //     }
-    //   }
-
-    //   else if(sourceColumnId === 'future'){
-    //     if (targetColumnId as ColumnId === 'today') {
-    //       // Remove from future
-    //       deleteTask(active.id.toString().split('-')[1], activeTask.id)
-    //       // Add to today
-    //       addTask(todayDate, {
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       })
-    //     }
-    //     else if (targetColumnId as ColumnId === 'backlog') {
-    //       // Remove from future
-    //       deleteTask(active.id.toString().split('-')[1], activeTask.id)
-    //       // Add to backlog
-    //       addBacklogTask({
-    //         ...activeTask,
-    //         calendarItem: undefined
-    //       })
-    //     }
-    //   }
-
-
-
-    //   // Moving between calendar dates
-    //   else if (sourceColumnId === 'calendar' && targetColumnId === 'calendar') {
-    //     const sourceDate = active.id.toString().split('-')[1]
-    //     const targetDate = over.id.toString().split('-')[1]
-    //     if (sourceDate !== targetDate) {
-    //       // Remove from source date
-    //       deleteTask(sourceDate, activeTask.id)
-    //       // Add to target date
-    //       addTask(targetDate, {
-    //         ...activeTask,
-    //         calendarItem: {
-    //           start: { date: targetDate },
-    //           end: { date: targetDate }
-    //         }
-    //       })
-    //     }
-    //   }
-
-    // } catch (error) {
-    //   console.error("Error handling drag end:", error)
-    
 
     // Clear previews and states
     clearPreviews()
@@ -646,7 +592,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
               date={format(selectedDate, "yyyy-MM-dd")}
               tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
               onDeleteTask={async (taskId) => {
-                const date = format(selectedDate, "yyyy-MM-dd")
                 await deleteTask(taskId)
                 await refreshTasks()
               }}

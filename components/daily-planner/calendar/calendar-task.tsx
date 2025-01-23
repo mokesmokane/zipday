@@ -52,9 +52,6 @@ export function CalendarTask({
   onDeleteTask?: (taskId: string) => void
 }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const style = getTaskStyle(task, position.index, position.total)
-  if (!style) return null
-
   const {
     attributes,
     listeners,
@@ -69,6 +66,9 @@ export function CalendarTask({
       task
     }
   })
+
+  const style = getTaskStyle(task, position.index, position.total)
+  if (!style) return null
 
   const dragStyle = {
     ...style,
@@ -126,7 +126,6 @@ export function CalendarTask({
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           onSave={(updatedTask) => {
-            // Handle task update through parent components
             onTaskUpdate?.(updatedTask)
             setIsEditDialogOpen(false)
           }}
