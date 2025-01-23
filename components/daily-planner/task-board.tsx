@@ -46,6 +46,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   const [localColumnTasks, setLocalColumnTasks] = useState<Record<string, Task[]>>({})
   const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
   const [sourceColumnId, setSourceColumnId] = useState<ColumnId | null>(null)
+  const [calendarColumnPreviewTask, setCalendarColumnPreviewTask] = useState<Task | null>(null)
   const { incompleteTasks, futureTasks, dailyTasks, incompleteTimeRange, setIncompleteTimeRange } = useTasks()
   const { backlogTasks, reorderTasks: reorderBacklogTasks, clearPreviews, deleteTask: deleteBacklogTask, updateTask: updateBacklogTask, addTask: addBacklogTask, refreshBacklog } = useBacklog()
   
@@ -57,6 +58,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     refreshTasks,
   } = useTasks()
 
+  // Add new state to track if we're over calendar
+  const [isOverCalendar, setIsOverCalendar] = useState(false)
+  
   // Sync local state with global tasks
   useEffect(() => {
     console.log("Syncing local state with global tasks")
@@ -264,6 +268,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
     const isOverCalendarColumn = overId.startsWith("calendar-")
 
+    // Update isOverCalendar state based on if we're over calendar
+    setIsOverCalendar(isOverCalendarHour !== null || isOverCalendarColumn)
+
     if (isOverCalendarHour || isOverCalendarColumn) {
       const targetDate = isOverCalendarHour
         ? overId.split('-')[1]
@@ -292,6 +299,8 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           }
         }
       }
+
+      setCalendarColumnPreviewTask(updatedTask)
 
       setLocalColumnTasks(prev => {
         const updated = structuredClone(prev)
@@ -505,6 +514,14 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     setPreviewColumnId(null)
     setIsDragging(false)
     setActiveTask(null)
+    setIsOverCalendar(false)
+  }
+
+  // Add this function
+  const mergeTasksWithPreview = (tasks: Task[], previewTask: Task | null): Task[] => {
+    if (!previewTask) return tasks;
+    const filtered = tasks.filter(t => t.id !== previewTask.id);
+    return [...filtered, previewTask];
   }
 
   return (
@@ -603,7 +620,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
               id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
               date={format(selectedDate, "yyyy-MM-dd")}
               singleColumn={true}
-              tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
+              tasks={mergeTasksWithPreview(dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || [], calendarColumnPreviewTask)}
               onDeleteTask={async (taskId) => {
                 await deleteTask(taskId)
                 await refreshTasks()
@@ -646,7 +663,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
             <TaskCard
               task={activeTask}
               day={today}
-              isOverCalendarZone={false}
+              isOverCalendarZone={isOverCalendar}
             />
           ) : null}
         </DragOverlay>

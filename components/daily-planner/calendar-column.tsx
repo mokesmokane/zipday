@@ -82,7 +82,6 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
               key={hour}
               id={id}
               hour={hour}
-              isOver={false}
             />
           ))}
           

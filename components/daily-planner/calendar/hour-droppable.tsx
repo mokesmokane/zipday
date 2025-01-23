@@ -7,10 +7,9 @@ const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
 interface HourDroppableProps {
   id: string
   hour: number
-  isOver: boolean
 }
 
-export function HourDroppable({ id, hour, isOver }: HourDroppableProps) {
+export function HourDroppable({ id, hour }: HourDroppableProps) {
   const { setNodeRef, isOver: isOverHour } = useDroppable({
     id: `${id}-hour-${hour}`
   })
