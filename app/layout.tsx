@@ -17,8 +17,8 @@ import { getServerUser } from "@/lib/firebaseAdmin"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "McKay's App Template",
-  description: "A template for building apps with Next.js and Firebase"
+  title: "ZipDay",
+  description: "A productivity app for the modern age"
 }
 
 

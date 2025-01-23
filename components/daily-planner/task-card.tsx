@@ -131,7 +131,7 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
         {/* Action buttons that appear on hover */}
         <div 
           className={cn(
-            "absolute right-2 top-2 flex items-center gap-1 transition-opacity duration-200",
+            "absolute left-1/2 -translate-x-1/2 -bottom-4 flex items-center gap-1 transition-opacity duration-200 bg-background rounded-md shadow-md p-1 border border-border",
             isHovered ? "opacity-100" : "opacity-0"
           )}
         >
