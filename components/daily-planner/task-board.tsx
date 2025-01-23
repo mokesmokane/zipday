@@ -24,11 +24,11 @@ type ColumnId = 'backlog' | 'incomplete' | 'today' | 'future' | 'calendar'
 
 // Add this constant to define allowed drag destinations for each column
 const ALLOWED_DROPS: Record<ColumnId, ColumnId[]> = {
-  'backlog': ['today', 'calendar', 'backlog'],  // Can only drag FROM backlog TO today or calendar
-  'incomplete': [], // Cannot drag TO incomplete
+  'backlog': ['today', 'calendar', 'backlog'],
+  'incomplete': ['backlog', 'today', 'calendar'], 
   'today': ['backlog', 'calendar', 'today'],
   'future': ['backlog', 'calendar', 'today'],
-  'calendar': [] // Calendar items can go to backlog, today, or other calendar dates
+  'calendar': ['backlog', 'today', 'calendar']
 }
 
 interface TaskBoardProps {
@@ -43,10 +43,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [localColumnTasks, setLocalColumnTasks] = useState<Record<string, Task[]>>({})
-  const [incompleteTimeRange, setIncompleteTimeRange] = useState<"week" | "month" | "year" | "all">("week")
   const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
   const [sourceColumnId, setSourceColumnId] = useState<ColumnId | null>(null)
-  const { incompleteTasks, futureTasks, dailyTasks } = useTasks()
+  const { incompleteTasks, futureTasks, dailyTasks, incompleteTimeRange, setIncompleteTimeRange } = useTasks()
   const { backlogTasks, reorderTasks: reorderBacklogTasks, clearPreviews, deleteTask: deleteBacklogTask, updateTask: updateBacklogTask, addTask: addBacklogTask, refreshBacklog } = useBacklog()
   
   const { 
@@ -64,6 +63,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     console.log("Daily tasks:", dailyTasks)
     console.log("Incomplete tasks:", incompleteTasks)
     console.log("Future tasks:", futureTasks)
+    
     setLocalColumnTasks({
       backlog: backlogTasks,
       today: dailyTasks[today.date]?.tasks || [],
@@ -72,25 +72,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     })
   }, [backlogTasks, dailyTasks, incompleteTasks, futureTasks])
   
-  // Filter incomplete tasks based on time range
-  const filteredIncompleteTasks = incompleteTasks.filter(task => {
-    const taskDate = new Date(task.createdAt)
-    const now = new Date()
-
-    switch (incompleteTimeRange) {
-      case "week":
-        return taskDate >= subDays(now, 7)
-      case "month":
-        return taskDate >= subMonths(now, 1)
-      case "year":
-        return taskDate >= subYears(now, 1)
-      case "all":
-        return true
-      default:
-        return true
-    }
-  })
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -122,9 +103,11 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
         </>
       ), 
       tasks: localColumnTasks.backlog || [],
-      onAddTask: async (task: Task) => {
-        await addBacklogTask(task)
-        await refreshBacklog()
+      onAddTask: async (task: Task, insertIndex?: number) => {
+        await addBacklogTask(task, insertIndex)
+      },
+      onDeleteTask: async (taskId: string) => {
+        await deleteBacklogTask(taskId)
       }
     },
     { 
@@ -182,7 +165,11 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           </div>
         </>
       ), 
-      tasks: filteredIncompleteTasks 
+      tasks: incompleteTasks,
+      onDeleteTask: async (taskId: string) => {
+        await deleteTask(taskId)
+        await refreshTasks()
+      }
     },
     { 
       id: "today", 
@@ -204,9 +191,12 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
         </>
       ), 
       tasks: localColumnTasks.today || [],
-      onAddTask: async (task: Task) => {
-        const date = format(new Date(), "yyyy-MM-dd")
-        await addTask(date, task)
+      onAddTask: async (task: Task, insertIndex?: number) => {  
+        await addTask(today.date, task, insertIndex)
+        await refreshTasks()
+      },
+      onDeleteTask: async (taskId: string) => {
+        await deleteTask(taskId)
         await refreshTasks()
       }
     },
@@ -219,7 +209,11 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           </h2>
         </div>
       ), 
-      tasks: futureTasks
+      tasks: futureTasks,
+      onDeleteTask: async (taskId: string) => {
+        await deleteTask(taskId)
+        await refreshTasks()
+      }
     },
   ]
 
@@ -315,11 +309,14 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     //   return
     // }
 
-    // Preview normal column drops
-    const newCol = columns.find(
-      col => col.id === over.data.current?.sortable?.containerId?.split('-')[0]
-    )
-    if (!newCol) return
+    /// Get target column id either from sortable container or direct column id
+  const targetColumnId = over.data.current?.sortable?.containerId?.split('-')[0] 
+    || (typeof over.id === 'string' && over.id.split('-')[0])
+
+  // Find the target column
+  const newCol = columns.find(col => col.id === targetColumnId)
+    
+  if (!newCol) return
 
     setLocalColumnTasks(prev => {
       console.log("Updating local column tasks")
@@ -400,76 +397,150 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
 
     try {
       const todayDate = format(new Date(), "yyyy-MM-dd")
+      //get source column delete function
+      const sourceColumnDelete = columns.find(col => col.id === sourceColumnId)?.onDeleteTask
+      //get target column add function
+      const targetColumnAdd = columns.find(col => col.id === targetColumnId)?.onAddTask
 
-      // Moving TO backlog
-      if (targetColumnId === 'backlog') {
-        console.log("Moving to backlog")
-        if (sourceColumnId === 'today') {
-          // Remove from today's tasks
-          deleteTask(todayDate, activeTask.id)
-          // Add to backlog
-          addBacklogTask({
-            ...activeTask,
-            calendarItem: undefined
-          }, overIndex)
-        } else if (sourceColumnId === 'calendar') {
-          const sourceDate = active.id.toString().split('-')[1]
-          // Remove from calendar date
-          deleteTask(sourceDate, activeTask.id)
-          // Add to backlog
-          addBacklogTask({
-            ...activeTask,
-            calendarItem: undefined
-          }, overIndex)
-        }
-      }
-      
-      // Moving FROM backlog
-      else if (sourceColumnId === 'backlog') {
-        if (targetColumnId === 'today') {
-          // Remove from backlog
-          deleteBacklogTask(activeTask.id)
-          // Add to today
-          addTask(todayDate, {
-            ...activeTask,
-            calendarItem: undefined
-          }, overIndex)
-        } else if (targetColumnId === 'calendar') {
-          const targetDate = over.id.toString().split('-')[1]
-          // Remove from backlog
-          deleteBacklogTask(activeTask.id)
-          // Add to calendar date
-          addTask(targetDate, {
-            ...activeTask,
-            calendarItem: {
-              start: { date: targetDate },
-              end: { date: targetDate }
-            }
-          })
-        }
-      }
-
-      // Moving between calendar dates
-      else if (sourceColumnId === 'calendar' && targetColumnId === 'calendar') {
-        const sourceDate = active.id.toString().split('-')[1]
-        const targetDate = over.id.toString().split('-')[1]
-        if (sourceDate !== targetDate) {
-          // Remove from source date
-          deleteTask(sourceDate, activeTask.id)
-          // Add to target date
-          addTask(targetDate, {
-            ...activeTask,
-            calendarItem: {
-              start: { date: targetDate },
-              end: { date: targetDate }
-            }
-          })
-        }
-      }
-
+      //delete source column task
+      sourceColumnDelete && sourceColumnDelete(activeTask.id)
+      //add task to target column
+      targetColumnAdd && targetColumnAdd(activeTask, overIndex)
     } catch (error) {
       console.error("Error handling drag end:", error)
     }
+
+      // Moving TO backlog
+    //   if (targetColumnId === 'backlog') {
+    //     console.log("Moving to backlog from", sourceColumnId)
+    //     console.log("Active task:", activeTask)
+    //     console.log("Over index:", overIndex)
+    //     if (sourceColumnId === 'today') {
+    //       // Remove from today's tasks
+    //       
+    //       // Add to backlog
+    //       addBacklogTask({
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       }, overIndex)
+    //     } else if (sourceColumnId === 'calendar') {
+    //       const sourceDate = active.id.toString().split('-')[1]
+    //       // Remove from calendar date
+    //       deleteTask(sourceDate, activeTask.id)
+    //       // Add to backlog
+    //       addBacklogTask({
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       }, overIndex)
+    //     } else if (sourceColumnId === 'incomplete') {
+    //       // Remove from incomplete
+    //       deleteIncompleteTask(activeTask.id)
+    //       // Add to backlog
+    //       addBacklogTask({
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       }, overIndex)
+    //     } else if (sourceColumnId === 'future') {
+    //       // Remove from future
+    //       deleteTask(active.id.toString().split('-')[1], activeTask.id)
+    //       // Add to backlog
+    //       addBacklogTask({
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       }, overIndex)
+    //     }
+    //   }
+      
+    //   // Moving FROM backlog
+    //   else if (sourceColumnId === 'backlog') {
+    //     if (targetColumnId === 'today') {
+    //       // Remove from backlog
+    //       deleteBacklogTask(activeTask.id)
+    //       // Add to today
+    //       addTask(todayDate, {
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       }, overIndex)
+    //     } else if (targetColumnId === 'calendar') {
+    //       const targetDate = over.id.toString().split('-')[1]
+    //       // Remove from backlog
+    //       deleteBacklogTask(activeTask.id)
+    //       // Add to calendar date
+    //       addTask(targetDate, {
+    //         ...activeTask,
+    //         calendarItem: {
+    //           start: { date: targetDate },
+    //           end: { date: targetDate }
+    //         }
+    //       })
+    //     }
+    //   }
+
+    //   else  if(sourceColumnId === 'incomplete'){
+    //     if (targetColumnId === 'today') {
+    //       // Remove from incomplete
+    //       deleteIncompleteTask(activeTask.id)
+    //       // Add to today
+    //       addTask(todayDate, {
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       })
+    //     }
+    //     else if (targetColumnId === 'backlog') {
+    //       // Remove from incomplete
+    //       deleteIncompleteTask(activeTask.id)
+    //       // Add to backlog
+    //       addBacklogTask({
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       })
+    //     }
+    //   }
+
+    //   else if(sourceColumnId === 'future'){
+    //     if (targetColumnId as ColumnId === 'today') {
+    //       // Remove from future
+    //       deleteTask(active.id.toString().split('-')[1], activeTask.id)
+    //       // Add to today
+    //       addTask(todayDate, {
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       })
+    //     }
+    //     else if (targetColumnId as ColumnId === 'backlog') {
+    //       // Remove from future
+    //       deleteTask(active.id.toString().split('-')[1], activeTask.id)
+    //       // Add to backlog
+    //       addBacklogTask({
+    //         ...activeTask,
+    //         calendarItem: undefined
+    //       })
+    //     }
+    //   }
+
+
+
+    //   // Moving between calendar dates
+    //   else if (sourceColumnId === 'calendar' && targetColumnId === 'calendar') {
+    //     const sourceDate = active.id.toString().split('-')[1]
+    //     const targetDate = over.id.toString().split('-')[1]
+    //     if (sourceDate !== targetDate) {
+    //       // Remove from source date
+    //       deleteTask(sourceDate, activeTask.id)
+    //       // Add to target date
+    //       addTask(targetDate, {
+    //         ...activeTask,
+    //         calendarItem: {
+    //           start: { date: targetDate },
+    //           end: { date: targetDate }
+    //         }
+    //       })
+    //     }
+    //   }
+
+    // } catch (error) {
+    //   console.error("Error handling drag end:", error)
+    
 
     // Clear previews and states
     clearPreviews()
@@ -519,7 +590,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
                           const date = column.id.startsWith('calendar') 
                             ? column.id.split('-')[1] 
                             : format(new Date(), "yyyy-MM-dd")
-                          await deleteTask(date, taskId)
+                          await deleteTask(taskId)
                           await refreshTasks()
                         }
                       }}
@@ -531,7 +602,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
                           const date = column.id.startsWith('calendar')
                             ? column.id.split('-')[1]
                             : format(new Date(), "yyyy-MM-dd")
-                          await updateTask(date, updatedTask.id, updatedTask)
+                          await updateTask(updatedTask.id, updatedTask)
                           await refreshTasks()
                         }
                       }}
@@ -576,12 +647,11 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
               tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
               onDeleteTask={async (taskId) => {
                 const date = format(selectedDate, "yyyy-MM-dd")
-                await deleteTask(date, taskId)
+                await deleteTask(taskId)
                 await refreshTasks()
               }}
               onTaskUpdate={async (task) => {
-                const date = format(selectedDate, "yyyy-MM-dd")
-                await updateTask(date, task.id, task)
+                await updateTask(task.id, task)
                 await refreshTasks()
               }}
               onAddTask={async (task) => {
@@ -620,8 +690,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           open={isNewTaskDialogOpen}
           onOpenChange={setIsNewTaskDialogOpen}
           onDelete={async (taskId) => {
-            const date = format(new Date(), "yyyy-MM-dd")
-            await deleteTask(date, taskId)
+            await deleteTask(taskId)
             await refreshTasks()
           }}
           onSave={async (task) => {

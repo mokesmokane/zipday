@@ -330,7 +330,8 @@ export async function getBacklogTasksAction(): Promise<ActionState<Task[]>> {
  * Adds a task to the user's backlog collection.
  */
 export async function addBacklogTaskAction(
-  task: Task
+  task: Task,
+  insertIndex?: number
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
@@ -354,8 +355,9 @@ export async function addBacklogTaskAction(
       })
     } else {
       // Append task to existing tasks array
+      const tasks = doc.data()?.tasks || []
       await docRef.update({
-        tasks: firestore.FieldValue.arrayUnion(taskWithTimestamps)
+        tasks: insertIndex !== undefined ? [...tasks.slice(0, insertIndex), taskWithTimestamps, ...tasks.slice(insertIndex)] : [taskWithTimestamps]
       })
     }
 
@@ -534,7 +536,7 @@ export async function reorderDayTasksAction(
 export async function getIncompleteTasksAction(
   startDate: string,
   endDate: string
-): Promise<ActionState<Task[]>> {
+): Promise<ActionState<Record<string, Day>>> {
   try {
     const userId = await getAuthenticatedUserId()
     console.log("Getting incomplete tasks for date range:", startDate, endDate)
@@ -548,12 +550,18 @@ export async function getIncompleteTasksAction(
       .endBefore(endDate)
       .get()
 
-    const incompleteTasks: Task[] = []
+    const incompleteTasks: Record<string, Day> = {} 
     
     for (const doc of snapshot.docs) {
       const data = doc.data()
       const tasks = data.tasks as Task[] || []
-      incompleteTasks.push(...tasks.filter(t => !t.completed))
+      incompleteTasks[doc.id] = {
+        id: doc.id,
+        date: doc.id,
+        tasks: tasks.filter(t => !t.completed),
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      }
     }
 
     return {

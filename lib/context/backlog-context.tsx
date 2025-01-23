@@ -73,7 +73,6 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addTask = async (task: Task, insertIndex?: number) => {
-    // Local optimistic
     const tempTask: Task = {
       ...task,
       id: task.id || crypto.randomUUID(),
@@ -93,9 +92,8 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const result = await addBacklogTaskAction(tempTask)
+      const result = await addBacklogTaskAction(tempTask, insertIndex)
       if (result.isSuccess && result.data) {
-        // Patch it in place
         setBacklogTasks(prev =>
           prev.map(t => (t.id === tempTask.id ? result.data! : t))
         )
