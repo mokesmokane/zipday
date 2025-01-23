@@ -219,18 +219,30 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   ]
 
   function handleDragStart(event: DragStartEvent) {
-    console.log("Drag start event data:", {
-      active: event.active.id
-    })
+    console.log("Drag start event data:", event)
     const { active } = event
-    const columnId = active.data.current?.sortable?.containerId?.split('-')[0] as ColumnId
+    const activeId = active.id.toString()
+    
+    // Check if this is a calendar item by looking for 'calendar' prefix
+    const isCalendar = activeId.startsWith('calendar-')
+    
+    // Get the column ID
+    const columnId = isCalendar 
+      ? 'calendar' 
+      : active.data.current?.sortable?.containerId?.split('-')[0] as ColumnId
     setSourceColumnId(columnId)
-    // Check all columns for the task
+
+    // Extract the task ID - for calendar items, remove the 'calendar-' prefix
+    const taskId = isCalendar 
+      ? activeId.replace('calendar-', '') 
+      : activeId
+
+    // Find the task
     const task = 
-      backlogTasks.find(t => t.id === active.id) ||
-      incompleteTasks.find(t => t.id === active.id) ||
-      todayTasks.find(t => t.id === active.id) ||
-      futureTasks.find(t => t.id === active.id)
+      backlogTasks.find(t => t.id === taskId) ||
+      incompleteTasks.find(t => t.id === taskId) ||
+      todayTasks.find(t => t.id === taskId) ||
+      futureTasks.find(t => t.id === taskId)
 
     if (task) {
       setActiveTask(task)
@@ -410,7 +422,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
           await addTask(targetDate, updatedTask)
         }
         // If dragging from today to today's calendar, just update the task
-        else if (isTodayCalendar && isDraggingFromToday) {
+        else if (isTodayCalendar && isDraggingFromToday || sourceColumnId === 'calendar') {
           console.log("Updating today's task in calendar")
           await updateTask(activeTask.id, updatedTask)
         }
@@ -590,6 +602,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
             <CalendarColumn
               id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
               date={format(selectedDate, "yyyy-MM-dd")}
+              singleColumn={true}
               tasks={dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []}
               onDeleteTask={async (taskId) => {
                 await deleteTask(taskId)

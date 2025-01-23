@@ -37,6 +37,7 @@ function getTaskStyle(task: Task, index: number, total: number): CSSProperties |
 }
 
 export function CalendarTask({ 
+  id,
   task, 
   onResize, 
   onDeleteTask,
@@ -44,6 +45,7 @@ export function CalendarTask({
   day,
   onTaskUpdate 
 }: { 
+  id: string
   task: Task
   onResize?: (taskId: string, durationMinutes: number) => void 
   position: {index: number, total: number}
@@ -60,7 +62,7 @@ export function CalendarTask({
     transition,
     isDragging
   } = useSortable({ 
-    id: task.id,
+    id: id,
     data: {
       type: "calendar-task",
       task

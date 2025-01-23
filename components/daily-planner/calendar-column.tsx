@@ -15,6 +15,7 @@ interface CalendarColumnProps {
   id: string
   date: string
   tasks: Task[]
+  singleColumn?: boolean
   onScheduleTask?: (hour: number) => void
   onAddTask: (task: Task) => void
   onDeleteTask: (taskId: string) => void
@@ -23,7 +24,7 @@ interface CalendarColumnProps {
   onTaskUpdate?: (task: Task) => void
 }
 
-export function CalendarColumn({ id, date, tasks, onScheduleTask, onAddTask, onDeleteTask, onResizeTask, onEventUpdate, onTaskUpdate }: CalendarColumnProps) {
+export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, onAddTask, onDeleteTask, onResizeTask, onEventUpdate, onTaskUpdate }: CalendarColumnProps) {
   const isCurrentDay = isToday(new Date(date))
   const { events } = useGoogleCalendar()
 
@@ -89,6 +90,7 @@ export function CalendarColumn({ id, date, tasks, onScheduleTask, onAddTask, onD
             const position = positionMap.get(idx) || { index: 0, total: 1 }
             return (
               <CalendarTask 
+                id={singleColumn ? `calendar-${task.id}` : task.id}
                 key={task.id} 
                 task={task}
                 position={position}
