@@ -617,6 +617,26 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
                 await addTask(date, task)
                 await refreshTasks()
               }}
+              onResizeTask={async (taskId, durationMinutes) => {
+                console.log("Resizing task:", taskId)
+                const task = dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks.find(t => t.id === taskId)
+                if (!task) return
+
+                const updatedTask = {
+                  ...task,
+                  durationMinutes
+                }
+
+                try {
+                  await updateTask(taskId, updatedTask)
+                  await refreshTasks()
+                } catch (error) {
+                  console.error(
+                    "Failed to update task duration:",
+                    error
+                  )
+                }
+              }}
             />
           </div>
         </div>
