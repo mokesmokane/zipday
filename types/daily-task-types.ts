@@ -28,6 +28,7 @@ export interface Task {
   createdAt: string
   updatedAt: string
   calendarItem?: CalendarItem
+  isBacklog?: boolean
 }
 
 export interface Day {

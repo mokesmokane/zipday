@@ -109,10 +109,19 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         const futureByDate: Record<string, Day> = {}
 
         for (const day of result.data) {
-          daysByDate[day.date] = day
+          // Add isBacklog: false to all tasks
+          const tasksWithBacklogFlag = day.tasks.map(task => ({
+            ...task,
+            isBacklog: false
+          }))
+          const dayWithBacklogFlag = {
+            ...day,
+            tasks: tasksWithBacklogFlag
+          }
+          daysByDate[day.date] = dayWithBacklogFlag
           // Only categorize future tasks
           if (day.date > todayStr) {
-            futureByDate[day.date] = day
+            futureByDate[day.date] = dayWithBacklogFlag
           }
         }
         const incompleteStartDateStr = getIncompleteStartDateStr(incompleteTimeRange)
@@ -126,7 +135,19 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         if (incompleteResult.isSuccess && incompleteResult.data) {
           // Data comes back as Day objects, so we can directly index them by date
           console.log("incompleteResult.data:", incompleteResult.data)
-          incompleteByDate = incompleteResult.data
+          // Add isBacklog: false to all incomplete tasks
+          incompleteByDate = Object.fromEntries(
+            Object.entries(incompleteResult.data).map(([date, day]) => [
+              date,
+              {
+                ...day,
+                tasks: day.tasks.map(task => ({
+                  ...task,
+                  isBacklog: false
+                }))
+              }
+            ])
+          )
 
           setIncompleteTasks(Object.values(incompleteByDate).flatMap(day => day.tasks) || [])
         } else {
@@ -195,7 +216,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       ...task,
       id: task.id || crypto.randomUUID(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      isBacklog: false
     }
 
     // Optimistic update
@@ -230,7 +252,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         id: prev[date]?.id || crypto.randomUUID(),
         date,
         tasks: prev[date]?.tasks.map(t => 
-          t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
+          t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString(), isBacklog: false } : t
         ) || [],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()

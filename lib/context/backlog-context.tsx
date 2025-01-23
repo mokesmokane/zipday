@@ -19,6 +19,7 @@ interface BacklogContextType {
   refreshBacklog: () => Promise<void>
   addTask: (task: Task, insertIndex?: number) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
+  deleteBacklogTask: (taskId: string) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
   reorderTasks: (taskIds: string[]) => Promise<void>
   updateBacklogPreview: (previewTasks: Task[]) => void
@@ -32,18 +33,11 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
-
-  // Keep ref to backlog so we can do a shallow compare
-  const prevBacklogRef = useRef(backlogTasks)
+  const prevBacklogRef = useRef<Task[]>([])
 
   const refreshBacklog = async () => {
-    console.log("Refreshing backlog")
-
     if (!user) {
-      // If user is not logged in, just clear backlog if not already empty
-      if (backlogTasks.length !== 0) {
-        setBacklogTasks([])
-      }
+      setBacklogTasks([])
       setIsLoading(false)
       return
     }
@@ -51,25 +45,24 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
     setError(null)
 
-    const backlogResult = await getBacklogTasksAction()
-    if (backlogResult.isSuccess && backlogResult.data) {
-      console.log("Backlog tasks:", backlogResult.data)
-      // Compare to previous
-      const newData = backlogResult.data
-      const changed = JSON.stringify(newData) !== JSON.stringify(prevBacklogRef.current)
-
-      if (changed) {
-        setBacklogTasks(newData)
-        prevBacklogRef.current = newData
+    try {
+      const result = await getBacklogTasksAction()
+      if (result.isSuccess && result.data) {
+        const tasksWithBacklogFlag = result.data.map(task => ({
+          ...task,
+          isBacklog: true
+        }))
+        setBacklogTasks(tasksWithBacklogFlag)
+        prevBacklogRef.current = tasksWithBacklogFlag
+      } else {
+        setError(result.message)
       }
-      setError(null)
-    } else {
-      console.error("Failed to get backlog tasks:", backlogResult.message)
-      setError(backlogResult.message || "Error loading backlog tasks")
-      setBacklogTasks([])
+    } catch (error) {
+      console.error("Error getting backlog tasks:", error)
+      setError("Failed to get backlog tasks")
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   const addTask = async (task: Task, insertIndex?: number) => {
@@ -77,7 +70,8 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
       ...task,
       id: task.id || crypto.randomUUID(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      isBacklog: true
     }
 
     console.log("Adding task to backlog:", tempTask)
@@ -95,10 +89,10 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
       const result = await addBacklogTaskAction(tempTask, insertIndex)
       if (result.isSuccess && result.data) {
         setBacklogTasks(prev =>
-          prev.map(t => (t.id === tempTask.id ? result.data! : t))
+          prev.map(t => (t.id === tempTask.id ? { ...result.data!, isBacklog: true } : t))
         )
         prevBacklogRef.current = prevBacklogRef.current.map(t =>
-          t.id === tempTask.id ? result.data! : t
+          t.id === tempTask.id ? { ...result.data!, isBacklog: true } : t
         )
       } else {
         // revert
@@ -136,17 +130,20 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Alias for deleteTask to match the interface
+  const deleteBacklogTask = deleteTask
+
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
     // Optimistic update
     setBacklogTasks(prev => 
       prev.map(t => t.id === taskId 
-        ? { ...t, ...updates, updatedAt: new Date().toISOString() } 
+        ? { ...t, ...updates, updatedAt: new Date().toISOString(), isBacklog: true } 
         : t
       )
     )
     prevBacklogRef.current = prevBacklogRef.current.map(t => 
       t.id === taskId 
-        ? { ...t, ...updates, updatedAt: new Date().toISOString() } 
+        ? { ...t, ...updates, updatedAt: new Date().toISOString(), isBacklog: true } 
         : t
     )
 
@@ -170,6 +167,7 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
       const reorderedTasks = taskIds
         .map(id => backlogTasks.find(t => t.id === id))
         .filter((task): task is Task => task !== undefined)
+        .map(task => ({ ...task, isBacklog: true }))
 
       setBacklogTasks(reorderedTasks)
       prevBacklogRef.current = reorderedTasks
@@ -188,17 +186,16 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const updateBacklogPreview = (previewTasks: Task[]) => {
+    setBacklogTasks(previewTasks.map(task => ({ ...task, isBacklog: true })))
+  }
+
+  const clearPreviews = () => {
+    setBacklogTasks(prevBacklogRef.current)
+  }
+
   useEffect(() => {
-    // Only refresh backlog if user is not null
-    if (user) {
-      void refreshBacklog()
-    } else {
-      // If user is null, clear tasks
-      setBacklogTasks([])
-      prevBacklogRef.current = []
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    refreshBacklog()
   }, [user])
 
   return (
@@ -210,10 +207,11 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
         refreshBacklog,
         addTask,
         deleteTask,
+        deleteBacklogTask,
         updateTask,
         reorderTasks,
-        updateBacklogPreview: () => {},
-        clearPreviews: () => {},
+        updateBacklogPreview,
+        clearPreviews
       }}
     >
       {children}

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/lib/context/auth-context"
-import { ChevronRight, User, LogOut, LayoutGrid, Calendar, Filter, X } from "lucide-react"
+import { ChevronRight, User, LogOut, LayoutGrid, Calendar, Filter, X, Trash2, Tag, Clock } from "lucide-react"
 import { useState } from "react"
 import { ThemeSwitcher } from "@/components/utilities/theme-switcher"
 import {
@@ -22,15 +22,23 @@ import { useFilter } from "@/lib/context/filter-context"
 import { Badge } from "@/components/ui/badge"
 import { useCurrentView } from "@/lib/context/current-view-context"
 import { GoogleCalendarButton } from "./google-calendar-button"
+import { useSelectedTasks } from "@/lib/context/selected-tasks-context"
+import { useTasks } from "@/lib/context/tasks-context"
+import { useBacklog } from "@/lib/context/backlog-context"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 type ViewType = "board" | "calendar"
 
 export function TaskBoardHeader() {
   const { user, isAuthenticated } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const { isExpanded, toggleSidebar } = useSidebar()
   const { currentView, setCurrentView } = useCurrentView()
   const { activeFilters, recentTags, availableTags, addFilter, removeFilter, clearFilters } = useFilter()
+  const { selectedTasks, clearSelectedTasks } = useSelectedTasks()
+  const { deleteTask, updateTask } = useTasks()
+  const { deleteBacklogTask } = useBacklog()
 
   const handleSignOut = async () => {
     try {
@@ -61,6 +69,55 @@ export function TaskBoardHeader() {
     }
   }
 
+  const handleBulkDelete = () => {
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleConfirmBulkDelete = async () => {
+    try {
+      // Delete each selected task
+      await Promise.all(selectedTasks.map(task => 
+        task.isBacklog ? deleteBacklogTask(task.id) : deleteTask(task.id)
+      ))
+      clearSelectedTasks()
+      setIsDeleteDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to delete selected tasks:", error)
+    }
+  }
+
+  const handleBulkAddTag = async (tag: string) => {
+    try {
+      // Add tag to each selected task
+      await Promise.all(selectedTasks.map(task => {
+        const updatedTask = {
+          ...task,
+          tags: [...new Set([...(task.tags || []), tag])]
+        }
+        return task.isBacklog ? deleteBacklogTask(task.id) : updateTask(task.id, updatedTask)
+      }))
+      clearSelectedTasks()
+    } catch (error) {
+      console.error("Failed to add tag to selected tasks:", error)
+    }
+  }
+
+  const handleBulkSetDuration = async (durationMinutes: number) => {
+    try {
+      // Set duration for each selected task
+      await Promise.all(selectedTasks.map(task => {
+        const updatedTask = {
+          ...task,
+          durationMinutes
+        }
+        return task.isBacklog ? deleteBacklogTask(task.id) : updateTask(task.id, updatedTask)
+      }))
+      clearSelectedTasks()
+    } catch (error) {
+      console.error("Failed to set duration for selected tasks:", error)
+    }
+  }
+
   return (
     <header className="bg-background sticky top-0 z-40 w-full">
       <div className="flex h-12 items-center gap-4 px-4">
@@ -76,101 +133,175 @@ export function TaskBoardHeader() {
           </Button>
         )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="ml-2">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilters.length}
-                </Badge>
-              )}
+        {selectedTasks.length > 0 ? (
+          // Show bulk actions when tasks are selected
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="mr-2">
+              {selectedTasks.length} selected
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => clearSelectedTasks()}
+              className="text-muted-foreground"
+            >
+              Clear selection
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            {recentTags.length > 0 && (
-              <>
-                <DropdownMenuLabel>Recent Tags</DropdownMenuLabel>
-                {recentTags.map(tag => (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBulkDelete}
+              className="text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Tag className="mr-2 h-4 w-4" />
+                  Add Tag
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {availableTags.map(tag => (
                   <DropdownMenuItem
                     key={tag}
-                    onClick={() => {
-                      if (activeFilters.includes(tag)) {
-                        removeFilter(tag)
-                      } else {
-                        addFilter(tag)
-                      }
-                    }}
-                    className={`flex items-center justify-between ${
-                      activeFilters.includes(tag) 
-                        ? 'bg-primary/10 dark:bg-primary/20' 
-                        : ''
-                    }`}
+                    onClick={() => handleBulkAddTag(tag)}
                   >
                     {tag}
-                    {activeFilters.includes(tag) && (
-                      <X 
-                        className="h-4 w-4 cursor-pointer hover:text-destructive" 
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeFilter(tag)
-                        }}
-                      />
-                    )}
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuSeparator />
-              </>
-            )}
-            
-            {availableTags.length > 0 && (
-              <>
-                <DropdownMenuLabel>All Tags</DropdownMenuLabel>
-                {availableTags
-                  .filter(tag => !recentTags.includes(tag))
-                  .map(tag => (
-                    <DropdownMenuItem
-                      key={tag}
-                      onClick={() => {
-                        if (activeFilters.includes(tag)) {
-                          removeFilter(tag)
-                        } else {
-                          addFilter(tag)
-                        }
-                      }}
-                      className={`flex items-center justify-between ${
-                        activeFilters.includes(tag) 
-                          ? 'bg-primary/10 dark:bg-primary/20' 
-                          : ''
-                      }`}
-                    >
-                      {tag}
-                      {activeFilters.includes(tag) && (
-                        <X 
-                          className="h-4 w-4 cursor-pointer hover:text-destructive" 
-                          onClick={(e) => {
-                            e.stopPropagation()
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Clock className="mr-2 h-4 w-4" />
+                  Set Duration
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {[15, 30, 45, 60, 90, 120].map(minutes => (
+                  <DropdownMenuItem
+                    key={minutes}
+                    onClick={() => handleBulkSetDuration(minutes)}
+                  >
+                    {minutes} minutes
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : (
+          // Show normal header content when no tasks are selected
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-2">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filter
+                  {activeFilters.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {activeFilters.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {recentTags.length > 0 && (
+                  <>
+                    <DropdownMenuLabel>Recent Tags</DropdownMenuLabel>
+                    {recentTags.map(tag => (
+                      <DropdownMenuItem
+                        key={tag}
+                        onClick={() => {
+                          if (activeFilters.includes(tag)) {
                             removeFilter(tag)
-                          }}
-                        />
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-              </>
-            )}
-            
-            {activeFilters.length > 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={clearFilters}>
-                  Clear filters
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                          } else {
+                            addFilter(tag)
+                          }
+                        }}
+                        className={`flex items-center justify-between ${
+                          activeFilters.includes(tag) 
+                            ? 'bg-primary/10 dark:bg-primary/20' 
+                            : ''
+                        }`}
+                      >
+                        {tag}
+                        {activeFilters.includes(tag) && (
+                          <X 
+                            className="h-4 w-4 cursor-pointer hover:text-destructive" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeFilter(tag)
+                            }}
+                          />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
 
+                {availableTags.length > 0 && (
+                  <>
+                    <DropdownMenuLabel>All Tags</DropdownMenuLabel>
+                    {availableTags
+                      .filter(tag => !recentTags.includes(tag))
+                      .map(tag => (
+                        <DropdownMenuItem
+                          key={tag}
+                          onClick={() => {
+                            if (activeFilters.includes(tag)) {
+                              removeFilter(tag)
+                            } else {
+                              addFilter(tag)
+                            }
+                          }}
+                          className={`flex items-center justify-between ${
+                            activeFilters.includes(tag) 
+                              ? 'bg-primary/10 dark:bg-primary/20' 
+                              : ''
+                          }`}
+                        >
+                          {tag}
+                          {activeFilters.includes(tag) && (
+                            <X 
+                              className="h-4 w-4 cursor-pointer hover:text-destructive" 
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeFilter(tag)
+                              }}
+                            />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                  </>
+                )}
+
+                {activeFilters.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={clearFilters}>
+                      Clear filters
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
+
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          title="Delete Tasks"
+          description={`Are you sure you want to delete ${selectedTasks.length} task${selectedTasks.length === 1 ? '' : 's'}? This action cannot be undone.`}
+          confirmText="Delete"
+          variant="destructive"
+          onConfirm={handleConfirmBulkDelete}
+        />
       </div>
     </header>
   )

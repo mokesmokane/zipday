@@ -9,6 +9,7 @@ import { TaskActionsProvider } from "@/lib/context/task-actions-context"
 import { FilterProvider } from "@/lib/context/filter-context"
 import { CurrentViewProvider } from "@/lib/context/current-view-context"
 import { GoogleCalendarProvider } from "@/lib/context/google-calendar-context"
+import { SelectedTasksProvider } from "@/lib/context/selected-tasks-context"
 import "./globals.css"
 import { RootProvider } from "@/components/utilities/root-provider"
 import { getServerUser } from "@/lib/firebaseAdmin"
@@ -42,17 +43,19 @@ export default async function RootLayout({
               <DateProvider>
                 <TasksProvider>
                   <BacklogProvider>
-                  <TaskActionsProvider>
-                    <FilterProvider>
-                      <CurrentViewProvider>
-                        <GoogleCalendarProvider>
-                          {children}
-                        </GoogleCalendarProvider>
-                      </CurrentViewProvider>
-                    </FilterProvider>
+                    <TaskActionsProvider>
+                      <FilterProvider>
+                        <CurrentViewProvider>
+                          <GoogleCalendarProvider>
+                            <SelectedTasksProvider>
+                              {children}
+                            </SelectedTasksProvider>
+                          </GoogleCalendarProvider>
+                        </CurrentViewProvider>
+                      </FilterProvider>
                     </TaskActionsProvider>
                   </BacklogProvider>
-                  </TasksProvider>
+                </TasksProvider>
               </DateProvider>
             </SidebarProvider>
           </RootProvider>

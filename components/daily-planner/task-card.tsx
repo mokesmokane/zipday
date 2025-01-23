@@ -5,12 +5,14 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Pencil } from "lucide-react"
+import { Clock, Pencil, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CustomCheckbox } from "@/components/ui/custom-checkbox"
 import { EditTaskDialog } from "./edit-task-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { Task, Subtask, Day } from "@/types/daily-task-types"
 import { cn } from "@/lib/utils"
+import { useSelectedTasks } from "@/lib/context/selected-tasks-context"
 
 // Helper function to format ISO date to "HH:mm"
 function formatStartTime(isoString?: string): string {
@@ -45,6 +47,9 @@ interface TaskCardProps {
 
 export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate }: TaskCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const { selectTask, deselectTask, isTaskSelected } = useSelectedTasks()
 
   if (!task) {
     return null
@@ -91,18 +96,83 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
     onTaskUpdate?.(updatedTask)
   }
 
+  const handleSelect = () => {
+    if (isTaskSelected(task.id)) {
+      deselectTask(task.id)
+    } else {
+      selectTask(task)
+    }
+  }
+
+  const handleDelete = () => {
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    onDelete?.(task.id)
+    setIsDeleteDialogOpen(false)
+  }
+
   return (
     <>
       <Card
         ref={setNodeRef}
         style={style}
         className={cn(
-          "bg-card relative cursor-grab touch-none active:cursor-grabbing transition-colors duration-200",
-          isOverCalendarZone && "border-blue-500"
+          "bg-card relative cursor-grab touch-none active:cursor-grabbing transition-colors duration-200 group",
+          isOverCalendarZone && "border-blue-500",
+          isTaskSelected(task.id) && "ring-2 ring-primary"
         )}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         {...attributes}
         {...listeners}
       >
+        {/* Action buttons that appear on hover */}
+        <div 
+          className={cn(
+            "absolute right-2 top-2 flex items-center gap-1 transition-opacity duration-200",
+            isHovered ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelect()
+            }}
+          >
+            <Check className={cn(
+              "h-4 w-4",
+              isTaskSelected(task.id) && "text-primary"
+            )} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsEditDialogOpen(true)
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleDelete()
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+
         <CardHeader className="p-4 pb-2">
           <div className="flex items-start gap-2">
             <CustomCheckbox
@@ -135,17 +205,6 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
                   </p>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 -mt-1.5 -mr-1"
-                onClick={e => {
-                  e.stopPropagation()
-                  setIsEditDialogOpen(true)
-                }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -194,6 +253,7 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
           </div>
         </CardContent>
       </Card>
+
       {day && (
         <EditTaskDialog
           day={day}
@@ -204,6 +264,16 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
           onSave={handleTaskUpdate}
         />
       )}
+
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title="Delete Task"
+        description="Are you sure you want to delete this task? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={handleConfirmDelete}
+      />
     </>
   )
 }
