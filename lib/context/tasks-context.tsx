@@ -9,6 +9,7 @@ import { addTaskAction, updateTaskAction, deleteTaskAction, reorderDayTasksActio
 import { toast } from "@/components/ui/use-toast"
 import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
 import { useGoogleCalendar } from "./google-calendar-context"
+import { getIncompleteStartDateStr } from "@/lib/utils/date-utils"
 
 /** 
  * If you only need a flat list of tasks, you can keep 'tasks' the same. 
@@ -31,25 +32,6 @@ interface TasksContextType {
 
 const TasksContext = createContext<TasksContextType | undefined>(undefined)
 
-const getIncompleteStartDateStr = (incompleteTimeRange: "week" | "month" | "year" | "all") => {
-  if (incompleteTimeRange === "week") {
-    const today = new Date()
-    const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
-    return startDate.toISOString().split("T")[0]
-  }
-  if (incompleteTimeRange === "month") {
-    const today = new Date()
-    const startDate = new Date(today.getFullYear(), today.getMonth() -1, today.getDate())
-    return startDate.toISOString().split("T")[0]
-  }
-  if (incompleteTimeRange === "year") {
-    const today = new Date()
-    const startDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
-    return startDate.toISOString().split("T")[0]
-  }
-  return new Date().toISOString().split("T")[0]
-}
-
 export function TasksProvider({ children }: { children: React.ReactNode }) {
   const [dailyTasks, setDailyTasks] = useState<Record<string, Day>>({})
   const [incompleteTasks, setIncompleteTasks] = useState<Task[]>([])
@@ -61,7 +43,6 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
   const { dateWindow } = useDate()
   const { user } = useAuth()
-  const { isConnected: isGoogleCalendarConnected } = useGoogleCalendar()
 
   // Keep refs of old data so we can do a shallow compare
   const prevDailyTasksRef = useRef(dailyTasks)
@@ -112,19 +93,10 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         const futureByDate: Record<string, Day> = {}
 
         for (const day of result.data) {
-          // Add isBacklog: false to all tasks
-          const tasksWithBacklogFlag = day.tasks.map(task => ({
-            ...task,
-            isBacklog: false
-          }))
-          const dayWithBacklogFlag = {
-            ...day,
-            tasks: tasksWithBacklogFlag
-          }
-          daysByDate[day.date] = dayWithBacklogFlag
+          daysByDate[day.date] = day
           // Only categorize future tasks
           if (day.date > todayStr) {
-            futureByDate[day.date] = dayWithBacklogFlag
+            futureByDate[day.date] = day
           }
         }
         const incompleteStartDateStr = getIncompleteStartDateStr(incompleteTimeRange)
@@ -138,19 +110,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         if (incompleteResult.isSuccess && incompleteResult.data) {
           // Data comes back as Day objects, so we can directly index them by date
           console.log("incompleteResult.data:", incompleteResult.data)
-          // Add isBacklog: false to all incomplete tasks
-          incompleteByDate = Object.fromEntries(
-            Object.entries(incompleteResult.data).map(([date, day]) => [
-              date,
-              {
-                ...day,
-                tasks: day.tasks.map(task => ({
-                  ...task,
-                  isBacklog: false
-                }))
-              }
-            ])
-          )
+          incompleteByDate = incompleteResult.data
 
           setIncompleteTasks(Object.values(incompleteByDate).flatMap(day => day.tasks) || [])
         } else {
@@ -219,22 +179,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       ...task,
       id: task.id || crypto.randomUUID(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isBacklog: false
-    }
-
-    // If task has calendar data and Google Calendar is connected, sync first
-    if (tempTask.calendarItem && isGoogleCalendarConnected) {
-      try {
-        await updateCalendarItemAction(tempTask.id, date, tempTask.calendarItem)
-      } catch (error) {
-        console.error("Failed to sync with Google Calendar:", error)
-        toast({
-          title: "Warning",
-          description: "Task added but failed to sync with Google Calendar",
-          variant: "destructive"
-        })
-      }
+      updatedAt: new Date().toISOString()
     }
 
     // Optimistic update
@@ -243,9 +188,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       [date]: {
         id: prev[date]?.id || crypto.randomUUID(),
         date,
-        tasks: insertIndex !== undefined 
-          ? [...(prev[date]?.tasks || []).slice(0, insertIndex), tempTask, ...(prev[date]?.tasks || []).slice(insertIndex)]
-          : [...(prev[date]?.tasks || []), tempTask],
+        tasks: insertIndex !== undefined ? [...(prev[date]?.tasks || []).slice(0, insertIndex), tempTask, ...(prev[date]?.tasks || []).slice(insertIndex)] :  [...(prev[date]?.tasks || []), tempTask],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -254,6 +197,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await addTaskAction(date, tempTask, insertIndex)
       if (!result.isSuccess) {
+        // Revert on failure
         await refreshTasks()
       }
     } catch (error) {
@@ -263,22 +207,6 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
     const date = taskDayLookup[taskId]
-    const existingTask = dailyTasks[date]?.tasks.find(t => t.id === taskId)
-    
-    // If updating calendar data and Google Calendar is connected, sync first
-    if (updates.calendarItem && isGoogleCalendarConnected) {
-      try {
-        await updateCalendarItemAction(taskId, date, updates.calendarItem)
-      } catch (error) {
-        console.error("Failed to sync with Google Calendar:", error)
-        toast({
-          title: "Warning",
-          description: "Task updated but failed to sync with Google Calendar",
-          variant: "destructive"
-        })
-      }
-    }
-
     // Optimistic update
     setDailyTasks(prev => ({
       ...prev,
@@ -286,7 +214,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         id: prev[date]?.id || crypto.randomUUID(),
         date,
         tasks: prev[date]?.tasks.map(t => 
-          t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString(), isBacklog: false } : t
+          t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
         ) || [],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -296,6 +224,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await updateTaskAction(date, taskId, updates)
       if (!result.isSuccess) {
+        // Revert on failure
         await refreshTasks()
       }
     } catch (error) {
@@ -304,29 +233,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteTask = async (taskId: string) => {
-    const date = taskDayLookup[taskId]
-    const existingTask = dailyTasks[date]?.tasks.find(t => t.id === taskId)
-
-    // If task had calendar data and Google Calendar is connected, delete from calendar
-    if (existingTask?.calendarItem?.gcalEventId && isGoogleCalendarConnected) {
-      try {
-        await updateCalendarItemAction(taskId, date, {
-          ...existingTask.calendarItem,
-          gcalEventId: undefined // This signals to delete the event
-        })
-      } catch (error) {
-        console.error("Failed to remove from Google Calendar:", error)
-        toast({
-          title: "Warning",
-          description: "Task deleted but failed to remove from Google Calendar",
-          variant: "destructive"
-        })
-      }
-    }
-
     // Optimistic delete
+    const date = taskDayLookup[taskId]
+
     setIncompleteTasks(prev => prev.filter(t => t.id !== taskId))
     setFutureTasks(prev => prev.filter(t => t.id !== taskId))
+
     setDailyTasks(prev => ({
       ...prev,
       [date]: {
@@ -339,8 +251,11 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     }))
 
     try {
+      console.log("deleteTask -> date:", date)
+      console.log("deleteTask -> taskId:", taskId)
       const result = await deleteTaskAction(date, taskId)
       if (!result.isSuccess) {
+        // Revert on failure
         await refreshTasks()
       }
     } catch (error) {
@@ -382,14 +297,13 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
   const setIncompleteTimeRange = (range: "week" | "month" | "year" | "all") => {
     setTimeRange(range)
-    refreshTasks()
   }
 
   // On mount, or when user or dateWindow changes, refresh tasks
   useEffect(() => {
     void refreshTasks()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, dateWindow.startDate, dateWindow.endDate])
+  }, [user, dateWindow.startDate, dateWindow.endDate, incompleteTimeRange])
 
   return (
     <TasksContext.Provider

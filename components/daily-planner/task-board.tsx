@@ -6,7 +6,6 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { format, isToday, subDays, subMonths, subYears } from "date-fns"
 import { Plus } from "lucide-react"
 import { v4 as uuidv4 } from "uuid"
-
 import { TaskColumn } from "./task-column"
 import { TaskCard } from "./task-card"
 import { CalendarColumn } from "./calendar-column"
@@ -18,8 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { useTasks } from "@/lib/context/tasks-context"
 import { useBacklog } from "@/lib/context/backlog-context"
-import { useTaskActions } from "@/lib/context/task-actions-context"
-import { addTaskAction, deleteTaskAction, updateTaskAction } from "@/actions/db/tasks-actions"
+
 // Add this type definition at the top of the file
 type ColumnId = 'backlog' | 'incomplete' | 'today' | 'future' | 'calendar'
 
@@ -58,9 +56,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     refreshTasks,
   } = useTasks()
 
-  // Add new state to track if we're over calendar
-  const [isOverCalendar, setIsOverCalendar] = useState(false)
-  
   // Sync local state with global tasks
   useEffect(() => {
     console.log("Syncing local state with global tasks")
@@ -267,9 +262,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     // Check if over a calendar hour
     const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
     const isOverCalendarColumn = overId.startsWith("calendar-")
-
-    // Update isOverCalendar state based on if we're over calendar
-    setIsOverCalendar(isOverCalendarHour !== null || isOverCalendarColumn)
 
     if (isOverCalendarHour || isOverCalendarColumn) {
       const targetDate = isOverCalendarHour
@@ -514,7 +506,6 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     setPreviewColumnId(null)
     setIsDragging(false)
     setActiveTask(null)
-    setIsOverCalendar(false)
   }
 
   // Add this function
@@ -644,7 +635,35 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
                   durationMinutes
                 }
 
+                // If the task has a calendar time, update the end time based on the new duration
+                if (updatedTask.calendarItem?.start?.dateTime) {
+                  const startTime = new Date(updatedTask.calendarItem.start.dateTime)
+                  const endTime = new Date(startTime.getTime() + durationMinutes * 60000)
+                  
+                  updatedTask.calendarItem = {
+                    ...updatedTask.calendarItem,
+                    end: {
+                      date: format(endTime, "yyyy-MM-dd"),
+                      dateTime: endTime.toISOString()
+                    }
+                  }
+                }
+
                 try {
+                  // Update local state first
+                  setLocalColumnTasks(prev => {
+                    const updated = structuredClone(prev)
+                    const date = format(selectedDate, "yyyy-MM-dd")
+                    if (!updated[date]) {
+                      updated[date] = []
+                    }
+                    updated[date] = updated[date].map(t => 
+                      t.id === taskId ? updatedTask : t
+                    )
+                    return updated
+                  })
+                  
+                  // Then make the API call
                   await updateTask(taskId, updatedTask)
                   await refreshTasks()
                 } catch (error) {
@@ -663,7 +682,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
             <TaskCard
               task={activeTask}
               day={today}
-              isOverCalendarZone={isOverCalendar}
+              isOverCalendarZone={false}
             />
           ) : null}
         </DragOverlay>
