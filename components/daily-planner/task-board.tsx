@@ -45,7 +45,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
   const [sourceColumnId, setSourceColumnId] = useState<ColumnId | null>(null)
   const [calendarColumnPreviewTask, setCalendarColumnPreviewTask] = useState<Task | null>(null)
-  const { incompleteTasks, futureTasks, dailyTasks, incompleteTimeRange, setIncompleteTimeRange } = useTasks()
+  const { incompleteTasks, futureTasks, dailyTasks, incompleteTimeRange, setIncompleteTimeRange, futureTimeRange, setFutureTimeRange } = useTasks()
   const { backlogTasks, reorderTasks: reorderBacklogTasks, clearPreviews, deleteTask: deleteBacklogTask, updateTask: updateBacklogTask, addTask: addBacklogTask, refreshBacklog } = useBacklog()
   
   const { 
@@ -203,11 +203,59 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     { 
       id: "future", 
       title: (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold">
-            Future
-          </h2>
-        </div>
+        <>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-lg font-semibold">
+              Future
+            </h2>
+          </div>
+          <div className="flex gap-1 text-xs">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs", 
+                futureTimeRange === "week" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setFutureTimeRange("week")}
+            >
+              Week
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs",
+                futureTimeRange === "month" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setFutureTimeRange("month")}
+            >
+              Month
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs",
+                futureTimeRange === "year" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setFutureTimeRange("year")}
+            >
+              Year
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={cn(
+                "h-6 px-2 text-xs",
+                futureTimeRange === "all" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setFutureTimeRange("all")}
+            >
+              All
+            </Button>
+          </div>
+        </>
       ), 
       tasks: futureTasks,
       onDeleteTask: async (taskId: string) => {

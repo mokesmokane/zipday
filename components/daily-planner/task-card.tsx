@@ -5,7 +5,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Pencil, Trash2, Check } from "lucide-react"
+import { Clock, Pencil, Trash2, Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CustomCheckbox } from "@/components/ui/custom-checkbox"
 import { EditTaskDialog } from "./edit-task-dialog"
@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { Task, Subtask, Day } from "@/types/daily-task-types"
 import { cn } from "@/lib/utils"
 import { useSelectedTasks } from "@/lib/context/selected-tasks-context"
+import { taskToShorthand } from "@/lib/utils/task-utils"
 
 // Helper function to format ISO date to "HH:mm"
 function formatStartTime(isoString?: string): string {
@@ -148,6 +149,17 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
               "h-4 w-4",
               isTaskSelected(task.id) && "text-primary"
             )} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigator.clipboard.writeText(taskToShorthand(task))
+            }}
+          >
+            <Copy className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"

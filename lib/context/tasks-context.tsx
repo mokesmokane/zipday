@@ -9,7 +9,7 @@ import { addTaskAction, updateTaskAction, deleteTaskAction, reorderDayTasksActio
 import { toast } from "@/components/ui/use-toast"
 import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
 import { useGoogleCalendar } from "./google-calendar-context"
-import { getIncompleteStartDateStr } from "@/lib/utils/date-utils"
+import { getIncompleteStartDateStr, getFutureEndDateStr } from "@/lib/utils/date-utils"
 
 /** 
  * If you only need a flat list of tasks, you can keep 'tasks' the same. 
@@ -22,11 +22,13 @@ interface TasksContextType {
   isLoading: boolean
   error: string | null
   incompleteTimeRange: "week" | "month" | "year" | "all"
+  futureTimeRange: "week" | "month" | "year" | "all"
   refreshTasks: () => Promise<void>
   addTask: (date: string, task: Task, insertIndex?: number) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
   setIncompleteTimeRange: (range: "week" | "month" | "year" | "all") => void
+  setFutureTimeRange: (range: "week" | "month" | "year" | "all") => void
   reorderDayTasks: (date: string, taskIds: string[]) => Promise<void>
 }
 
@@ -38,6 +40,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const [futureTasks, setFutureTasks] = useState<Task[]>([])
   const [taskDayLookup, setTaskDayLookup] = useState<Record<string, string>>({})
   const [incompleteTimeRange, setTimeRange] = useState<"week" | "month" | "year" | "all">("week")
+  const [futureTimeRange, setFutureTimeRangeState] = useState<"week" | "month" | "year" | "all">("week")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -81,10 +84,11 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     const startDateStr = dateWindow.startDate.toISOString().split("T")[0]
     const endDateStr = dateWindow.endDate.toISOString().split("T")[0]
     const todayStr = new Date().toISOString().split("T")[0]
+    const futureEndDateStr = getFutureEndDateStr(futureTimeRange)
 
     try {
       // Get tasks for date range
-      const result = await getDaysByDateRangeAction(startDateStr, endDateStr)
+      const result = await getDaysByDateRangeAction(startDateStr, futureEndDateStr)
       console.log("getDaysByDateRangeAction result:", result)
 
       if (result.isSuccess && result.data) {
@@ -94,11 +98,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
         for (const day of result.data) {
           daysByDate[day.date] = day
-          // Only categorize future tasks
-          if (day.date > todayStr) {
+          // Only categorize future tasks within the selected range
+          if (day.date > todayStr && day.date <= futureEndDateStr) {
             futureByDate[day.date] = day
           }
         }
+
         const incompleteStartDateStr = getIncompleteStartDateStr(incompleteTimeRange)
         console.log("incompleteStartDateStr:", incompleteStartDateStr)
         const incompleteResult = await getIncompleteTasksAction(
@@ -156,7 +161,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
           prevFutureRef.current = Object.values(futureByDate).flatMap(day => day.tasks)
         }
         if (incompleteChanged) {
-          
+          setIncompleteTasks(Object.values(incompleteByDate).flatMap(day => day.tasks))
           prevIncompleteRef.current = Object.values(incompleteByDate).flatMap(day => day.tasks)
         }
       } else {
@@ -299,11 +304,15 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     setTimeRange(range)
   }
 
+  const setFutureTimeRange = (range: "week" | "month" | "year" | "all") => {
+    setFutureTimeRangeState(range)
+  }
+
   // On mount, or when user or dateWindow changes, refresh tasks
   useEffect(() => {
     void refreshTasks()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, dateWindow.startDate, dateWindow.endDate, incompleteTimeRange])
+  }, [user, dateWindow.startDate, dateWindow.endDate, incompleteTimeRange, futureTimeRange])
 
   return (
     <TasksContext.Provider
@@ -319,7 +328,9 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         deleteTask,
         reorderDayTasks,
         setIncompleteTimeRange,
-        incompleteTimeRange
+        incompleteTimeRange,
+        setFutureTimeRange,
+        futureTimeRange
       }}
     >
       {children}
