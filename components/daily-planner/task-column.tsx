@@ -46,6 +46,7 @@ export function TaskColumn({
       let subtasks = []
       let tags = []
       let durationMinutes = undefined
+      let calendarItem = undefined
       let description = []
 
       for (let i = 1; i < lines.length; i++) {
@@ -63,6 +64,19 @@ export function TaskColumn({
         } else if (line.match(/^\d+m$/)) {
           // Duration in minutes
           durationMinutes = parseInt(line)
+        } else if (line.startsWith("@")) {
+          // Time in @HH:MM format
+          const timeMatch = line.match(/@(\d{1,2}):(\d{2})/)
+          if (timeMatch) {
+            const [_, hours, minutes] = timeMatch
+            const date = new Date()
+            date.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+            calendarItem = {
+              start: {
+                dateTime: date.toISOString()
+              }
+            }
+          }
         } else if (line) {
           // Any other non-empty line goes to description
           description.push(line)
@@ -77,6 +91,7 @@ export function TaskColumn({
         subtasks,
         tags,
         durationMinutes,
+        calendarItem,
         completed: false,
         createdAt: now,
         updatedAt: now
@@ -171,9 +186,10 @@ export function TaskColumn({
 - subtask
 - another subtask
 #category
+@9:30
 45m`}
             className="min-h-[130px] resize-none"
-            rows={5}
+            rows={6}
           />
         </div>
       ) : null}
