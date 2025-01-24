@@ -38,6 +38,38 @@ function formatDuration(durationMinutes?: number): string {
   }
 }
 
+// Helper function to get urgency badge variant
+function getUrgencyVariant(urgency?: string): "default" | "destructive" | "secondary" | "outline" {
+  switch (urgency) {
+    case "immediate":
+      return "destructive"
+    case "soon":
+      return "default"
+    case "later":
+      return "secondary"
+    case "someday":
+      return "outline"
+    default:
+      return "outline"
+  }
+}
+
+// Helper function to get importance badge variant
+function getImportanceVariant(importance?: string): "default" | "destructive" | "secondary" | "outline" {
+  switch (importance) {
+    case "critical":
+      return "destructive"
+    case "significant":
+      return "default"
+    case "valuable":
+      return "secondary"
+    case "optional":
+      return "outline"
+    default:
+      return "outline"
+  }
+}
+
 interface TaskCardProps {
   task: Task | undefined
   day?: Day
@@ -253,15 +285,23 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
                   : formatDuration(task.durationMinutes)}
               </div>
             ) : <div className="w-6" />}
-            {task.tags && task.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {task.tags.map((tag: string) => (
-                  <Badge variant="secondary" className="text-xs" key={tag}>
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-1">
+              {task.urgency && (
+                <Badge variant={getUrgencyVariant(task.urgency)} className="text-xs">
+                  {task.urgency.charAt(0).toUpperCase() + task.urgency.slice(1)}
+                </Badge>
+              )}
+              {task.importance && (
+                <Badge variant={getImportanceVariant(task.importance)} className="text-xs">
+                  {task.importance.charAt(0).toUpperCase() + task.importance.slice(1)}
+                </Badge>
+              )}
+              {task.tags && task.tags.length > 0 && task.tags.map((tag: string) => (
+                <Badge variant="secondary" className="text-xs" key={tag}>
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

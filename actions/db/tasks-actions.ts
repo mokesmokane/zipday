@@ -335,36 +335,42 @@ export async function addBacklogTaskAction(
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
-    
     const docRef = db.collection("userBacklog").doc(userId)
-    const doc = await docRef.get()
+    
+    // Use a transaction to handle concurrent updates
+    const result = await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef)
+      const now = new Date().toISOString()
+      const taskWithTimestamps = {
+        ...task,
+        id: crypto.randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+        userId
+      }
 
-    const now = new Date().toISOString()
-    const taskWithTimestamps = {
-      ...task,
-      id: crypto.randomUUID(),
-      createdAt: now,
-      updatedAt: now,
-      userId
-    }
+      if (!doc.exists) {
+        // Initialize with first task if document doesn't exist
+        transaction.set(docRef, {
+          tasks: [taskWithTimestamps]
+        })
+      } else {
+        // Get current tasks and insert new task at correct position
+        const tasks = doc.data()?.tasks || []
+        const updatedTasks = insertIndex !== undefined
+          ? [...tasks.slice(0, insertIndex), taskWithTimestamps, ...tasks.slice(insertIndex)]
+          : [...tasks, taskWithTimestamps]
+        
+        transaction.update(docRef, { tasks: updatedTasks })
+      }
 
-    if (!doc.exists) {
-      // Initialize with first task if document doesn't exist
-      await docRef.set({
-        tasks: [taskWithTimestamps]
-      })
-    } else {
-      // Append task to existing tasks array
-      const tasks = doc.data()?.tasks || []
-      await docRef.update({
-        tasks: insertIndex !== undefined ? [...tasks.slice(0, insertIndex), taskWithTimestamps, ...tasks.slice(insertIndex)] : [taskWithTimestamps]
-      })
-    }
+      return taskWithTimestamps
+    })
 
     return {
       isSuccess: true,
       message: "Task added to backlog successfully",
-      data: taskWithTimestamps
+      data: result
     }
   } catch (error) {
     console.error("Failed to add task to backlog:", error)

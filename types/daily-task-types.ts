@@ -4,6 +4,9 @@ export interface Subtask {
   completed: boolean
 }
 
+export type Urgency = "immediate" | "soon" | "later" | "someday"
+export type Importance = "critical" | "significant" | "valuable" | "optional"
+
 export interface CalendarDateTime {
   date?: string
   dateTime?: string
@@ -29,6 +32,8 @@ export interface Task {
   updatedAt: string
   calendarItem?: CalendarItem
   isBacklog?: boolean
+  urgency?: Urgency
+  importance?: Importance
 }
 
 export interface Day {

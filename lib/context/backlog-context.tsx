@@ -34,6 +34,7 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
   const prevBacklogRef = useRef<Task[]>([])
+  const taskQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const refreshBacklog = async () => {
     if (!user) {
@@ -66,52 +67,60 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addTask = async (task: Task, insertIndex?: number) => {
-    const tempTask: Task = {
-      ...task,
-      id: task.id || crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isBacklog: true
-    }
+    // Queue this task addition to run after any pending operations
+    taskQueueRef.current = taskQueueRef.current.then(async () => {
+      const tempTask: Task = {
+        ...task,
+        id: task.id || crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isBacklog: true
+      }
 
-    console.log("Adding task to backlog:", tempTask)
-    console.log("Insert index:", insertIndex)
+      console.log("Adding task to backlog:", tempTask)
+      console.log("Insert index:", insertIndex)
 
-    if (insertIndex !== undefined) {
-      setBacklogTasks(prev => [...prev.slice(0, insertIndex), tempTask, ...prev.slice(insertIndex)])
-      prevBacklogRef.current = [...prevBacklogRef.current.slice(0, insertIndex), tempTask, ...prevBacklogRef.current.slice(insertIndex)]
-    } else {
-      setBacklogTasks(prev => [...prev, tempTask])
-      prevBacklogRef.current = [...prevBacklogRef.current, tempTask]
-    }
+      // Update local state
+      setBacklogTasks(prev => {
+        const newTasks = insertIndex !== undefined
+          ? [...prev.slice(0, insertIndex), tempTask, ...prev.slice(insertIndex)]
+          : [...prev, tempTask]
+        prevBacklogRef.current = newTasks
+        return newTasks
+      })
 
-    try {
-      const result = await addBacklogTaskAction(tempTask, insertIndex)
-      if (result.isSuccess && result.data) {
-        setBacklogTasks(prev =>
-          prev.map(t => (t.id === tempTask.id ? { ...result.data!, isBacklog: true } : t))
-        )
-        prevBacklogRef.current = prevBacklogRef.current.map(t =>
-          t.id === tempTask.id ? { ...result.data!, isBacklog: true } : t
-        )
-      } else {
+      try {
+        const result = await addBacklogTaskAction(tempTask, insertIndex)
+        if (result.isSuccess && result.data) {
+          setBacklogTasks(prev =>
+            prev.map(t => (t.id === tempTask.id ? { ...result.data!, isBacklog: true } : t))
+          )
+          prevBacklogRef.current = prevBacklogRef.current.map(t =>
+            t.id === tempTask.id ? { ...result.data!, isBacklog: true } : t
+          )
+        } else {
+          // revert
+          setBacklogTasks(prev => prev.filter(t => t.id !== tempTask.id))
+          prevBacklogRef.current = prevBacklogRef.current.filter(
+            t => t.id !== tempTask.id
+          )
+          setError(result.message)
+        }
+      } catch (error) {
         // revert
         setBacklogTasks(prev => prev.filter(t => t.id !== tempTask.id))
         prevBacklogRef.current = prevBacklogRef.current.filter(
           t => t.id !== tempTask.id
         )
-        setError(result.message)
+        setError("Failed to add task to backlog")
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      // revert
-      setBacklogTasks(prev => prev.filter(t => t.id !== tempTask.id))
-      prevBacklogRef.current = prevBacklogRef.current.filter(
-        t => t.id !== tempTask.id
-      )
-      setError("Failed to add task to backlog")
-    } finally {
-      setIsLoading(false)
-    }
+    }).catch(error => {
+      console.error("Error in task queue:", error)
+    })
+
+    return taskQueueRef.current
   }
 
   const deleteTask = async (taskId: string) => {

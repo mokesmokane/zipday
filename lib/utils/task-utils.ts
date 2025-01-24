@@ -9,6 +9,8 @@ import type { Task } from "@/types/daily-task-types"
  * - Subtask2
  * #Tag1
  * #Tag2
+ * ! (Urgency)
+ * * (Importance)
  * @HH:MM
  * XhYm
  */
@@ -36,6 +38,22 @@ export function taskToShorthand(task: Task): string {
     tags.forEach(tag => {
       lines.push(`#${tag}`)
     })
+  }
+
+  // Urgency
+  if (task.urgency) {
+    lines.push(`! (${task.urgency.charAt(0).toUpperCase() + task.urgency.slice(1)})`)
+  }
+
+  // Importance (1-3 stars based on level)
+  if (task.importance) {
+    const importanceStars = {
+      critical: "****",
+      significant: "***",
+      valuable: "**",
+      optional: "*"
+    }
+    lines.push(`${importanceStars[task.importance]} (${task.importance.charAt(0).toUpperCase() + task.importance.slice(1)})`)
   }
   
   // Calendar time

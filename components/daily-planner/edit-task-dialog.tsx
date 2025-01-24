@@ -9,13 +9,20 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
 import { motion, AnimatePresence } from "framer-motion"
-import type { Task, Subtask, Day } from "@/types/daily-task-types"
+import type { Task, Subtask, Day, Urgency, Importance } from "@/types/daily-task-types"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { TagSelector } from "./tag-selector"
 
 interface EditTaskDialogProps {
@@ -39,6 +46,20 @@ const TIME_OPTIONS = [
   { label: '4 hours', value: '4h' },
   { label: '6 hours', value: '6h' },
   { label: '8 hours', value: '8h' },
+]
+
+const URGENCY_OPTIONS: { label: string; value: Urgency }[] = [
+  { label: 'Immediate', value: 'immediate' },
+  { label: 'Soon', value: 'soon' },
+  { label: 'Later', value: 'later' },
+  { label: 'Someday', value: 'someday' },
+]
+
+const IMPORTANCE_OPTIONS: { label: string; value: Importance }[] = [
+  { label: 'Critical', value: 'critical' },
+  { label: 'Significant', value: 'significant' },
+  { label: 'Valuable', value: 'valuable' },
+  { label: 'Optional', value: 'optional' },
 ]
 
 const formatDuration = (minutes: number): string => {
@@ -167,6 +188,48 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
               placeholder="Add task description..."
               rows={3}
             />
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Select
+                value={editedTask.urgency}
+                onValueChange={(value: Urgency) => 
+                  setEditedTask(prev => ({ ...prev, urgency: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select urgency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {URGENCY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-1">
+              <Select
+                value={editedTask.importance}
+                onValueChange={(value: Importance) => 
+                  setEditedTask(prev => ({ ...prev, importance: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select importance" />
+                </SelectTrigger>
+                <SelectContent>
+                  {IMPORTANCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid gap-2">
