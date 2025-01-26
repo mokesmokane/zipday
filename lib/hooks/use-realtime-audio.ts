@@ -314,21 +314,10 @@ The last thing you do should be to call the update_plan function with the final 
               if (data.arguments.final) {
                 stopSession()
               }
-              const message = {
-                type: "conversation.item.create",
-                item: {
-                  type: "message",
-                  role: "user",
-                  content: [
-                    {
-                      type: "input_text",
-                      text: "YOU JUST CALLED A FUNCTION"
-                    }
-                  ]
-                }
-              }
           
-              dataChannel.send(JSON.stringify(message))
+              dataChannel.send(JSON.stringify({
+                type: "response.create",
+              }))
             }
 
           }
