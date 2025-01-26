@@ -2,7 +2,14 @@ import { useState, useRef, useEffect } from "react"
 
 interface UseRealtimeAudioProps {
   onDataChannelMessage?: (event: MessageEvent) => void
-  voice?: string
+  context?: string
+  onResponse?: (response: any) => void
+}
+
+interface Message {
+  role: 'user' | 'assistant' | 'function_call'
+  content: string
+  timestamp: number
 }
 
 interface UseRealtimeAudioReturn {
@@ -12,14 +19,17 @@ interface UseRealtimeAudioReturn {
   userAudioLevels: number[]
   realtimeMode: "debug" | "openai"
   voice: string
-  startSession: () => Promise<void>
+  messages: Message[]
+  startSession: (context: string) => Promise<void>
   stopSession: () => void
   setRealtimeMode: (mode: "debug" | "openai") => void
   setVoice: (voice: string) => void
 }
 
 export function useRealtimeAudio({
-  onDataChannelMessage
+  onDataChannelMessage,
+  context,
+  onResponse
 }: UseRealtimeAudioProps = {}): UseRealtimeAudioReturn {
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
@@ -34,6 +44,7 @@ export function useRealtimeAudio({
   const audioContext = useRef<AudioContext | null>(null)
   const analyser = useRef<AnalyserNode | null>(null)
   const userAnalyser = useRef<AnalyserNode | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
 
   const calculateLevels = (analyserNode: AnalyserNode) => {
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
@@ -54,7 +65,6 @@ export function useRealtimeAudio({
     res = [...mirror, ...res.slice(0, 15)]
 
     if (res[0] > 0.05) {
-      console.log("level:", res[0])
     }
 
     return res
@@ -72,8 +82,62 @@ export function useRealtimeAudio({
     }
   }
 
+  const getInstructions = (context: string) => `You are a highly efficient and professional personal assistant. Your role is to help your boss organize and prepare for their day in the most effective way possible.
+  Here is their current schedule:
+  ${context}
+  Your primary goal is to package the day in a way that maximizes their efficiency, keeps them focused on what matters, and reduces their stress.
+  They have ADHD so keep that in mind - though dont mention it.
+  Its up to you to get all the informationfrom thaem sop that you can plan their day. You should drive the cadence of the conversation. Be as succint as possible
+
+
+When generating your response, act as if you are making the first phone call of the day to your boss. Follow this structured approach:
+
+1. Greeting and Energy Check:
+Start the call by warmly greeting your boss and assessing their mindset:
+
+Provide a positive and professional tone.
+2. Quick Overview of the Day:
+Summarize the key aspects of their schedule:
+
+3. Highlight the primary focus or theme of the day (e.g., critical meetings, deadlines, or decisions).
+Mention any major events or time-sensitive items.
+
+4. Alert them to anything they may have missed from yesterday - ask them if they want to reschedule them or mark them as complete.
+
+5. Follow-ups and Questions:
+Ensure you understand their needs:
+
+Ask if they have any additional focus areas or adjustments for the day.
+Reassure them of your support and readiness to handle any tasks or updates they need.
+
+Provide encouragement to set a confident tone for the day.
+Confirm check-in points or next steps.
+Constraints for Responses:
+Be as concise as possible.
+Proactive and Calm: Always offer solutions for potential challenges and avoid overwhelming them with unnecessary details.
+Adapt to the Boss's Personality: Adjust tone and suggestions based on the boss's known preferences or mood.
+Your responses should sound like you are speaking directly to your boss, focusing on clarity, efficiency, and professionalism.
+
+After the call you'll use the transcript to plan their day.
+
+When you think you have enough information, check with them the rough plan, ie "ok so i'll add those takss to you calendar and mark yesterdays as complete, was theer anything else?" or something similar
+
+Your boss is called Mokes
+
+DO NOT MAKE ANYTHING UP.
+YOU MUST ONLY USE THE INFORMATION PROVIDED.
+
+Update the plan as you go using the update_plan function. the function call shouldnt take the place of an audio respone too the user, it should be alongside the audio response.
+
+When you call the update_plan function, it needs to include all previous tasks and the new tasks. You should only add tasks that the user has asked you to do.
+
+It seems like you can only call a function or respond to the user, not both. So we'll send you a messages that says "YOU JUST CALLED A FUNCTION" to let you know you successfully did that. But then you need to rerspond in a way that sounds like you are talking to the user about what youre planning to do 
+
+The last thing you do should be to call the update_plan function with the final set of tasks and final set to true.
+`
+
   // Start a realtime session
-  const startSession = async () => {
+  const startSession = async (context: string) => {
     try {
       // Set up audio context and analyser
       audioContext.current = new AudioContext()
@@ -96,7 +160,12 @@ export function useRealtimeAudio({
       }
 
       // Original OpenAI connection logic
-      const tokenResponse = await fetch("/api/realtime-token")
+      const url = new URL("/api/realtime-token", window.location.origin)
+      if (context) {
+        url.searchParams.append("instructions", getInstructions(context))
+      }
+      
+      const tokenResponse = await fetch(url.toString())
       const data = await tokenResponse.json()
       const EPHEMERAL_KEY = data.client_secret.value
 
@@ -178,6 +247,7 @@ export function useRealtimeAudio({
       setIsSessionActive(false)
       setAudioLevels(Array(30).fill(0))
       setUserAudioLevels(Array(30).fill(0))
+      setMessages([])
       return
     }
 
@@ -195,6 +265,7 @@ export function useRealtimeAudio({
     peerConnection.current = null
     setAudioLevels(Array(30).fill(0))
     setUserAudioLevels(Array(30).fill(0))
+    setMessages([])
   }
 
   useEffect(() => {
@@ -203,17 +274,80 @@ export function useRealtimeAudio({
         setIsSessionActive(true)
       })
 
-      if (onDataChannelMessage) {
-        dataChannel.addEventListener("message", onDataChannelMessage)
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data)
+          // Handle different message types from OpenAI
+          if (data.type === 'conversation.item.input_audio_transcription.completed') {
+            console.log(data)
+            const newMessage: Message = {
+              role: 'user',
+              content: data.transcript,
+              timestamp: Date.now()
+            }
+            
+            setMessages(prev => [...prev, newMessage])
+          } else if (data.type === 'response.audio_transcript.done') {
+            console.log(data)
+            const newMessage: Message = {
+              role: 'assistant',
+              content: data.transcript,
+              timestamp: Date.now()
+            }
+            
+            setMessages(prev => [...prev, newMessage])
+          } else if (data.type === 'response.function_call_arguments.done') {
+            console.log(data)
+            
+            // Handle hang_up function call
+            if (data.name === 'hang_up') {
+              stopSession()
+              return
+            }
+            else if (data.name === 'update_plan') {
+              const newMessage: Message = {
+                role: 'function_call',
+                content: data.arguments,
+                timestamp: Date.now()
+              }
+              setMessages(prev => [...prev, newMessage])
+              if (data.arguments.final) {
+                stopSession()
+              }
+              const message = {
+                type: "conversation.item.create",
+                item: {
+                  type: "message",
+                  role: "user",
+                  content: [
+                    {
+                      type: "input_text",
+                      text: "YOU JUST CALLED A FUNCTION"
+                    }
+                  ]
+                }
+              }
+          
+              dataChannel.send(JSON.stringify(message))
+            }
+
+          }
+
+          onResponse?.(data)
+        } catch (error) {
+          console.error("Error parsing message:", error)
+        }
+
+        onDataChannelMessage?.(event)
       }
 
+      dataChannel.addEventListener("message", handleMessage)
+
       return () => {
-        if (onDataChannelMessage) {
-          dataChannel.removeEventListener("message", onDataChannelMessage)
-        }
+        dataChannel.removeEventListener("message", handleMessage)
       }
     }
-  }, [dataChannel, onDataChannelMessage])
+  }, [dataChannel, onDataChannelMessage, onResponse])
 
   // Animation frame loop for updating audio levels
   useEffect(() => {
@@ -242,9 +376,10 @@ export function useRealtimeAudio({
     userAudioLevels,
     realtimeMode,
     voice,
+    messages,
     setVoice,
     setRealtimeMode,
     startSession,
     stopSession
-  }
+  } 
 }

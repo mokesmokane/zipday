@@ -70,6 +70,21 @@ function getImportanceVariant(importance?: string): "default" | "destructive" | 
   }
 }
 
+// Add the emoji constants at the top
+const URGENCY_EMOJIS: Record<string, string> = {
+  'someday': '🧘',
+  'later': '🚶',
+  'soon': '🏃',
+  'immediate': '🚀',
+}
+
+const IMPORTANCE_EMOJIS: Record<string, string> = {
+  'optional': '🟢',
+  'valuable': '🟠',
+  'significant': '🔴',
+  'critical': '🔥',
+}
+
 interface TaskCardProps {
   task: Task | undefined
   day?: Day
@@ -273,34 +288,34 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
             </div>
           )}
           <div className="mt-4 flex items-center justify-between">
-            {(task.calendarItem?.start.dateTime || task.durationMinutes) ? (
+            <div className="flex-1 flex items-center gap-2">
               <div className="text-muted-foreground flex items-center text-sm">
-                {task.calendarItem?.start.dateTime && <Clock className="mr-1 size-3" />}
-                {task.calendarItem?.start.dateTime && task.durationMinutes
-                  ? `${formatStartTime(task.calendarItem?.start.dateTime)} - ${formatDuration(
-                      task.durationMinutes
-                    )}`
-                  : task.calendarItem?.start.dateTime
-                  ? formatStartTime(task.calendarItem?.start.dateTime)
-                  : formatDuration(task.durationMinutes)}
+                {(task.calendarItem?.start.dateTime || task.durationMinutes) && (
+                  <>
+                    {task.calendarItem?.start.dateTime && <Clock className="mr-1 size-3" />}
+                    {task.calendarItem?.start.dateTime && task.durationMinutes
+                      ? `${formatStartTime(task.calendarItem?.start.dateTime)} - ${formatDuration(
+                          task.durationMinutes
+                        )}`
+                      : task.calendarItem?.start.dateTime
+                      ? formatStartTime(task.calendarItem?.start.dateTime)
+                      : formatDuration(task.durationMinutes)}
+                  </>
+                )}
               </div>
-            ) : <div className="w-6" />}
-            <div className="flex flex-wrap gap-1">
-              {task.urgency && (
-                <Badge variant={getUrgencyVariant(task.urgency)} className="text-xs">
-                  {task.urgency.charAt(0).toUpperCase() + task.urgency.slice(1)}
-                </Badge>
-              )}
-              {task.importance && (
-                <Badge variant={getImportanceVariant(task.importance)} className="text-xs">
-                  {task.importance.charAt(0).toUpperCase() + task.importance.slice(1)}
-                </Badge>
-              )}
-              {task.tags && task.tags.length > 0 && task.tags.map((tag: string) => (
-                <Badge variant="secondary" className="text-xs" key={tag}>
-                  {tag}
-                </Badge>
-              ))}
+
+              <div className="flex items-center gap-1">
+                {task.tags && task.tags.length > 0 && task.tags.map((tag: string) => (
+                  <Badge variant="secondary" className="text-xs" key={tag}>
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {task.importance && <span>{IMPORTANCE_EMOJIS[task.importance]}</span>}
+              {task.urgency && <span>{URGENCY_EMOJIS[task.urgency]}</span>}
             </div>
           </div>
         </CardContent>

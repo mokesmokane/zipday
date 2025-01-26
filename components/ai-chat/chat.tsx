@@ -6,12 +6,12 @@ import { useChat } from "ai/react"
 import {
   ArrowUpIcon,
   MessageCircle,
-
   Play,
   Square,
   Maximize2,
   Minimize2,
-  Bot
+  Bot,
+  MoreVertical
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,11 +29,19 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AIVoiceVisualizer } from "@/components/ai-chat/ai-voice-visualizer"
 import { useRealtimeAudio } from "@/lib/hooks/use-realtime-audio"
 import { useSidebar } from "@/lib/context/sidebar-context"
+import { useAiContext } from "@/lib/context/ai-context"
+import { Textarea } from "@/components/ui/textarea"
 
 export function ChatForm({
   className,
@@ -53,8 +61,11 @@ export function ChatForm({
   const initialSize = useRef({ width: 0, height: 0 })
   const initialPosition = useRef({ x: 0, y: 0 })
   const { isExpanded } = useSidebar()
+  const { getAiContext } = useAiContext()
 
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false)
+  const [showContextDialog, setShowContextDialog] = useState(false)
+  const [showMessagesDialog, setShowMessagesDialog] = useState(false)
 
   const {
     isSessionActive,
@@ -63,11 +74,13 @@ export function ChatForm({
     userAudioLevels,
     realtimeMode,
     voice,
+    messages: realtimeMessages,
     startSession,
     stopSession,
     setRealtimeMode,
     setVoice
   } = useRealtimeAudio({
+    context: getAiContext(),
     onDataChannelMessage: e => {
       // Handle incoming messages if desired
       // console.log("Realtime event:", JSON.parse(e.data))
@@ -294,7 +307,7 @@ export function ChatForm({
               <Button
                 onClick={() => {
                   setShowRealtimeDialog(false)
-                  startSession()
+                  startSession(getAiContext())
                 }}
               >
                 Start Session
@@ -407,100 +420,229 @@ export function ChatForm({
     }
   }, [isResizing])
 
+  const headerContent = (
+    <div className="flex items-center gap-2">
+      <MessageCircle className="size-5" />
+      <CardTitle className="flex-1 text-sm font-medium">
+        AI Assistant
+      </CardTitle>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-7 opacity-50 hover:opacity-100">
+            <MoreVertical className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setShowContextDialog(true)}>
+            View Context
+          </DropdownMenuItem>
+          {isSessionActive && (
+            <DropdownMenuItem onClick={() => setShowMessagesDialog(true)}>
+              View Realtime Messages
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handlePopOutToggle}
+        className="size-7 opacity-50 hover:opacity-100"
+      >
+        {isPoppedOut ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+      </Button>
+    </div>
+  )
+
+  // Add this helper function to format messages
+  const formatRealtimeMessage = (message: any) => {
+    if (typeof message === 'string') return message
+    
+    if (message.content && Array.isArray(message.content)) {
+      return message.content
+        .map((item: any) => item.text || '')
+        .filter(Boolean)
+        .join('\n')
+    }
+    
+    return JSON.stringify(message, null, 2)
+  }
+
   if (!isPoppedOut) {
     // Inline mode
     if(!isExpanded) {
       return (
         <div className="flex justify-center p-2">
-
-        <Button
-          variant="ghost" 
-          size="icon"
-          className="text-muted-foreground hover:text-foreground hover:bg-accent size-10 p-0"
-          onClick={() => setIsPoppedOut(true)}
-        >
-          <Bot className="size-4" />
-        </Button>
+          <Button
+            variant="ghost" 
+            size="icon"
+            className="text-muted-foreground hover:text-foreground hover:bg-accent size-10 p-0"
+            onClick={() => setIsPoppedOut(true)}
+          >
+            <Bot className="size-4" />
+          </Button>
         </div>
       )
     }
     return (
-      <Card
-        className="relative flex flex-col border-none shadow-none"
-        style={{ height: size.height }}
-      >
-        <CardHeader className="shrink-0 p-4">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="size-5" />
-            <CardTitle className="flex-1 text-sm font-medium">
-              AI Assistant
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handlePopOutToggle}
-              className="size-7 opacity-50 hover:opacity-100"
-              >
-              <Maximize2 className="size-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="flex min-h-0 flex-1 flex-col p-4 pt-0">
-          {mainContent}
-        </CardContent>
-
-        <div
-          className="group absolute inset-x-0 top-0 h-2 cursor-n-resize hover:bg-gray-300/20"
-          onMouseDown={e => handleResizeMouseDown(e, "n")}
+      <>
+        <Card
+          className="relative flex flex-col border-none shadow-none"
+          style={{ height: size.height }}
         >
-          <div className="absolute inset-x-0 top-1/2 h-[1px] bg-gray-200 group-hover:bg-gray-400 dark:bg-gray-700 dark:group-hover:bg-gray-500" />
-        </div>
-      </Card>
+          <CardHeader className="shrink-0 p-4">
+            {headerContent}
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col p-4 pt-0">
+            {mainContent}
+          </CardContent>
+
+          <div
+            className="group absolute inset-x-0 top-0 h-2 cursor-n-resize hover:bg-gray-300/20"
+            onMouseDown={e => handleResizeMouseDown(e, "n")}
+          >
+            <div className="absolute inset-x-0 top-1/2 h-[1px] bg-gray-200 group-hover:bg-gray-400 dark:bg-gray-700 dark:group-hover:bg-gray-500" />
+          </div>
+        </Card>
+
+        <Dialog open={showContextDialog} onOpenChange={setShowContextDialog}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Current Context</DialogTitle>
+              <DialogDescription>
+                This is the current context being used by the AI assistant.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Textarea
+                value={getAiContext()}
+                readOnly
+                className="h-[400px] font-mono text-sm"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showMessagesDialog} onOpenChange={setShowMessagesDialog}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Realtime Messages</DialogTitle>
+              <DialogDescription>
+                Messages from the current realtime session.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="max-h-[400px] overflow-y-auto rounded border p-4">
+                {realtimeMessages.length === 0 ? (
+                  <div className="text-muted-foreground text-center">No messages yet</div>
+                ) : (
+                  realtimeMessages.map((message, index) => (
+                    <div 
+                      key={index}
+                      className="mb-4 last:mb-0"
+                    >
+                      <div className="font-semibold">
+                        {message.role === 'assistant' ? 'AI' : 'You'}:
+                      </div>
+                      <div className="whitespace-pre-wrap text-sm">
+                        {formatRealtimeMessage(message)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
     )
   }
 
   // Popped out mode
   return (
-    <div
-      className="fixed z-50 flex flex-col rounded border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
-      style={{
-        top: position.y,
-        left: position.x,
-        width: size.width,
-        height: size.height,
-        position: "fixed"
-      }}
-    >
+    <>
       <div
-        className="flex shrink-0 cursor-move items-center border-b border-gray-300 bg-gray-100 p-2 dark:border-gray-700 dark:bg-gray-800"
-        onMouseDown={handleMouseDown}
+        className="fixed z-50 flex flex-col rounded border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+        style={{
+          top: position.y,
+          left: position.x,
+          width: size.width,
+          height: size.height,
+          position: "fixed"
+        }}
       >
-        <MessageCircle className="size-5" />
-        <span className="ml-2 flex-1 text-sm font-medium">AI Assistant</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handlePopOutToggle}
-          className="size-7 opacity-50 hover:opacity-100"
-          >
-          <Minimize2 className="size-4" />
-        </Button>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col">{mainContent}</div>
+        <div
+          className="flex shrink-0 cursor-move items-center border-b border-gray-300 bg-gray-100 p-2 dark:border-gray-700 dark:bg-gray-800"
+          onMouseDown={handleMouseDown}
+        >
+          {headerContent}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col">{mainContent}</div>
 
-      {/* Resize handles */}
-      <div
-        className="absolute inset-y-0 right-0 w-2 cursor-e-resize hover:bg-gray-300/20"
-        onMouseDown={e => handleResizeMouseDown(e, "e")}
-      />
-      <div
-        className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize hover:bg-gray-300/20"
-        onMouseDown={e => handleResizeMouseDown(e, "s")}
-      />
-      <div
-        className="absolute bottom-0 right-0 size-4 cursor-se-resize hover:bg-gray-300/20"
-        onMouseDown={e => handleResizeMouseDown(e, "se")}
-      />
-    </div>
+        {/* Resize handles */}
+        <div
+          className="absolute inset-y-0 right-0 w-2 cursor-e-resize hover:bg-gray-300/20"
+          onMouseDown={e => handleResizeMouseDown(e, "e")}
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize hover:bg-gray-300/20"
+          onMouseDown={e => handleResizeMouseDown(e, "s")}
+        />
+        <div
+          className="absolute bottom-0 right-0 size-4 cursor-se-resize hover:bg-gray-300/20"
+          onMouseDown={e => handleResizeMouseDown(e, "se")}
+        />
+      </div>
+
+      <Dialog open={showContextDialog} onOpenChange={setShowContextDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Current Context</DialogTitle>
+            <DialogDescription>
+              This is the current context being used by the AI assistant.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={getAiContext()}
+              readOnly
+              className="h-[400px] font-mono text-sm"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMessagesDialog} onOpenChange={setShowMessagesDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Realtime Messages</DialogTitle>
+            <DialogDescription>
+              Messages from the current realtime session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="max-h-[400px] overflow-y-auto rounded border p-4">
+              {realtimeMessages.length === 0 ? (
+                <div className="text-muted-foreground text-center">No messages yet</div>
+              ) : (
+                realtimeMessages.map((message, index) => (
+                  <div 
+                    key={index}
+                    className="mb-4 last:mb-0"
+                  >
+                    <div className="font-semibold">
+                      {message.role === 'assistant' ? 'AI' : 'You'}:
+                    </div>
+                    <div className="whitespace-pre-wrap text-sm">
+                      {formatRealtimeMessage(message)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

@@ -67,8 +67,7 @@ export function TagSelector({ tags, onTagsChange }: TagSelectorProps) {
             variant="outline" 
             className="text-xs cursor-pointer hover:bg-accent px-3 py-1"
           >
-            <Plus className="h-3 w-3 mr-2" />
-            Add tag
+            <Plus className="h-3 w-3" />
           </Badge>
         </PopoverTrigger>
         <PopoverContent className="w-[200px] p-2" align="start">

@@ -48,18 +48,18 @@ const TIME_OPTIONS = [
   { label: '8 hours', value: '8h' },
 ]
 
-const URGENCY_OPTIONS: { label: string; value: Urgency }[] = [
-  { label: 'Immediate', value: 'immediate' },
-  { label: 'Soon', value: 'soon' },
-  { label: 'Later', value: 'later' },
-  { label: 'Someday', value: 'someday' },
+const URGENCY_OPTIONS: { label: string; value: Urgency; emoji: string }[] = [
+  { label: 'Someday', value: 'someday', emoji: '🧘' },
+  { label: 'Later', value: 'later', emoji: '🚶' },
+  { label: 'Soon', value: 'soon', emoji: '🏃' },
+  { label: 'Immediate', value: 'immediate', emoji: '🚀' },
 ]
 
-const IMPORTANCE_OPTIONS: { label: string; value: Importance }[] = [
-  { label: 'Critical', value: 'critical' },
-  { label: 'Significant', value: 'significant' },
-  { label: 'Valuable', value: 'valuable' },
-  { label: 'Optional', value: 'optional' },
+const IMPORTANCE_OPTIONS: { label: string; value: Importance; emoji: string }[] = [
+  { label: 'Optional', value: 'optional', emoji: '🟢' },
+  { label: 'Valuable', value: 'valuable', emoji: '🟠' },
+  { label: 'Significant', value: 'significant', emoji: '🔴' },
+  { label: 'Critical', value: 'critical', emoji: '🔥' },
 ]
 
 const formatDuration = (minutes: number): string => {
@@ -125,15 +125,58 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
             <DialogTitle>Edit Task</DialogTitle>
           </span>
           <div className="flex items-center justify-between">
-            <TagSelector 
-              tags={editedTask.tags || []}
-              onTagsChange={(newTags) => 
-                setEditedTask(prev => ({ ...prev, tags: newTags }))
-              }
-            />
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{day.date}</span>
             </div>
+            <div className="flex items-center gap-2">
+              <TagSelector 
+                tags={editedTask.tags || []}
+                onTagsChange={(newTags) => 
+                  setEditedTask(prev => ({ ...prev, tags: newTags }))
+                }
+              />
+            </div>
+              <div className="flex items-center gap-1 ml-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      {URGENCY_OPTIONS.find(o => o.value === editedTask.urgency)?.emoji || '🧘'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" key="urgency-dropdown">
+                    {URGENCY_OPTIONS.map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => setEditedTask(prev => ({ ...prev, urgency: option.value }))}
+                      >
+                        <span className="flex items-center gap-2">
+                          {option.emoji} {option.label}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      {IMPORTANCE_OPTIONS.find(o => o.value === editedTask.importance)?.emoji || '🟢'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" key="importance-dropdown">
+                    {IMPORTANCE_OPTIONS.map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => setEditedTask(prev => ({ ...prev, importance: option.value }))}
+                      >
+                        <span className="flex items-center gap-2">
+                          {option.emoji} {option.label}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
           </div>
         </DialogHeader>
 
@@ -188,48 +231,6 @@ export function EditTaskDialog({ day,task, open, onOpenChange, onSave, isNewTask
               placeholder="Add task description..."
               rows={3}
             />
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Select
-                value={editedTask.urgency}
-                onValueChange={(value: Urgency) => 
-                  setEditedTask(prev => ({ ...prev, urgency: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select urgency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {URGENCY_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex-1">
-              <Select
-                value={editedTask.importance}
-                onValueChange={(value: Importance) => 
-                  setEditedTask(prev => ({ ...prev, importance: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select importance" />
-                </SelectTrigger>
-                <SelectContent>
-                  {IMPORTANCE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="grid gap-2">

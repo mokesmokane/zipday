@@ -10,6 +10,7 @@ import { FilterProvider } from "@/lib/context/filter-context"
 import { CurrentViewProvider } from "@/lib/context/current-view-context"
 import { GoogleCalendarProvider } from "@/lib/context/google-calendar-context"
 import { SelectedTasksProvider } from "@/lib/context/selected-tasks-context"
+import { AiProvider } from "@/lib/context/ai-context"
 import "./globals.css"
 import { RootProvider } from "@/components/utilities/root-provider"
 import { getServerUser } from "@/lib/firebaseAdmin"
@@ -48,7 +49,9 @@ export default async function RootLayout({
                         <CurrentViewProvider>
                           <GoogleCalendarProvider>
                             <SelectedTasksProvider>
-                              {children}
+                              <AiProvider>
+                                {children}
+                              </AiProvider>
                             </SelectedTasksProvider>
                           </GoogleCalendarProvider>
                         </CurrentViewProvider>
