@@ -6,9 +6,19 @@ export interface HangUpArgs {
   reason: string
 }
 
-export type FunctionCallArgs = UpdatePlanArgs | HangUpArgs
+export enum SuggestActions {
+  REVIEW_BACKLOG = "review_backlog",
+  SUMMARISE_DAY = "summarise_day",
+  SUGGEST_PRIORITIES = "suggest_priorities"
+}
 
-export type FunctionCallName = 'updatePlan'
+export interface SuggestActionsArgs {
+  action_list: SuggestActions[]
+}
+
+export type FunctionCallArgs = UpdatePlanArgs | HangUpArgs | SuggestActionsArgs
+
+export type FunctionCallName = 'updatePlan' | 'suggestActions'
 
 export interface FunctionCallDefinition {
   type: "function"
@@ -54,6 +64,21 @@ export class FunctionCallFactory {
           },
           required: ["todo_list"]
         }
+    },
+    suggestActions: {
+      type: "function",
+      name: "suggest_actions",
+      description: "Use this to suggest actions to the user",
+      parameters: {
+        type: "object",
+        properties: {
+          action_list: {
+            type: "enum",
+            description: "List of actions to be completed",
+            enum: ["review_backlog", "summarise_day", "suggest_priorities"]
+          }
+        }
+      }
     },
     // hangUp: {
     //   type: "function",

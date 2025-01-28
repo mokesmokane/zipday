@@ -166,7 +166,7 @@ export function ChatForm({
       <div className="min-h-0 flex-1 content-center overflow-y-auto px-6 [&::-webkit-scrollbar]:hidden">
         {isSessionActive ? (
           <>
-            <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="flex h-full items-start justify-center gap-2 pt-[10%]">
               <PulsatingSphereVisualizer
                 isActive={isSessionActive}
                 audioLevel={audioLevels[0]}
@@ -174,26 +174,27 @@ export function ChatForm({
                 color="purple"
                 onClick={() => {
                   if (dataChannel && dataChannel.readyState === "open") {
-                    // Send a message as the user to start the conversation
-                    const startMessage = {
-                      type: "conversation.item.create",
-                      item: {
-                        type: "message",
-                        role: "user",
-                        content: [
-                          {
-                            type: "input_text",
-                            text: "Hi there! I'd love to start our conversation."
-                          }
-                        ]
-                      }
+                    console.log("Sending start conversation instruction")
+                    const startConversationInstruction = {
+                      type: "response.create",
+                      response: {
+                        instructions: `
+                        start the conversation with the user
+                      `,
+                      },
                     }
-                    dataChannel.send(JSON.stringify(startMessage))
-                    // Request a response from the AI
-                    dataChannel.send(JSON.stringify({ type: "response.create" }))
+                    dataChannel.send(JSON.stringify(startConversationInstruction))
                   }
                 }}
               />
+              {/* <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowRealtimeMessages(!showRealtimeMessages)}
+                className="shrink-0 text-xs"
+              >
+                {showRealtimeMessages ? "Hide" : "Show"} Messages
+              </Button> */}
             </div>
             {showRealtimeMessages && realtimeMessageList}
           </>

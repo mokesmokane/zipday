@@ -69,14 +69,20 @@ export const PulsatingSphereVisualizer: React.FC<PulsatingSphereVisualizerProps>
         <motion.div
           className={`size-full rounded-full bg-gradient-to-br ${colors.innerFrom} ${colors.innerTo} opacity-75`}
           animate={{
-            scale: isActive ? 0.9 + (audioLevel * 0.1) : 0.85,
+            scale: isActive 
+              ? [0.85, 0.95, 0.85]
+              : 0.85,
           }}
           transition={{
-            type: "spring",
-            stiffness: baseStiffness * 1.2,
-            damping: baseDamping * 1.1,
-            mass: 0.8,
-            restDelta: 0.001
+            scale: {
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+              times: [0, 0.5, 1],
+              ...(isActive && audioLevel > 0 && {
+                duration: 1.5 - audioLevel * 0.5,
+              })
+            }
           }}
         />
       </motion.div>
