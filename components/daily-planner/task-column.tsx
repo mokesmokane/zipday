@@ -3,12 +3,11 @@
 import { useDroppable } from "@dnd-kit/core"
 import { motion } from "framer-motion"
 import { Calendar } from "lucide-react"
-import { useState, useCallback } from "react"
-import { v4 as uuidv4 } from "uuid"
+import { useState } from "react"
 import type { Task } from "@/types/daily-task-types"
 import { Textarea } from "../ui/textarea"
 import { TaskCard } from "./task-card"
-import { cn } from "@/lib/utils"
+import { parseTaskInput } from "@/lib/utils/task-parser"
 
 interface TaskColumnProps {
   id: string
@@ -33,73 +32,6 @@ export function TaskColumn({
   })
 
   const [inputValue, setInputValue] = useState("")
-
-  const parseTaskInput = useCallback((input: string) => {
-    const tasks: Task[] = []
-    const taskBlocks = input.split("\n\n").filter(Boolean)
-
-    for (const block of taskBlocks) {
-      const lines = block.split("\n")
-      if (lines.length === 0) continue
-
-      const title = lines[0].trim()
-      let subtasks = []
-      let tags = []
-      let durationMinutes = undefined
-      let calendarItem = undefined
-      let description = []
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim()
-        if (line.startsWith("-")) {
-          // Subtask
-          subtasks.push({
-            id: uuidv4(),
-            text: line.slice(1).trim(),
-            completed: false
-          })
-        } else if (line.startsWith("#")) {
-          // Tag
-          tags.push(line.slice(1).trim())
-        } else if (line.match(/^\d+m$/)) {
-          // Duration in minutes
-          durationMinutes = parseInt(line)
-        } else if (line.startsWith("@")) {
-          // Time in @HH:MM format
-          const timeMatch = line.match(/@(\d{1,2}):(\d{2})/)
-          if (timeMatch) {
-            const [_, hours, minutes] = timeMatch
-            const date = new Date()
-            date.setHours(parseInt(hours), parseInt(minutes), 0, 0)
-            calendarItem = {
-              start: {
-                dateTime: date.toISOString()
-              }
-            }
-          }
-        } else if (line) {
-          // Any other non-empty line goes to description
-          description.push(line)
-        }
-      }
-
-      const now = new Date().toISOString()
-      tasks.push({
-        id: uuidv4(),
-        title,
-        description: description.length > 0 ? description.join("\n") : undefined,
-        subtasks,
-        tags,
-        durationMinutes,
-        calendarItem,
-        completed: false,
-        createdAt: now,
-        updatedAt: now
-      })
-    }
-
-    return tasks
-  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter") {
@@ -136,22 +68,24 @@ export function TaskColumn({
       ref={setColumnRef}
       className="bg-muted/50 flex min-h-[200px] flex-col rounded-lg border p-4"
     >
-      <div className="flex-1 space-y-4">
-        {children}
-      </div>
+      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto">
+        <div className="space-y-4">
+          {children}
 
-      {/* Preview section */}
-      {previewTasks.length > 0 && (
-        <div className="mt-4 space-y-4 opacity-50">
-          {previewTasks.map(task => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              isOverCalendarZone={false}
-            />
-          ))}
+          {/* Preview section */}
+          {previewTasks.length > 0 && (
+            <div className="mt-4 space-y-4 opacity-50">
+              {previewTasks.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  isOverCalendarZone={false}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {isDragging && showCalendarZone ? (
         <motion.div
@@ -187,7 +121,7 @@ export function TaskColumn({
 - another subtask
 #category
 @9:30
-45m`}
+1h30m`}
             className="min-h-[130px] resize-none"
             rows={6}
           />

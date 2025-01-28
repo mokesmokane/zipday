@@ -571,12 +571,11 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-6 h-full px-6">
+        <div className="flex gap-6 px-6">
           {columns.map(column => (
-            <div key={column.id} className="w-[300px]">
+            <div key={column.id} className="w-[300px] flex flex-col">
               <div className="mb-4 flex justify-between items-center">
                 {column.title}
-                
               </div>
               <SortableContext
                 id={`${column.id}-sortable`}

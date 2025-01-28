@@ -506,23 +506,29 @@ export default function DailyPlanner() {
           }
         }
 
-        const overIndex =
-          columns.find(col => col.date === targetDate)?.tasks.findIndex(
-            t => t.id === overId
-          ) ?? -1
-        const indexToInsert =
-          overIndex >= 0
-            ? overIndex
-            : updated[targetDate].tasks.length
+        // Calculate the correct insertion index
+        let indexToInsert = updated[targetDate].tasks.length
+        if (overId !== targetDate) {
+          const overTaskIndex = updated[targetDate].tasks.findIndex(t => t.id === overId)
+          if (overTaskIndex !== -1) {
+            indexToInsert = overTaskIndex
+          }
+        }
 
+        // Remove the task from its current position if it exists
         const existingTaskIndex = updated[targetDate].tasks.findIndex(
           t => t.id === activeTask.id
         )
         if (existingTaskIndex !== -1) {
-          updated[targetDate].tasks[existingTaskIndex] = activeTask
-        } else {
-          updated[targetDate].tasks.splice(indexToInsert, 0, activeTask)
+          updated[targetDate].tasks.splice(existingTaskIndex, 1)
+          // Adjust insertion index if needed
+          if (existingTaskIndex < indexToInsert) {
+            indexToInsert--
+          }
         }
+
+        // Insert the task at the correct position
+        updated[targetDate].tasks.splice(indexToInsert, 0, activeTask)
 
         return updated
       })
