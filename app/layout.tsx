@@ -14,6 +14,7 @@ import { AiProvider } from "@/lib/context/ai-context"
 import "./globals.css"
 import { RootProvider } from "@/components/utilities/root-provider"
 import { getServerUser } from "@/lib/firebaseAdmin"
+import { RealtimeProvider } from "@/lib/context/transcription-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -42,6 +43,7 @@ export default async function RootLayout({
           <RootProvider serverUser={user}>
             <SidebarProvider>
               <DateProvider>
+                <RealtimeProvider>
                 <TasksProvider>
                   <BacklogProvider>
                     <TaskActionsProvider>
@@ -59,7 +61,8 @@ export default async function RootLayout({
                     </TaskActionsProvider>
                   </BacklogProvider>
                 </TasksProvider>
-              </DateProvider>
+                </RealtimeProvider>
+                </DateProvider>
             </SidebarProvider>
           </RootProvider>
           <Toaster />

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getAllFunctionDefinitions } from "@/lib/function-calls"  
 
 export async function GET(request: Request) {
   try {
@@ -18,44 +19,15 @@ export async function GET(request: Request) {
         input_audio_transcription: {
             model: "whisper-1"
         },
-        tools: [{
-          type: "function",
-          name: "update_plan",
-          description: "Use this to note down tasks that need to be completed after the call. Call this when you have gathered enough information about what needs to be done. you can call this multiple times if you need to update the plan.",
-          parameters: {
-            type: "object",
-            properties: {
-              final: {
-                type: "boolean",
-                description: "Whether this is the final plan or not - if true, the call will be ended after this function call"
-              },
-              tasks: {
-                type: "array",
-                description: "List of tasks that need to be completed - these are tasks you are going to do after the call",
-                items: {
-                  type: "string",
-                  description: "Description of the task to be completed"
-                }
-              }
-            },
-            required: ["tasks"]
-          }
+        tools: getAllFunctionDefinitions(),
+        tool_choice: "auto",
+        turn_detection: {
+            type: "server_vad",
+            threshold: 1.0,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 500,
+            create_response: true
         },
-        {
-          type: "function",
-          name: "hang_up",
-          description: "Use this to end the call when the conversation has reached a natural conclusion or all necessary information has been gathered.",
-          parameters: {
-            type: "object",
-            properties: {
-              reason: {
-                type: "string",
-                description: "Brief explanation of why the call is being ended"
-              }
-            },
-            required: ["reason"]
-          }
-        }],
         // Only include instructions if provided
         ...(instructions && { instructions })
       })

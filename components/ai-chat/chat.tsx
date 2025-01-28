@@ -42,6 +42,9 @@ import { useRealtimeAudio } from "@/lib/hooks/use-realtime-audio"
 import { useSidebar } from "@/lib/context/sidebar-context"
 import { useAiContext } from "@/lib/context/ai-context"
 import { Textarea } from "@/components/ui/textarea"
+import { useRealtime } from "@/lib/context/transcription-context"
+import { FunctionCall } from "@/types/function-call-types"
+import { PulsatingSphereVisualizer } from "./ai-voice-sphere"
 
 export function ChatForm({
   className,
@@ -65,7 +68,7 @@ export function ChatForm({
 
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false)
   const [showContextDialog, setShowContextDialog] = useState(false)
-  const [showMessagesDialog, setShowMessagesDialog] = useState(false)
+  const { messages: realtimeMessages, addMessage, clearMessages } = useRealtime() 
 
   const {
     isSessionActive,
@@ -74,18 +77,15 @@ export function ChatForm({
     userAudioLevels,
     realtimeMode,
     voice,
-    messages: realtimeMessages,
     startSession,
     stopSession,
     setRealtimeMode,
     setVoice
   } = useRealtimeAudio({
-    context: getAiContext(),
-    onDataChannelMessage: e => {
-      // Handle incoming messages if desired
-      // console.log("Realtime event:", JSON.parse(e.data))
-    }
+    context: getAiContext()
   })
+
+  const [showRealtimeMessages, setShowRealtimeMessages] = useState(true)
 
   const handlePopOutToggle = () => {
     setIsPoppedOut(!isPoppedOut)
@@ -141,6 +141,20 @@ export function ChatForm({
     </div>
   )
 
+  const realtimeMessageList = (
+    <div className="my-4 flex h-fit min-h-full flex-col gap-4">
+      {realtimeMessages.map((message, index) =>{
+        if(message instanceof FunctionCall) { 
+          const args = JSON.stringify(message.args)
+          return <div key={index} data-role={message.name}>{message.name} {args}</div>
+        }
+        return <div key={index} data-role={message.role}
+          className="max-w-[80%] rounded-xl px-3 py-2 text-sm data-[role=assistant]:self-start data-[role=user]:self-end data-[role=assistant]:bg-gray-100 data-[role=user]:bg-blue-500 data-[role=assistant]:text-black data-[role=user]:text-white"
+        >{message.content}</div>
+      })}
+    </div>
+  )
+
   const mainContent = (
     <main
       className={cn(
@@ -151,10 +165,38 @@ export function ChatForm({
     >
       <div className="min-h-0 flex-1 content-center overflow-y-auto px-6 [&::-webkit-scrollbar]:hidden">
         {isSessionActive ? (
-          <AIVoiceVisualizer
-            isActive={isSessionActive}
-            audioLevels={audioLevels}
-          />
+          <>
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <PulsatingSphereVisualizer
+                isActive={isSessionActive}
+                audioLevel={audioLevels[0]}
+                className="size-48 cursor-pointer hover:opacity-80 transition-opacity"
+                color="purple"
+                onClick={() => {
+                  if (dataChannel && dataChannel.readyState === "open") {
+                    // Send a message as the user to start the conversation
+                    const startMessage = {
+                      type: "conversation.item.create",
+                      item: {
+                        type: "message",
+                        role: "user",
+                        content: [
+                          {
+                            type: "input_text",
+                            text: "Hi there! I'd love to start our conversation."
+                          }
+                        ]
+                      }
+                    }
+                    dataChannel.send(JSON.stringify(startMessage))
+                    // Request a response from the AI
+                    dataChannel.send(JSON.stringify({ type: "response.create" }))
+                  }
+                }}
+              />
+            </div>
+            {showRealtimeMessages && realtimeMessageList}
+          </>
         ) : messages.length ? (
           messageList
         ) : (
@@ -164,158 +206,158 @@ export function ChatForm({
         )}
       </div>
       <div className="shrink-0">
-        <div className="mx-6 mb-6 flex items-center gap-2">
-          <div className="flex-1">
-            {isSessionActive ? (
-              <AIVoiceVisualizer
+        <div className="mx-6 mb-6 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            {isSessionActive && (
+              <PulsatingSphereVisualizer
                 isActive={isSessionActive}
-                audioLevels={userAudioLevels}
-                className="w-full"
+                audioLevel={userAudioLevels[userAudioLevels.length - 1]}
+                className="size-8 shrink-0"
+                color="green"
               />
-            ) : (
-              <form
-                onSubmit={handleSubmit}
-                className="border-input bg-background focus-within:ring-ring/10 relative flex flex-1 items-center gap-2 rounded-[16px] border px-3 py-1.5 text-sm focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0"
-              >
-                <AutoResizeTextarea
-                  onKeyDown={handleKeyDown}
-                  onChange={v => setInput(v)}
-                  value={input}
-                  placeholder="Enter a message"
-                  className="placeholder:text-muted-foreground flex-1 bg-transparent focus:outline-none"
-                />
+            )}
+            <form
+              onSubmit={handleSubmit}
+              className="border-input bg-background focus-within:ring-ring/10 relative flex flex-1 items-center gap-2 rounded-[16px] border px-3 py-1.5 text-sm focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0"
+            >
+              <AutoResizeTextarea 
+                onKeyDown={handleKeyDown}
+                onChange={v => setInput(v)}
+                value={input}
+                placeholder="Enter a message"
+                className="placeholder:text-muted-foreground flex-1 bg-transparent focus:outline-none"
+              />
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="sm"
-                      className="size-8 rounded-full"
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="sm"
+                    className="size-8 rounded-full"
+                  >
+                    <ArrowUpIcon size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Submit</TooltipContent>
+              </Tooltip>
+            </form>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={
+                    isSessionActive
+                      ? stopSession
+                      : () => setShowRealtimeDialog(true)
+                  }
+                  className={cn(
+                    "size-8 rounded-full",
+                    isSessionActive
+                      ? "hover:bg-red-100 hover:text-red-600"
+                      : "hover:bg-green-100 hover:text-green-600"
+                  )}
+                >
+                  {isSessionActive ? (
+                    <Square className="size-4" />
+                  ) : (
+                    <Play className="size-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isSessionActive ? "Stop Session" : "Start Realtime Session"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </div>
+      <Dialog open={showRealtimeDialog} onOpenChange={setShowRealtimeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Realtime Session</DialogTitle>
+            <DialogDescription>
+              Choose how you'd like to interact with the AI assistant in
+              real-time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6">
+            <RadioGroup
+              value={realtimeMode}
+              onValueChange={value =>
+                setRealtimeMode(value as "debug" | "openai")
+              }
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="openai" id="openai" />
+                <Label htmlFor="openai">Voice Conversation</Label>
+              </div>
+              <div className="mt-2 text-sm text-gray-500">
+                Speak naturally with the AI using your microphone
+              </div>
+
+              <div className="mt-4 flex items-center space-x-2">
+                <RadioGroupItem value="debug" id="debug" />
+                <Label htmlFor="debug">Debug Mode</Label>
+              </div>
+              <div className="mt-2 text-sm text-gray-500">
+                Debug mode will not connect to the AI assistant.
+              </div>
+            </RadioGroup>
+
+            {realtimeMode === "openai" && (
+              <div className="mt-6">
+                <Label>Voice</Label>
+                <RadioGroup
+                  value={voice}
+                  onValueChange={setVoice}
+                  className="mt-2"
+                >
+                  {[
+                    { id: "alloy", label: "Alloy" },
+                    { id: "ash", label: "Ash" },
+                    { id: "ballad", label: "Ballad" },
+                    { id: "coral", label: "Coral" },
+                    { id: "echo", label: "Echo" },
+                    { id: "sage", label: "Sage" },
+                    { id: "shimmer", label: "Shimmer" },
+                    { id: "verse", label: "Verse" }
+                  ].map(voice => (
+                    <div
+                      key={voice.id}
+                      className="flex items-center space-x-2"
                     >
-                      <ArrowUpIcon size={16} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Submit</TooltipContent>
-                </Tooltip>
-              </form>
+                      <RadioGroupItem value={voice.id} id={voice.id} />
+                      <Label htmlFor={voice.id}>{voice.label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
             )}
           </div>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={
-                  isSessionActive
-                    ? stopSession
-                    : () => setShowRealtimeDialog(true)
-                }
-                className={cn(
-                  "size-8 rounded-full",
-                  isSessionActive
-                    ? "hover:bg-red-100 hover:text-red-600"
-                    : "hover:bg-green-100 hover:text-green-600"
-                )}
-              >
-                {isSessionActive ? (
-                  <Square className="size-4" />
-                ) : (
-                  <Play className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isSessionActive ? "Stop Session" : "Start Realtime Session"}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-        <Dialog open={showRealtimeDialog} onOpenChange={setShowRealtimeDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Start Realtime Session</DialogTitle>
-              <DialogDescription>
-                Choose how you'd like to interact with the AI assistant in
-                real-time.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-6">
-              <RadioGroup
-                value={realtimeMode}
-                onValueChange={value =>
-                  setRealtimeMode(value as "debug" | "openai")
-                }
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="openai" id="openai" />
-                  <Label htmlFor="openai">Voice Conversation</Label>
-                </div>
-                <div className="mt-2 text-sm text-gray-500">
-                  Speak naturally with the AI using your microphone
-                </div>
-
-                <div className="mt-4 flex items-center space-x-2">
-                  <RadioGroupItem value="debug" id="debug" />
-                  <Label htmlFor="debug">Debug Mode</Label>
-                </div>
-                <div className="mt-2 text-sm text-gray-500">
-                  Debug mode will not connect to the AI assistant.
-                </div>
-              </RadioGroup>
-
-              {realtimeMode === "openai" && (
-                <div className="mt-6">
-                  <Label>Voice</Label>
-                  <RadioGroup
-                    value={voice}
-                    onValueChange={setVoice}
-                    className="mt-2"
-                  >
-                    {[
-                      { id: "alloy", label: "Alloy" },
-                      { id: "ash", label: "Ash" },
-                      { id: "ballad", label: "Ballad" },
-                      { id: "coral", label: "Coral" },
-                      { id: "echo", label: "Echo" },
-                      { id: "sage", label: "Sage" },
-                      { id: "shimmer", label: "Shimmer" },
-                      { id: "verse", label: "Verse" }
-                    ].map(voice => (
-                      <div
-                        key={voice.id}
-                        className="flex items-center space-x-2"
-                      >
-                        <RadioGroupItem value={voice.id} id={voice.id} />
-                        <Label htmlFor={voice.id}>{voice.label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowRealtimeDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowRealtimeDialog(false)
-                  startSession(getAiContext())
-                }}
-              >
-                Start Session
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRealtimeDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowRealtimeDialog(false)
+                startSession(getAiContext())
+              }}
+            >
+              Start Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 
@@ -436,11 +478,6 @@ export function ChatForm({
           <DropdownMenuItem onClick={() => setShowContextDialog(true)}>
             View Context
           </DropdownMenuItem>
-          {isSessionActive && (
-            <DropdownMenuItem onClick={() => setShowMessagesDialog(true)}>
-              View Realtime Messages
-            </DropdownMenuItem>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <Button
@@ -453,20 +490,6 @@ export function ChatForm({
       </Button>
     </div>
   )
-
-  // Add this helper function to format messages
-  const formatRealtimeMessage = (message: any) => {
-    if (typeof message === 'string') return message
-    
-    if (message.content && Array.isArray(message.content)) {
-      return message.content
-        .map((item: any) => item.text || '')
-        .filter(Boolean)
-        .join('\n')
-    }
-    
-    return JSON.stringify(message, null, 2)
-  }
 
   if (!isPoppedOut) {
     // Inline mode
@@ -519,38 +542,6 @@ export function ChatForm({
                 readOnly
                 className="h-[400px] font-mono text-sm"
               />
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showMessagesDialog} onOpenChange={setShowMessagesDialog}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Realtime Messages</DialogTitle>
-              <DialogDescription>
-                Messages from the current realtime session.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <div className="max-h-[400px] overflow-y-auto rounded border p-4">
-                {realtimeMessages.length === 0 ? (
-                  <div className="text-muted-foreground text-center">No messages yet</div>
-                ) : (
-                  realtimeMessages.map((message, index) => (
-                    <div 
-                      key={index}
-                      className="mb-4 last:mb-0"
-                    >
-                      <div className="font-semibold">
-                        {message.role === 'assistant' ? 'AI' : 'You'}:
-                      </div>
-                      <div className="whitespace-pre-wrap text-sm">
-                        {formatRealtimeMessage(message)}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -608,38 +599,6 @@ export function ChatForm({
               readOnly
               className="h-[400px] font-mono text-sm"
             />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showMessagesDialog} onOpenChange={setShowMessagesDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Realtime Messages</DialogTitle>
-            <DialogDescription>
-              Messages from the current realtime session.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="max-h-[400px] overflow-y-auto rounded border p-4">
-              {realtimeMessages.length === 0 ? (
-                <div className="text-muted-foreground text-center">No messages yet</div>
-              ) : (
-                realtimeMessages.map((message, index) => (
-                  <div 
-                    key={index}
-                    className="mb-4 last:mb-0"
-                  >
-                    <div className="font-semibold">
-                      {message.role === 'assistant' ? 'AI' : 'You'}:
-                    </div>
-                    <div className="whitespace-pre-wrap text-sm">
-                      {formatRealtimeMessage(message)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect } from "react"
+"use client"
 
-interface UseRealtimeAudioProps {
+import { useState, useRef, useEffect } from "react"
+import { useRealtime, Message, Transcript } from "../context/transcription-context"
+import { FunctionCall, FunctionCallFactory } from "@/types/function-call-types"
+import { functionCallFactory } from "../function-calls"
+
+interface UseRealtimeAudioProps {     
   onDataChannelMessage?: (event: MessageEvent) => void
   context?: string
   onResponse?: (response: any) => void
-}
-
-interface Message {
-  role: 'user' | 'assistant' | 'function_call'
-  content: string
-  timestamp: number
+  vadEnabled?: boolean
 }
 
 interface UseRealtimeAudioReturn {
@@ -19,7 +19,6 @@ interface UseRealtimeAudioReturn {
   userAudioLevels: number[]
   realtimeMode: "debug" | "openai"
   voice: string
-  messages: Message[]
   startSession: (context: string) => Promise<void>
   stopSession: () => void
   setRealtimeMode: (mode: "debug" | "openai") => void
@@ -29,8 +28,8 @@ interface UseRealtimeAudioReturn {
 export function useRealtimeAudio({
   onDataChannelMessage,
   context,
-  onResponse
-}: UseRealtimeAudioProps = {}): UseRealtimeAudioReturn {
+  onResponse,
+}: UseRealtimeAudioProps = {}) {
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
   const [audioLevels, setAudioLevels] = useState<number[]>(Array(30).fill(0))
@@ -44,7 +43,7 @@ export function useRealtimeAudio({
   const audioContext = useRef<AudioContext | null>(null)
   const analyser = useRef<AnalyserNode | null>(null)
   const userAnalyser = useRef<AnalyserNode | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+  const { addMessage, clearMessages } = useRealtime()
 
   const calculateLevels = (analyserNode: AnalyserNode) => {
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
@@ -89,8 +88,11 @@ export function useRealtimeAudio({
   They have ADHD so keep that in mind - though dont mention it.
   Its up to you to get all the informationfrom thaem sop that you can plan their day. You should drive the cadence of the conversation. Be as succint as possible
 
+Your main task is to respond to your bosses commands
 
-When generating your response, act as if you are making the first phone call of the day to your boss. Follow this structured approach:
+When generating your response, act as if you are making the first phone call of the day to your boss.
+
+If your boss doesnt give you a clear instruction you can follow this structured approach:
 
 1. Greeting and Energy Check:
 Start the call by warmly greeting your boss and assessing their mindset:
@@ -118,29 +120,25 @@ Proactive and Calm: Always offer solutions for potential challenges and avoid ov
 Adapt to the Boss's Personality: Adjust tone and suggestions based on the boss's known preferences or mood.
 Your responses should sound like you are speaking directly to your boss, focusing on clarity, efficiency, and professionalism.
 
-After the call you'll use the transcript to plan their day.
+As you are speaking, you should be making notes about what you need to do after the call. The way you do this is by calling the update_plan function.
 
-When you think you have enough information, check with them the rough plan, ie "ok so i'll add those takss to you calendar and mark yesterdays as complete, was theer anything else?" or something similar
+The list of things on that plan is like a todo list - it high level but should have enough detail when in context to be actionable. You should be updating it as you go.
 
 Your boss is called Mokes
 
 DO NOT MAKE ANYTHING UP.
 YOU MUST ONLY USE THE INFORMATION PROVIDED.
 
-Update the plan as you go using the update_plan function. the function call shouldnt take the place of an audio respone too the user, it should be alongside the audio response.
+If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN. 
 
-When you call the update_plan function, it needs to include all previous tasks and the new tasks. You should only add tasks that the user has asked you to do.
-
-It seems like you can only call a function or respond to the user, not both. So we'll send you a messages that says "YOU JUST CALLED A FUNCTION" to let you know you successfully did that. But then you need to rerspond in a way that sounds like you are talking to the user about what youre planning to do 
-
-The last thing you do should be to call the update_plan function with the final set of tasks and final set to true.
 `
+
+
 
   // Start a realtime session
   const startSession = async (context: string) => {
     try {
-      // Set up audio context and analyser
-      audioContext.current = new AudioContext()
+      clearMessages()
 
       if (realtimeMode === "debug") {
         // Debug mode - only set up local audio analysis
@@ -247,7 +245,7 @@ The last thing you do should be to call the update_plan function with the final 
       setIsSessionActive(false)
       setAudioLevels(Array(30).fill(0))
       setUserAudioLevels(Array(30).fill(0))
-      setMessages([])
+      clearMessages()
       return
     }
 
@@ -265,7 +263,7 @@ The last thing you do should be to call the update_plan function with the final 
     peerConnection.current = null
     setAudioLevels(Array(30).fill(0))
     setUserAudioLevels(Array(30).fill(0))
-    setMessages([])
+    clearMessages()
   }
 
   useEffect(() => {
@@ -286,7 +284,7 @@ The last thing you do should be to call the update_plan function with the final 
               timestamp: Date.now()
             }
             
-            setMessages(prev => [...prev, newMessage])
+            addMessage(newMessage)
           } else if (data.type === 'response.audio_transcript.done') {
             console.log(data)
             const newMessage: Message = {
@@ -295,7 +293,7 @@ The last thing you do should be to call the update_plan function with the final 
               timestamp: Date.now()
             }
             
-            setMessages(prev => [...prev, newMessage])
+            addMessage(newMessage)
           } else if (data.type === 'response.function_call_arguments.done') {
             console.log(data)
             
@@ -305,12 +303,9 @@ The last thing you do should be to call the update_plan function with the final 
               return
             }
             else if (data.name === 'update_plan') {
-              const newMessage: Message = {
-                role: 'function_call',
-                content: data.arguments,
-                timestamp: Date.now()
-              }
-              setMessages(prev => [...prev, newMessage])
+              const newMessage = new FunctionCall(data.name, data.arguments)
+              
+              addMessage(newMessage)
               if (data.arguments.final) {
                 stopSession()
               }
@@ -357,6 +352,7 @@ The last thing you do should be to call the update_plan function with the final 
       }
     }
   }, [isSessionActive])
+  
 
   return {
     isSessionActive,
@@ -365,10 +361,9 @@ The last thing you do should be to call the update_plan function with the final 
     userAudioLevels,
     realtimeMode,
     voice,
-    messages,
     setVoice,
     setRealtimeMode,
     startSession,
-    stopSession
+    stopSession,
   } 
 }
