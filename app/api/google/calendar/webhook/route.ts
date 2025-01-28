@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { google } from "googleapis"
 import { broadcastCalendarUpdate } from "../stream/route"
 import { getFirestore } from "firebase-admin/firestore"
+import { refreshGoogleTokens } from "@/lib/google/refresh-token"
 
 // Verify the webhook is from Google
 async function isValidWebhook(req: Request) {
@@ -34,10 +35,16 @@ async function fetchLatestEvents(userId: string) {
   // Get user's tokens
   const db = getFirestore()
   const userDoc = await db.collection("users").doc(userId).get()
-  const tokens = userDoc.data()?.googleCalendar?.tokens
+  let tokens = userDoc.data()?.googleCalendar?.tokens
 
   if (!tokens) {
     throw new Error("No Google Calendar tokens found")
+  }
+
+  // Check if access token needs refresh
+  const expiryDate = new Date((tokens.expiry_date || 0))
+  if (expiryDate <= new Date()) {
+    tokens = await refreshGoogleTokens(userId)
   }
 
   // Set up authenticated client

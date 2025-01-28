@@ -3,6 +3,8 @@ import { google } from "googleapis"
 import { getAuth } from "firebase-admin/auth"
 import { getFirestore } from "firebase-admin/firestore"
 import { cookies } from "next/headers"
+import { refreshGoogleTokens } from "@/lib/google/refresh-token"
+
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -28,13 +30,27 @@ export async function POST(request: Request) {
       .get()
 
     const userData = userDoc.data()
-    const tokens = userData?.googleCalendar?.tokens
+    let tokens = userData?.googleCalendar?.tokens
 
     if (!tokens) {
       return NextResponse.json(
         { error: "Google Calendar not connected" },
         { status: 400 }
       )
+    }
+
+    // Check if access token needs refresh
+    const expiryDate = new Date((tokens.expiry_date || 0))
+    if (expiryDate <= new Date()) {
+      try {
+        tokens = await refreshGoogleTokens(session.uid)
+      } catch (error) {
+        console.error("Failed to refresh tokens:", error)
+        return NextResponse.json(
+          { error: "Failed to refresh Google Calendar access" },
+          { status: 401 }
+        )
+      }
     }
 
     // Get task data from request

@@ -54,6 +54,10 @@ export async function GET(request: Request) {
 
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code)
+    // Ensure we have a refresh token
+    if (!tokens.refresh_token) {
+      throw new Error("No refresh token received from Google")
+    }
     oauth2Client.setCredentials(tokens)
 
     // Set up webhook subscription (skipped in development)
