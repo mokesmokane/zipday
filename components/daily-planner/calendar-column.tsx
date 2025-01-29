@@ -54,7 +54,7 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
   })
 
   return (
-    <div className="bg-muted/50 flex h-full w-full flex-col rounded-lg border">
+    <div className="bg-muted/50 flex h-[calc(100vh-8rem)] flex-col rounded-lg border">
       <div className="border-b p-2 h-[72px] overflow-y-auto">
         {allDayEvents.length > 0 && (
           <div className="space-y-1">
@@ -71,7 +71,7 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto relative">
+      <div className="flex-1 min-h-0 overflow-y-auto relative scrollbar-hide">
         {/* Time labels column */}
         <TimeLabels />
         

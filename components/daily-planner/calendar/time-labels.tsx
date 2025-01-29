@@ -6,7 +6,7 @@ export function TimeLabels() {
       {Array.from({ length: 24 }, (_, hour) => (
         <div 
           key={hour}
-          className="absolute left-0 w-full border-b text-xs text-muted-foreground px-2 flex items-start"
+          className={`absolute left-0 w-full ${hour < 23 ? 'border-b' : ''} text-xs text-muted-foreground px-2 flex items-start`}
           style={{ 
             top: `${hour * HOUR_HEIGHT}px`,
             height: `${HOUR_HEIGHT}px`

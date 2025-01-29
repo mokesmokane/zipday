@@ -68,23 +68,21 @@ export function TaskColumn({
       ref={setColumnRef}
       className="bg-muted/50 flex min-h-[200px] flex-col rounded-lg border p-4"
     >
-      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto">
-        <div className="space-y-4">
-          {children}
+      <div className={`flex-1 max-h-[calc(100vh-${onAddTask ? "20" : "10"}rem)] overflow-y-auto space-y-4 scrollbar-hide`}>
+        {children}
 
-          {/* Preview section */}
-          {previewTasks.length > 0 && (
-            <div className="mt-4 space-y-4 opacity-50">
-              {previewTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  isOverCalendarZone={false}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Preview section */}
+        {previewTasks.length > 0 && (
+          <div className="space-y-4 opacity-50">
+            {previewTasks.map(task => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                isOverCalendarZone={false}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {isDragging && showCalendarZone ? (

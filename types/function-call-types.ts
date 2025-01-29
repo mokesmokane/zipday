@@ -18,7 +18,7 @@ export interface SuggestActionsArgs {
 
 export type FunctionCallArgs = UpdatePlanArgs | HangUpArgs | SuggestActionsArgs
 
-export type FunctionCallName = 'updatePlan' | 'suggestActions'
+export type FunctionCallName = 'updatePlan' | 'create_task' | 'move_task' | 'mark_task_completed' | 'mark_subtask_completed' | 'get_calendar_for_date_range' | 'set_callback' | 'add_user_notes'
 
 export interface FunctionCallDefinition {
   type: "function"
@@ -65,37 +65,167 @@ export class FunctionCallFactory {
           required: ["todo_list"]
         }
     },
-    suggestActions: {
+    create_task: {
       type: "function",
-      name: "suggest_actions",
-      description: "Use this to suggest actions to the user",
+      name: "create_task",
+      description: "Creates a new task in the user's to-do list or calendar",
       parameters: {
         type: "object",
         properties: {
-          action_list: {
-            type: "enum",
-            description: "List of actions to be completed",
-            enum: ["review_backlog", "summarise_day", "suggest_priorities"]
+          title: {
+            type: "string",
+            description: "The title of the task"
+          },
+          description: {
+            type: "string",
+            description: "Optional details or notes about the task"
+          },
+          due_date: {
+            type: "string",
+            description: "Due date for the task in YYYY-MM-DD format (optional)"
+          },
+          due_time: {
+            type: "string",
+            description: "Due time for the task in HH:MM (24-hour) format (optional)"
+          },
+          subtasks: {
+            type: "array",
+            description: "List of subtasks associated with this task",
+            items: {
+              type: "string"
+            }
+          },
+          priority: {
+            type: "string",
+            description: "Priority level, e.g. 'low', 'medium', 'high' (optional)"
           }
-        }
+        },
+        required: ["title"]
       }
     },
-    // hangUp: {
-    //   type: "function",
-    //   name: "hang_up",
-    //   description: "Use this to end the call when the conversation has reached a natural conclusion or all necessary information has been gathered.",
-    //   parameters: {
-    //       type: "object",
-    //       properties: {
-    //         reason: {
-    //           type: "string",
-    //           description: "Brief explanation of why the call is being ended"
-    //         }
-    //       },
-    //       required: ["reason"]
-    //     }
-    //   }
+    move_task: {
+      type: "function",
+      name: "move_task",
+      description: "Moves or reschedules an existing task on the calendar",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: {
+            type: "string",
+            "description": "Unique identifier or reference for the task"
+          },
+          new_date: {
+            type: "string",
+            description: "New date for the task in YYYY-MM-DD format"
+          },
+          new_start_time: {
+            type: "string",
+            description: "New start time in HH:MM (24-hour) format"
+          },
+          new_end_time: {
+            type: "string",
+            description: "New end time in HH:MM (24-hour) format"
+          }
+        },
+        required: ["task_id", "new_date", "new_start_time", "new_end_time"]
+      }
+    },
+  
+    mark_task_completed: {
+      type: "function",
+      name: "mark_task_completed",
+      description: "Marks a specified task as completed",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: {
+            type: "string",
+            description: "Unique identifier or reference for the task"
+          }
+        },
+        required: ["task_id"]
+      }
+    },
+
+    mark_subtask_completed: {
+      type: "function",
+      name: "mark_subtask_completed",
+      description: "Marks a specific subtask as completed within a given parent task",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: {
+            type: "string",
+            description: "Unique identifier or reference for the parent task"
+          },
+          subtask_id: {
+            type: "string",
+            description: "Unique identifier or reference for the subtask"
+          }
+        },
+        required: ["task_id", "subtask_id"]
+      }
+    },
+  
+    get_calendar_for_date_range: {
+      type: "function",
+      name: "get_calendar_for_date_range",
+      description: "Retrieves tasks and events within a specified date range from the calendar",
+      parameters: {
+        type: "object",
+        properties: {
+          start_date: {
+            type: "string",
+            description: "Start date in YYYY-MM-DD format"
+          },
+          end_date: {
+            type: "string",
+            description: "End date in YYYY-MM-DD format"
+          }
+        },
+        required: ["start_date", "end_date"]
+      }
+    },
+  
+    set_callback: {
+      type: "function",
+      name: "set_callback",
+      description: "Schedules a callback time for future interaction or reminders",
+      parameters: {
+        type: "object",
+        properties: {
+          callback_datetime: {
+            type: "string",
+            description: "Date and time for the callback in ISO 8601 format (e.g. '2025-01-15T14:30:00')"
+          },
+          context: {
+            type: "string",
+            description: "A note or reference describing the purpose of the callback"
+          }
+        },
+        required: ["callback_datetime", "context"]
+      }
+    },
+    add_user_notes: {
+      type: "function",
+      name: "add_user_notes",
+      description: "Store user instructions or relevant notes about how to interact best with the user. This data is for the AI's private reference, not for external display.",
+      parameters: {
+        type: "object",
+        properties: {
+          explicit_instructions: {
+            type: "string",
+            description: "Any explicit general instructions the user provides (e.g., preferences on how to be addressed, topics to avoid, etc.)"
+          },
+          interaction_notes: {
+            type: "string",
+            description: "Additional observations or strategies for best interacting with the user, e.g. communication style, motivational tips, etc."
+          }
+        },
+        required: []
+      }
     }
+  }
 
   createFunctionCall(name: "updatePlan", args: UpdatePlanArgs): FunctionCall
 //   createFunctionCall(name: "hangUp", args: HangUpArgs): FunctionCall

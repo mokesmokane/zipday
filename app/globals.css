@@ -169,3 +169,11 @@ Global styles for the app.
 .calendar-hour:hover {
   background-color: var(--accent);
 }
+/* Usually in globals.css */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE */
+  scrollbar-width: none;     /* Firefox */
+}

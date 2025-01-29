@@ -56,6 +56,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     refreshTasks,
   } = useTasks()
 
+  // Add this state to track when dragging over calendar
+  const [isDraggingOverCalendar, setIsDraggingOverCalendar] = useState(false)
+
   // Sync local state with global tasks
   useEffect(() => {
     console.log("Syncing local state with global tasks")
@@ -311,7 +314,9 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
     const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
     const isOverCalendarColumn = overId.startsWith("calendar-")
 
+
     if (isOverCalendarHour || isOverCalendarColumn) {
+      setIsDraggingOverCalendar(true)
       const targetDate = isOverCalendarHour
         ? overId.split('-')[1]
         : overId.split('-')[1]
@@ -362,6 +367,8 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
 
       setPreviewColumnId(overId)
       return
+    } else {
+      setIsDraggingOverCalendar(false)
     }
 
     /// Get target column id either from sortable container or direct column id
@@ -409,6 +416,7 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
   }
 
   async function handleDragEnd(event: DragEndEvent) {
+    setIsDraggingOverCalendar(false)
     const { active, over } = event
     if (!over || !activeTask) return
     setIsDragging(false)
@@ -726,11 +734,13 @@ export function TaskBoard({ today, selectedDate, setSelectedDate }: TaskBoardPro
 
         <DragOverlay>
           {activeTask ? (
-            <TaskCard
-              task={activeTask}
-              day={today}
-              isOverCalendarZone={false}
-            />
+            <div className={cn(isDraggingOverCalendar && "opacity-50")}>
+              <TaskCard
+                task={activeTask}
+                day={today}
+                isOverCalendarZone={false}
+              />
+            </div>
           ) : null}
         </DragOverlay>
 

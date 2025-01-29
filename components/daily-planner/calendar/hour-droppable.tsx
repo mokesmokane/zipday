@@ -17,7 +17,7 @@ export function HourDroppable({ id, hour }: HourDroppableProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`relative border-b transition-colors ${isOverHour ? 'bg-accent' : 'hover:bg-accent/50'}`}
+      className={`relative ${hour < 23 ? 'border-b' : ''} transition-colors ${isOverHour ? 'bg-accent' : 'hover:bg-accent/50'}`}
       style={{ height: `${HOUR_HEIGHT}px` }}
     />
   )
