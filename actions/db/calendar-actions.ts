@@ -3,6 +3,9 @@ import { auth, firestore } from "firebase-admin"
 import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
 import { Task, CalendarItem } from "@/types/daily-task-types"
+import { GetCalendarForDateRangeArgs } from "@/types/function-call-types"
+import { google } from "googleapis"
+import { getAuth } from "firebase-admin/auth"
 
 const db = firestore()
 
@@ -149,5 +152,66 @@ export async function removeCalendarItemAction(
   } catch (error) {
     console.error("Failed to remove calendar item:", error)
     return { isSuccess: false, message: "Failed to remove calendar item" }
+  }
+}
+
+export async function getCalendarForDateRange(args: GetCalendarForDateRangeArgs): Promise<ActionState<any>> {
+  try {
+    const { start_date, end_date } = args
+
+    // Get user's Google Calendar tokens
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get("session")?.value
+    if (!sessionCookie) {
+      return {
+        isSuccess: false,
+        message: "Unauthorized"
+      }
+    }
+
+    // Get the current user's session
+    const session = await getAuth().verifySessionCookie(sessionCookie)
+
+    // Get user's Google Calendar tokens from Firestore
+    const userDoc = await db.collection("users").doc(session.uid).get()
+    const userData = userDoc.data()
+    const tokens = userData?.googleCalendar?.tokens
+
+    if (!tokens) {
+      return {
+        isSuccess: false,
+        message: "Google Calendar not connected"
+      }
+    }
+
+    // Set up Google Calendar client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
+    oauth2Client.setCredentials(tokens)
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client })
+
+    // Get events from Google Calendar
+    const response = await calendar.events.list({
+      calendarId: "primary",
+      timeMin: new Date(start_date).toISOString(),
+      timeMax: new Date(end_date).toISOString(),
+      singleEvents: true,
+      orderBy: "startTime"
+    })
+
+    return {
+      isSuccess: true,
+      message: "Calendar events retrieved successfully",
+      data: response.data.items
+    }
+  } catch (error) {
+    console.error("Error getting calendar events:", error)
+    return {
+      isSuccess: false,
+      message: "Failed to get calendar events"
+    }
   }
 } 

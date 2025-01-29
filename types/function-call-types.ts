@@ -16,7 +16,48 @@ export interface SuggestActionsArgs {
   action_list: SuggestActions[]
 }
 
-export type FunctionCallArgs = UpdatePlanArgs | HangUpArgs | SuggestActionsArgs
+export interface AddUserNotesArgs {
+  explicit_instructions: string[]
+  interaction_notes: string[]
+}
+
+export interface CreateTaskArgs {
+  title: string
+  description?: string
+  due_date?: string
+  due_time?: string
+  subtasks?: string[]
+  priority?: string
+}
+
+export interface SetCallbackArgs {
+  callback_datetime: string
+  context: string
+}
+
+export interface MoveTaskArgs {
+  task_id: string
+  new_date: string
+  new_start_time: string
+  new_end_time: string
+}
+
+export interface MarkTaskCompletedArgs {
+  task_id: string
+}
+
+export interface MarkSubtaskCompletedArgs {
+  task_id: string
+  subtask_id: string
+}
+
+export interface GetCalendarForDateRangeArgs {
+  start_date: string
+  end_date: string
+}
+
+
+export type FunctionCallArgs = UpdatePlanArgs | HangUpArgs | SuggestActionsArgs | AddUserNotesArgs | CreateTaskArgs | SetCallbackArgs | MoveTaskArgs | MarkTaskCompletedArgs | MarkSubtaskCompletedArgs | GetCalendarForDateRangeArgs 
 
 export type FunctionCallName = 'updatePlan' | 'create_task' | 'move_task' | 'mark_task_completed' | 'mark_subtask_completed' | 'get_calendar_for_date_range' | 'set_callback' | 'add_user_notes'
 
@@ -34,10 +75,14 @@ export interface FunctionCallDefinition {
 export class FunctionCall {
   name: string
   args: FunctionCallArgs
+  executeImmediately: boolean
+  idMappings: Record<string, string>
 
-  constructor(name: string, args: FunctionCallArgs) {
+  constructor(name: string, args: FunctionCallArgs, idMappings: Record<string, string>,  executeImmediately: boolean = false) {
     this.name = name
     this.args = args
+    this.idMappings = idMappings
+    this.executeImmediately = executeImmediately
   }
 }
 
@@ -227,10 +272,17 @@ export class FunctionCallFactory {
     }
   }
 
-  createFunctionCall(name: "updatePlan", args: UpdatePlanArgs): FunctionCall
-//   createFunctionCall(name: "hangUp", args: HangUpArgs): FunctionCall
-  createFunctionCall(name: FunctionCallName, args: FunctionCallArgs): FunctionCall {
-    return new FunctionCall(name, args)
+  createFunctionCall(name: "updatePlan", args: UpdatePlanArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "create_task", args: CreateTaskArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "move_task", args: MoveTaskArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "mark_task_completed", args: MarkTaskCompletedArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "mark_subtask_completed", args: MarkSubtaskCompletedArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "get_calendar_for_date_range", args: GetCalendarForDateRangeArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "set_callback", args: SetCallbackArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(name: "add_user_notes", args: AddUserNotesArgs, idMappings: Record<string, string>): FunctionCall
+
+  createFunctionCall(name: FunctionCallName, args: FunctionCallArgs, idMappings: Record<string, string>): FunctionCall {
+    return new FunctionCall(name, args, idMappings)
   }
 
   getFunctionDefinition(name: FunctionCallName): FunctionCallDefinition {

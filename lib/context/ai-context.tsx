@@ -1,15 +1,17 @@
 "use client"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import { useDate } from "./date-context"
 import { useTasks } from "./tasks-context"
 import { useBacklog } from "./backlog-context"
 import { useGoogleCalendar } from "./google-calendar-context"
 import { Task } from "@/types/daily-task-types"
 import { format, subDays, parseISO, isWeekend } from "date-fns"
+import { createIdMapping, formatTasksContext, formatCalendarEvents } from "@/lib/utils/context-utils"
 
 interface AiContextType {
-  getAiContext: () => string
+  context: string;
+  idMappings: Record<number, string>;
 }
 
 const AiContext = createContext<AiContextType | undefined>(undefined)
@@ -19,6 +21,7 @@ export function AiProvider({ children }: { children: React.ReactNode }) {
   const { dailyTasks, incompleteTasks } = useTasks()
   const { backlogTasks } = useBacklog()
   const { events } = useGoogleCalendar()
+  const [contextData, setContextData] = useState<AiContextType>({ context: "", idMappings: {} })
 
   const getLastBusinessDay = (from: Date = new Date()): Date => {
     let date = subDays(from, 1)
@@ -28,64 +31,7 @@ export function AiProvider({ children }: { children: React.ReactNode }) {
     return date
   }
 
-  const formatTasksContext = (title: string, tasks: Task[]) => {
-    if (!tasks.length) return ""
-
-    const formattedTasks = tasks.map(task => {
-      const metadata = []
-      if (task.urgency) metadata.push(`Urgency: ${task.urgency}`)
-      if (task.importance) metadata.push(`Importance: ${task.importance}`)
-      if (task.durationMinutes) metadata.push(`Duration: ${task.durationMinutes}m`)
-      if (task.tags?.length) metadata.push(`Tags: ${task.tags.join(", ")}`)
-      if (task.calendarItem?.start?.dateTime) {
-        const startTime = format(parseISO(task.calendarItem.start.dateTime), "h:mm a")
-        const endTime = task.calendarItem?.end?.dateTime ? 
-          format(parseISO(task.calendarItem.end.dateTime), "h:mm a") : 
-          undefined
-        metadata.push(`Time: ${startTime}${endTime ? ` - ${endTime}` : ""}`)
-      }
-
-      let taskStr = `  - [${task.completed ? "x" : " "}] ${task.title}`
-      if (task.description) taskStr += `\n    Description: ${task.description}`
-      if (metadata.length) taskStr += `\n    (${metadata.join(" | ")})`
-      if (task.subtasks?.length) {
-        taskStr += "\n    Subtasks:"
-        task.subtasks.forEach(subtask => {
-          taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text}`
-        })
-      }
-      return taskStr
-    }).join("\n")
-
-    return `
-${title}:
-${formattedTasks}
-`
-  }
-
-  const formatCalendarEvents = (events: any[]) => {
-    if (!events.length) return ""
-
-    const formattedEvents = events.map(event => {
-      let eventStr = `  - ${event.title}`
-      if (event.calendarItem?.start?.dateTime) {
-        const startTime = format(parseISO(event.calendarItem.start.dateTime), "h:mm a")
-        const endTime = event.calendarItem?.end?.dateTime ? 
-          format(parseISO(event.calendarItem.end.dateTime), "h:mm a") : 
-          undefined
-        eventStr += ` (${startTime}${endTime ? ` - ${endTime}` : ""})`
-      }
-      if (event.description) eventStr += `\n    Description: ${event.description}`
-      return eventStr
-    }).join("\n")
-
-    return `
-Calendar Events:
-${formattedEvents}
-`
-  }
-
-  const getAiContext = () => {
+  useEffect(() => {
     const today = format(new Date(), "yyyy-MM-dd")
     const lastBusinessDay = format(getLastBusinessDay(), "yyyy-MM-dd")
 
@@ -104,27 +50,40 @@ ${formattedEvents}
     // Get incomplete tasks from last business day
     const lastBusinessDayTasks = dailyTasks[lastBusinessDay]?.tasks.filter(t => !t.completed) || []
     
-    // Get backlog tasks
-    const backlogTasksContext = formatTasksContext("Backlog Tasks", backlogTasks)
+    // Format all task sections and collect their ID mappings
+    let nextIndex = 1
+    const { mapping, reverseMapping } = createIdMapping([...scheduledTasks, ...unscheduledTasks, ...lastBusinessDayTasks, ...backlogTasks])
+    const scheduledTasksContext = formatTasksContext("Today's Scheduled Tasks", scheduledTasks, mapping)
+    nextIndex += scheduledTasks.length
+
+    const unscheduledTasksContext = formatTasksContext("Today's Unscheduled Tasks", unscheduledTasks, mapping)
+    nextIndex += unscheduledTasks.length
+
+      const lastBusinessDayTasksContext = formatTasksContext("Incomplete Tasks from Last Business Day", lastBusinessDayTasks, mapping)
+    nextIndex += lastBusinessDayTasks.length
+
+    const backlogTasksContext = formatTasksContext("Backlog Tasks", backlogTasks, mapping)
 
     // Combine all context
-    return `
+    const context = `
 Current Context:
 
 ${formatCalendarEvents(todaysEvents)}
 
-${formatTasksContext("Today's Scheduled Tasks", scheduledTasks)}
+${scheduledTasksContext}
 
-${formatTasksContext("Today's Unscheduled Tasks", unscheduledTasks)}
+${unscheduledTasksContext}
 
-${formatTasksContext("Incomplete Tasks from Last Business Day", lastBusinessDayTasks)}
+${lastBusinessDayTasksContext}
 
 ${backlogTasksContext}
-    `.trim()
-  }
+`.trim()
+
+    setContextData({ context, idMappings: reverseMapping })
+  }, [selectedDate, dailyTasks, backlogTasks, events])
 
   return (
-    <AiContext.Provider value={{ getAiContext }}>
+    <AiContext.Provider value={contextData}>
       {children}
     </AiContext.Provider>
   )

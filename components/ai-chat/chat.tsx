@@ -45,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useRealtime } from "@/lib/context/transcription-context"
 import { FunctionCall } from "@/types/function-call-types"
 import { PulsatingSphereVisualizer } from "./ai-voice-sphere"
+import { FunctionCallDisplay } from "@/components/ai-chat/function-call-display"
 
 export function ChatForm({
   className,
@@ -64,7 +65,7 @@ export function ChatForm({
   const initialSize = useRef({ width: 0, height: 0 })
   const initialPosition = useRef({ x: 0, y: 0 })
   const { isExpanded } = useSidebar()
-  const { getAiContext } = useAiContext()
+  const { context, idMappings } = useAiContext()
 
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false)
   const [showContextDialog, setShowContextDialog] = useState(false)
@@ -82,7 +83,8 @@ export function ChatForm({
     setRealtimeMode,
     setVoice
   } = useRealtimeAudio({
-    context: getAiContext()
+    context: context,
+    idMappings: idMappings
   })
 
   const [showRealtimeMessages, setShowRealtimeMessages] = useState(true)
@@ -145,8 +147,7 @@ export function ChatForm({
     <div className="my-4 flex h-fit min-h-full flex-col gap-4">
       {realtimeMessages.map((message, index) =>{
         if(message instanceof FunctionCall) { 
-          const args = JSON.stringify(message.args)
-          return <div key={index} data-role={message.name}>{message.name} {args}</div>
+          return <FunctionCallDisplay key={index} functionCall={message} index={index} />
         }
         return <div key={index} data-role={message.role}
           className="max-w-[80%] rounded-xl px-3 py-2 text-sm data-[role=assistant]:self-start data-[role=user]:self-end data-[role=assistant]:bg-gray-100 data-[role=user]:bg-blue-500 data-[role=assistant]:text-black data-[role=user]:text-white"
@@ -351,7 +352,7 @@ export function ChatForm({
             <Button
               onClick={() => {
                 setShowRealtimeDialog(false)
-                startSession(getAiContext())
+                startSession(context)
               }}
             >
               Start Session
@@ -479,6 +480,9 @@ export function ChatForm({
           <DropdownMenuItem onClick={() => setShowContextDialog(true)}>
             View Context
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowRealtimeMessages(!showRealtimeMessages)}>
+            {showRealtimeMessages ? "Hide Messages" : "Show Messages"}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Button
@@ -539,7 +543,9 @@ export function ChatForm({
             </DialogHeader>
             <div className="py-4">
               <Textarea
-                value={getAiContext()}
+                value={`context: ${context}
+idMappings: ${JSON.stringify(idMappings, null, 2)}
+              `}
                 readOnly
                 className="h-[400px] font-mono text-sm"
               />
@@ -596,7 +602,9 @@ export function ChatForm({
           </DialogHeader>
           <div className="py-4">
             <Textarea
-              value={getAiContext()}
+              value={`context: ${context}
+                  idMappings: ${JSON.stringify(idMappings, null, 2)}
+              `}
               readOnly
               className="h-[400px] font-mono text-sm"
             />

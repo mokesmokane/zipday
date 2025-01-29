@@ -10,6 +10,7 @@ interface UseRealtimeAudioProps {
   context?: string
   onResponse?: (response: any) => void
   vadEnabled?: boolean
+  idMappings: Record<number, string>
 }
 
 interface UseRealtimeAudioReturn {
@@ -28,8 +29,11 @@ interface UseRealtimeAudioReturn {
 export function useRealtimeAudio({
   onDataChannelMessage,
   context,
+  idMappings,
   onResponse,
-}: UseRealtimeAudioProps = {}) {
+}: UseRealtimeAudioProps = { 
+  idMappings: {}
+}) {
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
   const [audioLevels, setAudioLevels] = useState<number[]>(Array(30).fill(0))
@@ -295,16 +299,18 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
             
             addMessage(newMessage)
           } else if (data.type === 'response.function_call_arguments.done') {
-            console.log(data)
-            
+            console.log("function call done")
             // Handle hang_up function call
             if (data.name === 'hang_up') {
               stopSession()
               return
             }
-            else if (data.name === 'update_plan') {
-              const newMessage = new FunctionCall(data.name, data.arguments)
-              
+            else {
+              try {
+                console.log(data)
+
+                const newMessage = new FunctionCall(data.name, data.arguments, idMappings)
+                
               addMessage(newMessage)
               if (data.arguments.final) {
                 stopSession()
@@ -314,6 +320,11 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
                 type: "response.create",
               }))
             }
+            catch (error) {
+              console.error("Error parsing function call:", error)
+            }
+          }
+
 
           }
 
