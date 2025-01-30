@@ -1,3 +1,5 @@
+import { Task } from "./daily-task-types"
+
 export interface UpdatePlanArgs {
   todo_list: string[]
 }
@@ -24,10 +26,12 @@ export interface AddUserNotesArgs {
 export interface CreateTaskArgs {
   title: string
   description?: string
-  due_date?: string
-  due_time?: string
+  date: string
+  start_time?: string
   subtasks?: string[]
-  priority?: string
+  duration_minutes?: number
+  urgency?: string
+  importance?: string
 }
 
 export interface SetCallbackArgs {
@@ -56,10 +60,38 @@ export interface GetCalendarForDateRangeArgs {
   end_date: string
 }
 
+export interface CreateBacklogTaskArgs {
+  title: string
+  description?: string
+  subtasks?: string[]
+  duration_minutes?: string
+  urgency?: string
+  importance?: string
+}
 
-export type FunctionCallArgs = UpdatePlanArgs | HangUpArgs | SuggestActionsArgs | AddUserNotesArgs | CreateTaskArgs | SetCallbackArgs | MoveTaskArgs | MarkTaskCompletedArgs | MarkSubtaskCompletedArgs | GetCalendarForDateRangeArgs 
+export type FunctionCallArgs =
+  | UpdatePlanArgs
+  | HangUpArgs
+  | SuggestActionsArgs
+  | AddUserNotesArgs
+  | CreateTaskArgs
+  | SetCallbackArgs
+  | MoveTaskArgs
+  | MarkTaskCompletedArgs
+  | MarkSubtaskCompletedArgs
+  | GetCalendarForDateRangeArgs
+  | CreateBacklogTaskArgs
 
-export type FunctionCallName = 'updatePlan' | 'create_task' | 'move_task' | 'mark_task_completed' | 'mark_subtask_completed' | 'get_calendar_for_date_range' | 'set_callback' | 'add_user_notes'
+export type FunctionCallName =
+  | "updatePlan"
+  | "create_task"
+  | "move_task"
+  | "mark_task_completed"
+  | "mark_subtask_completed"
+  | "get_calendar_for_date_range"
+  | "set_callback"
+  | "add_user_notes"
+  | "create_backlog_task"
 
 export interface FunctionCallDefinition {
   type: "function"
@@ -78,7 +110,12 @@ export class FunctionCall {
   executeImmediately: boolean
   idMappings: Record<string, string>
 
-  constructor(name: string, args: FunctionCallArgs, idMappings: Record<string, string>,  executeImmediately: boolean = false) {
+  constructor(
+    name: string,
+    args: FunctionCallArgs,
+    idMappings: Record<string, string>,
+    executeImmediately: boolean = false
+  ) {
     this.name = name
     this.args = args
     this.idMappings = idMappings
@@ -86,29 +123,33 @@ export class FunctionCall {
   }
 }
 
-
-export type FunctionCallRegistry = Record<FunctionCallName, FunctionCallDefinition>
+export type FunctionCallRegistry = Record<
+  FunctionCallName,
+  FunctionCallDefinition
+>
 
 export class FunctionCallFactory {
   private readonly _functionCallDefinitions: FunctionCallRegistry = {
     updatePlan: {
       type: "function",
       name: "update_plan",
-      description: "Use this to note down things that need to be completed after the call. you can call this multiple times if you need to update the plan but it must contain all the things you need to do after the call. it overwrites the previous plan",
+      description:
+        "Use this to note down things that need to be completed after the call. you can call this multiple times if you need to update the plan but it must contain all the things you need to do after the call. it overwrites the previous plan",
       parameters: {
-          type: "object",
-          properties: {
-            todo_list: {
-              type: "array",
-              description: "List of things that need to be completed - these are actions you are going to do after the call",
-              items: {
-                type: "string",
-                description: "Description of the action to be completed"
-              }
+        type: "object",
+        properties: {
+          todo_list: {
+            type: "array",
+            description:
+              "List of things that need to be completed - these are actions you are going to do after the call",
+            items: {
+              type: "string",
+              description: "Description of the action to be completed"
             }
-          },
-          required: ["todo_list"]
-        }
+          }
+        },
+        required: ["todo_list"]
+      }
     },
     create_task: {
       type: "function",
@@ -125,13 +166,13 @@ export class FunctionCallFactory {
             type: "string",
             description: "Optional details or notes about the task"
           },
-          due_date: {
+          date: {
             type: "string",
-            description: "Due date for the task in YYYY-MM-DD format (optional)"
+            description: "Date of the task in YYYY-MM-DD format"
           },
-          due_time: {
+          start_time: {
             type: "string",
-            description: "Due time for the task in HH:MM (24-hour) format (optional)"
+            description: "Start time of the task in HH:MM format"
           },
           subtasks: {
             type: "array",
@@ -140,9 +181,61 @@ export class FunctionCallFactory {
               type: "string"
             }
           },
-          priority: {
+          duration_minutes: {
+            type: "number",
+            description: "Duration of the task in minutes"
+          },
+
+          urgency: {
             type: "string",
-            description: "Priority level, e.g. 'low', 'medium', 'high' (optional)"
+            enum: ["immediate", "soon", "later", "someday"],
+            description: "Urgency level"
+          },
+          importance: {
+            type: "string",
+            enum: ["critical", "significant", "valuable", "optional"],
+            description: "Importance level"
+          }
+        },
+        required: ["title", "date"]
+      }
+    },
+    create_backlog_task: {
+      type: "function",
+      name: "create_backlog_task",
+      description: "Creates a new task in the user's to-do list or calendar",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "The title of the task"
+          },
+          description: {
+            type: "string",
+            description: "Optional details or notes about the task"
+          },
+          subtasks: {
+            type: "array",
+            description: "List of subtasks associated with this task",
+            items: {
+              type: "string"
+            }
+          },
+          duration_minutes: {
+            type: "string",
+            description: "Duration of the task in minutes in the format '1h30m'"
+          },
+
+          urgency: {
+            type: "string",
+            enum: ["immediate", "soon", "later", "someday"],
+            description: "Urgency level"
+          },
+          importance: {
+            type: "string",
+            enum: ["critical", "significant", "valuable", "optional"],
+            description: "Importance level"
           }
         },
         required: ["title"]
@@ -157,7 +250,7 @@ export class FunctionCallFactory {
         properties: {
           task_id: {
             type: "string",
-            "description": "Unique identifier or reference for the task"
+            description: "Unique identifier or reference for the task"
           },
           new_date: {
             type: "string",
@@ -175,7 +268,7 @@ export class FunctionCallFactory {
         required: ["task_id", "new_date", "new_start_time", "new_end_time"]
       }
     },
-  
+
     mark_task_completed: {
       type: "function",
       name: "mark_task_completed",
@@ -195,7 +288,8 @@ export class FunctionCallFactory {
     mark_subtask_completed: {
       type: "function",
       name: "mark_subtask_completed",
-      description: "Marks a specific subtask as completed within a given parent task",
+      description:
+        "Marks a specific subtask as completed within a given parent task",
       parameters: {
         type: "object",
         properties: {
@@ -211,11 +305,12 @@ export class FunctionCallFactory {
         required: ["task_id", "subtask_id"]
       }
     },
-  
+
     get_calendar_for_date_range: {
       type: "function",
       name: "get_calendar_for_date_range",
-      description: "Retrieves tasks and events within a specified date range from the calendar",
+      description:
+        "Retrieves tasks and events within a specified date range from the calendar",
       parameters: {
         type: "object",
         properties: {
@@ -231,21 +326,24 @@ export class FunctionCallFactory {
         required: ["start_date", "end_date"]
       }
     },
-  
+
     set_callback: {
       type: "function",
       name: "set_callback",
-      description: "Schedules a callback time for future interaction or reminders",
+      description:
+        "Schedules a callback time for future interaction or reminders",
       parameters: {
         type: "object",
         properties: {
           callback_datetime: {
             type: "string",
-            description: "Date and time for the callback in ISO 8601 format (e.g. '2025-01-15T14:30:00')"
+            description:
+              "Date and time for the callback in ISO 8601 format (e.g. '2025-01-15T14:30:00')"
           },
           context: {
             type: "string",
-            description: "A note or reference describing the purpose of the callback"
+            description:
+              "A note or reference describing the purpose of the callback"
           }
         },
         required: ["callback_datetime", "context"]
@@ -254,17 +352,20 @@ export class FunctionCallFactory {
     add_user_notes: {
       type: "function",
       name: "add_user_notes",
-      description: "Store user instructions or relevant notes about how to interact best with the user. This data is for the AI's private reference, not for external display.",
+      description:
+        "Store user instructions or relevant notes about how to interact best with the user. This data is for the AI's private reference, not for external display.",
       parameters: {
         type: "object",
         properties: {
           explicit_instructions: {
             type: "string",
-            description: "Any explicit general instructions the user provides (e.g., preferences on how to be addressed, topics to avoid, etc.)"
+            description:
+              "Any explicit general instructions the user provides (e.g., preferences on how to be addressed, topics to avoid, etc.)"
           },
           interaction_notes: {
             type: "string",
-            description: "Additional observations or strategies for best interacting with the user, e.g. communication style, motivational tips, etc."
+            description:
+              "Additional observations or strategies for best interacting with the user, e.g. communication style, motivational tips, etc."
           }
         },
         required: []
@@ -272,16 +373,52 @@ export class FunctionCallFactory {
     }
   }
 
-  createFunctionCall(name: "updatePlan", args: UpdatePlanArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "create_task", args: CreateTaskArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "move_task", args: MoveTaskArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "mark_task_completed", args: MarkTaskCompletedArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "mark_subtask_completed", args: MarkSubtaskCompletedArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "get_calendar_for_date_range", args: GetCalendarForDateRangeArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "set_callback", args: SetCallbackArgs, idMappings: Record<string, string>): FunctionCall
-  createFunctionCall(name: "add_user_notes", args: AddUserNotesArgs, idMappings: Record<string, string>): FunctionCall
+  createFunctionCall(
+    name: "updatePlan",
+    args: UpdatePlanArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "create_task",
+    args: CreateTaskArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "move_task",
+    args: MoveTaskArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "mark_task_completed",
+    args: MarkTaskCompletedArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "mark_subtask_completed",
+    args: MarkSubtaskCompletedArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "get_calendar_for_date_range",
+    args: GetCalendarForDateRangeArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "set_callback",
+    args: SetCallbackArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
+  createFunctionCall(
+    name: "add_user_notes",
+    args: AddUserNotesArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall
 
-  createFunctionCall(name: FunctionCallName, args: FunctionCallArgs, idMappings: Record<string, string>): FunctionCall {
+  createFunctionCall(
+    name: FunctionCallName,
+    args: FunctionCallArgs,
+    idMappings: Record<string, string>
+  ): FunctionCall {
     return new FunctionCall(name, args, idMappings)
   }
 

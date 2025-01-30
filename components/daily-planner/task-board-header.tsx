@@ -3,7 +3,18 @@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/lib/context/auth-context"
-import { ChevronRight, User, LogOut, LayoutGrid, Calendar, Filter, X, Trash2, Tag, Clock } from "lucide-react"
+import {
+  ChevronRight,
+  User,
+  LogOut,
+  LayoutGrid,
+  Calendar,
+  Filter,
+  X,
+  Trash2,
+  Tag,
+  Clock
+} from "lucide-react"
 import { useState } from "react"
 import { ThemeSwitcher } from "@/components/utilities/theme-switcher"
 import {
@@ -35,7 +46,14 @@ export function TaskBoardHeader() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const { isExpanded, toggleSidebar } = useSidebar()
   const { currentView, setCurrentView } = useCurrentView()
-  const { activeFilters, recentTags, availableTags, addFilter, removeFilter, clearFilters } = useFilter()
+  const {
+    activeFilters,
+    recentTags,
+    availableTags,
+    addFilter,
+    removeFilter,
+    clearFilters
+  } = useFilter()
   const { selectedTasks, clearSelectedTasks } = useSelectedTasks()
   const { deleteTask, updateTask } = useTasks()
   const { deleteBacklogTask } = useBacklog()
@@ -76,9 +94,11 @@ export function TaskBoardHeader() {
   const handleConfirmBulkDelete = async () => {
     try {
       // Delete each selected task
-      await Promise.all(selectedTasks.map(task => 
-        task.isBacklog ? deleteBacklogTask(task.id) : deleteTask(task.id)
-      ))
+      await Promise.all(
+        selectedTasks.map(task =>
+          task.isBacklog ? deleteBacklogTask(task.id) : deleteTask(task.id)
+        )
+      )
       clearSelectedTasks()
       setIsDeleteDialogOpen(false)
     } catch (error) {
@@ -89,13 +109,17 @@ export function TaskBoardHeader() {
   const handleBulkAddTag = async (tag: string) => {
     try {
       // Add tag to each selected task
-      await Promise.all(selectedTasks.map(task => {
-        const updatedTask = {
-          ...task,
-          tags: [...new Set([...(task.tags || []), tag])]
-        }
-        return task.isBacklog ? deleteBacklogTask(task.id) : updateTask(task.id, updatedTask)
-      }))
+      await Promise.all(
+        selectedTasks.map(task => {
+          const updatedTask = {
+            ...task,
+            tags: [...new Set([...(task.tags || []), tag])]
+          }
+          return task.isBacklog
+            ? deleteBacklogTask(task.id)
+            : updateTask(task.id, updatedTask)
+        })
+      )
       clearSelectedTasks()
     } catch (error) {
       console.error("Failed to add tag to selected tasks:", error)
@@ -105,13 +129,17 @@ export function TaskBoardHeader() {
   const handleBulkSetDuration = async (durationMinutes: number) => {
     try {
       // Set duration for each selected task
-      await Promise.all(selectedTasks.map(task => {
-        const updatedTask = {
-          ...task,
-          durationMinutes
-        }
-        return task.isBacklog ? deleteBacklogTask(task.id) : updateTask(task.id, updatedTask)
-      }))
+      await Promise.all(
+        selectedTasks.map(task => {
+          const updatedTask = {
+            ...task,
+            durationMinutes
+          }
+          return task.isBacklog
+            ? deleteBacklogTask(task.id)
+            : updateTask(task.id, updatedTask)
+        })
+      )
       clearSelectedTasks()
     } catch (error) {
       console.error("Failed to set duration for selected tasks:", error)
@@ -128,7 +156,7 @@ export function TaskBoardHeader() {
             onClick={toggleSidebar}
             className="mr-2"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="size-4" />
             <span className="sr-only">Toggle sidebar</span>
           </Button>
         )}
@@ -153,13 +181,13 @@ export function TaskBoardHeader() {
               onClick={handleBulkDelete}
               className="text-destructive"
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="mr-2 size-4" />
               Delete
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm">
-                  <Tag className="mr-2 h-4 w-4" />
+                  <Tag className="mr-2 size-4" />
                   Add Tag
                 </Button>
               </DropdownMenuTrigger>
@@ -177,7 +205,7 @@ export function TaskBoardHeader() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm">
-                  <Clock className="mr-2 h-4 w-4" />
+                  <Clock className="mr-2 size-4" />
                   Set Duration
                 </Button>
               </DropdownMenuTrigger>
@@ -199,7 +227,7 @@ export function TaskBoardHeader() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="ml-2">
-                  <Filter className="mr-2 h-4 w-4" />
+                  <Filter className="mr-2 size-4" />
                   Filter
                   {activeFilters.length > 0 && (
                     <Badge variant="secondary" className="ml-2">
@@ -223,16 +251,16 @@ export function TaskBoardHeader() {
                           }
                         }}
                         className={`flex items-center justify-between ${
-                          activeFilters.includes(tag) 
-                            ? 'bg-primary/10 dark:bg-primary/20' 
-                            : ''
+                          activeFilters.includes(tag)
+                            ? "bg-primary/10 dark:bg-primary/20"
+                            : ""
                         }`}
                       >
                         {tag}
                         {activeFilters.includes(tag) && (
-                          <X 
-                            className="h-4 w-4 cursor-pointer hover:text-destructive" 
-                            onClick={(e) => {
+                          <X
+                            className="hover:text-destructive size-4 cursor-pointer"
+                            onClick={e => {
                               e.stopPropagation()
                               removeFilter(tag)
                             }}
@@ -260,16 +288,16 @@ export function TaskBoardHeader() {
                             }
                           }}
                           className={`flex items-center justify-between ${
-                            activeFilters.includes(tag) 
-                              ? 'bg-primary/10 dark:bg-primary/20' 
-                              : ''
+                            activeFilters.includes(tag)
+                              ? "bg-primary/10 dark:bg-primary/20"
+                              : ""
                           }`}
                         >
                           {tag}
                           {activeFilters.includes(tag) && (
-                            <X 
-                              className="h-4 w-4 cursor-pointer hover:text-destructive" 
-                              onClick={(e) => {
+                            <X
+                              className="hover:text-destructive size-4 cursor-pointer"
+                              onClick={e => {
                                 e.stopPropagation()
                                 removeFilter(tag)
                               }}
@@ -297,7 +325,7 @@ export function TaskBoardHeader() {
           open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
           title="Delete Tasks"
-          description={`Are you sure you want to delete ${selectedTasks.length} task${selectedTasks.length === 1 ? '' : 's'}? This action cannot be undone.`}
+          description={`Are you sure you want to delete ${selectedTasks.length} task${selectedTasks.length === 1 ? "" : "s"}? This action cannot be undone.`}
           confirmText="Delete"
           variant="destructive"
           onConfirm={handleConfirmBulkDelete}

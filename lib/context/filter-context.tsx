@@ -60,4 +60,4 @@ export function useFilter() {
     throw new Error("useFilter must be used within a FilterProvider")
   }
   return context
-} 
+}

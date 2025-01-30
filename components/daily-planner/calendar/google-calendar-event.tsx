@@ -26,7 +26,8 @@ function getEventStyle(
 
   const startHour = startDate.getHours()
   const startMinute = startDate.getMinutes()
-  const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
+  const durationMinutes =
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60)
 
   const top = startHour * HOUR_HEIGHT + (startMinute / 60) * HOUR_HEIGHT
   const height = (durationMinutes / 60) * HOUR_HEIGHT
@@ -88,7 +89,12 @@ export function GoogleCalendarEvent({
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [localEndTime, setLocalEndTime] = useState(endTime)
   const { updateEvent, deleteEvent } = useContext(GoogleCalendarContext)
-  const style = getEventStyle(startTime, localEndTime, position.index, position.total)
+  const style = getEventStyle(
+    startTime,
+    localEndTime,
+    position.index,
+    position.total
+  )
 
   const {
     attributes,
@@ -118,22 +124,26 @@ export function GoogleCalendarEvent({
     const newHeight = parseInt(ref.style.height)
     const startDate = new Date(startTime)
     const newDurationMinutes = Math.round((newHeight / HOUR_HEIGHT) * 60)
-    const updatedEndTime = new Date(startDate.getTime() + newDurationMinutes * 60000).toISOString()
+    const updatedEndTime = new Date(
+      startDate.getTime() + newDurationMinutes * 60000
+    ).toISOString()
 
     setLocalEndTime(updatedEndTime)
     await updateEvent(id, { endTime: updatedEndTime })
     onEventUpdate?.(id, { endTime: updatedEndTime })
   }
 
-  const handleConvertToTask = async (eventData: { 
+  const handleConvertToTask = async (eventData: {
     title: string
     startTime: string
     endTime: string
-    description: string 
+    description: string
   }) => {
     const startDate = new Date(eventData.startTime)
     const endDate = new Date(eventData.endTime)
-    const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (60 * 1000))
+    const durationMinutes = Math.round(
+      (endDate.getTime() - startDate.getTime()) / (60 * 1000)
+    )
 
     const newTask: Task = {
       id: crypto.randomUUID(),
@@ -177,9 +187,9 @@ export function GoogleCalendarEvent({
           {...attributes}
           {...listeners}
           onClick={() => setIsDialogOpen(true)}
-          className="h-full w-full overflow-hidden select-none cursor-pointer p-1 text-sm flex flex-col justify-between"
+          className="flex size-full cursor-pointer select-none flex-col justify-between overflow-hidden p-1 text-sm"
         >
-          <div className="font-medium line-clamp-2">{title}</div>
+          <div className="line-clamp-2 font-medium">{title}</div>
         </div>
       </Resizable>
 

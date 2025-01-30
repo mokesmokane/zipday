@@ -1,11 +1,15 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRealtime, Message, Transcript } from "../context/transcription-context"
+import {
+  useRealtime,
+  Message,
+  Transcript
+} from "../context/transcription-context"
 import { FunctionCall, FunctionCallFactory } from "@/types/function-call-types"
 import { functionCallFactory } from "../function-calls"
 
-interface UseRealtimeAudioProps {     
+interface UseRealtimeAudioProps {
   onDataChannelMessage?: (event: MessageEvent) => void
   context?: string
   onResponse?: (response: any) => void
@@ -26,14 +30,16 @@ interface UseRealtimeAudioReturn {
   setVoice: (voice: string) => void
 }
 
-export function useRealtimeAudio({
-  onDataChannelMessage,
-  context,
-  idMappings,
-  onResponse,
-}: UseRealtimeAudioProps = { 
-  idMappings: {}
-}) {
+export function useRealtimeAudio(
+  {
+    onDataChannelMessage,
+    context,
+    idMappings,
+    onResponse
+  }: UseRealtimeAudioProps = {
+    idMappings: {}
+  }
+) {
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
   const [audioLevels, setAudioLevels] = useState<number[]>(Array(30).fill(0))
@@ -85,7 +91,9 @@ export function useRealtimeAudio({
     }
   }
 
-  const getInstructions = (context: string) => `You are a highly efficient and professional personal assistant. Your role is to help your boss organize and prepare for their day in the most effective way possible.
+  const getInstructions = (
+    context: string
+  ) => `You are a highly efficient and professional personal assistant. Your role is to help your boss organize and prepare for their day in the most effective way possible.
   Here is their current schedule:
   ${context}
   Your primary goal is to package the day in a way that maximizes their efficiency, keeps them focused on what matters, and reduces their stress.
@@ -137,8 +145,6 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
 
 `
 
-
-
   // Start a realtime session
   const startSession = async (context: string) => {
     try {
@@ -166,7 +172,7 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
       if (context) {
         url.searchParams.append("instructions", getInstructions(context))
       }
-      
+
       const tokenResponse = await fetch(url.toString())
       const data = await tokenResponse.json()
       const EPHEMERAL_KEY = data.client_secret.value
@@ -280,52 +286,57 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
         try {
           const data = JSON.parse(event.data)
           // Handle different message types from OpenAI
-          if (data.type === 'conversation.item.input_audio_transcription.completed') {
+          if (
+            data.type ===
+            "conversation.item.input_audio_transcription.completed"
+          ) {
             console.log(data)
             const newMessage: Message = {
-              role: 'user',
+              role: "user",
               content: data.transcript,
               timestamp: Date.now()
             }
-            
+
             addMessage(newMessage)
-          } else if (data.type === 'response.audio_transcript.done') {
+          } else if (data.type === "response.audio_transcript.done") {
             console.log(data)
             const newMessage: Message = {
-              role: 'assistant',
+              role: "assistant",
               content: data.transcript,
               timestamp: Date.now()
             }
-            
+
             addMessage(newMessage)
-          } else if (data.type === 'response.function_call_arguments.done') {
+          } else if (data.type === "response.function_call_arguments.done") {
             console.log("function call done")
             // Handle hang_up function call
-            if (data.name === 'hang_up') {
+            if (data.name === "hang_up") {
               stopSession()
               return
-            }
-            else {
+            } else {
               try {
                 console.log(data)
 
-                const newMessage = new FunctionCall(data.name, data.arguments, idMappings)
-                
-              addMessage(newMessage)
-              if (data.arguments.final) {
-                stopSession()
+                const newMessage = new FunctionCall(
+                  data.name,
+                  JSON.parse(data.arguments),
+                  idMappings
+                )
+
+                addMessage(newMessage)
+                if (data.arguments.final) {
+                  stopSession()
+                }
+
+                dataChannel.send(
+                  JSON.stringify({
+                    type: "response.create"
+                  })
+                )
+              } catch (error) {
+                console.error("Error parsing function call:", error)
               }
-          
-              dataChannel.send(JSON.stringify({
-                type: "response.create",
-              }))
             }
-            catch (error) {
-              console.error("Error parsing function call:", error)
-            }
-          }
-
-
           }
 
           onResponse?.(data)
@@ -363,7 +374,6 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
       }
     }
   }, [isSessionActive])
-  
 
   return {
     isSessionActive,
@@ -375,6 +385,6 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
     setVoice,
     setRealtimeMode,
     startSession,
-    stopSession,
-  } 
+    stopSession
+  }
 }

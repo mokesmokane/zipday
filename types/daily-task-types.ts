@@ -10,7 +10,7 @@ export type Importance = "critical" | "significant" | "valuable" | "optional"
 export interface CalendarDateTime {
   date?: string
   dateTime?: string
-  timeZone?: string  
+  timeZone?: string
 }
 
 export interface CalendarItem {
@@ -31,7 +31,6 @@ export interface Task {
   createdAt: string
   updatedAt: string
   calendarItem?: CalendarItem
-  isBacklog?: boolean
   urgency?: Urgency
   importance?: Importance
 }
@@ -45,4 +44,3 @@ export interface Day {
 }
 
 export type DailyTasks = Record<string, Day>
-

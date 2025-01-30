@@ -22,7 +22,7 @@ export async function refreshGoogleTokens(userId: string) {
     })
 
     const { credentials } = await oauth2Client.refreshAccessToken()
-    
+
     // Update tokens in Firestore
     await db.collection("users").doc(userId).update({
       "googleCalendar.tokens": credentials
@@ -33,4 +33,4 @@ export async function refreshGoogleTokens(userId: string) {
     console.error("Failed to refresh Google tokens:", error)
     throw error
   }
-} 
+}

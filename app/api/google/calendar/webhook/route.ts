@@ -12,18 +12,18 @@ async function isValidWebhook(req: Request) {
   const resourceId = headersList.get("x-goog-resource-id")
   const state = headersList.get("x-goog-resource-state")
   const token = headersList.get("x-goog-channel-token")
-  
+
   console.log("Webhook headers:", {
     channelId,
     resourceId,
     state,
     token
   })
-  
+
   return (
-    channelId && 
-    resourceId && 
-    state && 
+    channelId &&
+    resourceId &&
+    state &&
     token === process.env.GOOGLE_WEBHOOK_TOKEN
   )
 }
@@ -31,7 +31,7 @@ async function isValidWebhook(req: Request) {
 // Fetch latest events with auth
 async function fetchLatestEvents(userId: string) {
   console.log("Fetching latest events...")
-  
+
   // Get user's tokens
   const db = getFirestore()
   const userDoc = await db.collection("users").doc(userId).get()
@@ -42,7 +42,7 @@ async function fetchLatestEvents(userId: string) {
   }
 
   // Check if access token needs refresh
-  const expiryDate = new Date((tokens.expiry_date || 0))
+  const expiryDate = new Date(tokens.expiry_date || 0)
   if (expiryDate <= new Date()) {
     tokens = await refreshGoogleTokens(userId)
   }
@@ -54,7 +54,7 @@ async function fetchLatestEvents(userId: string) {
     process.env.GOOGLE_REDIRECT_URI
   )
   oauth2Client.setCredentials(tokens)
-  
+
   const calendar = google.calendar({ version: "v3", auth: oauth2Client })
   const now = new Date()
   const timeMin = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -69,14 +69,15 @@ async function fetchLatestEvents(userId: string) {
       orderBy: "startTime"
     })
 
-    const events = response.data.items?.map(event => ({
-      id: event.id,
-      title: event.summary,
-      description: event.description,
-      startTime: event.start?.dateTime || event.start?.date,
-      endTime: event.end?.dateTime || event.end?.date,
-      allDay: !event.start?.dateTime
-    })) || []
+    const events =
+      response.data.items?.map(event => ({
+        id: event.id,
+        title: event.summary,
+        description: event.description,
+        startTime: event.start?.dateTime || event.start?.date,
+        endTime: event.end?.dateTime || event.end?.date,
+        allDay: !event.start?.dateTime
+      })) || []
 
     console.log("Fetched events:", events)
     return events
@@ -88,7 +89,7 @@ async function fetchLatestEvents(userId: string) {
 
 export async function POST(req: Request) {
   console.log("Received webhook notification")
-  
+
   try {
     // Verify webhook is from Google
     if (!isValidWebhook(req)) {
@@ -141,4 +142,4 @@ export async function POST(req: Request) {
     console.error("Error handling webhook:", error)
     return new NextResponse("Internal Server Error", { status: 500 })
   }
-} 
+}

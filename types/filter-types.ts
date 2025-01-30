@@ -7,4 +7,4 @@ export interface FilterContextType {
   addRecentTag: (tag: string) => void
   clearFilters: () => void
   setAvailableTags: (tags: string[]) => void
-} 
+}

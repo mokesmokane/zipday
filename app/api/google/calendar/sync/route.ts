@@ -5,7 +5,6 @@ import { getFirestore } from "firebase-admin/firestore"
 import { cookies } from "next/headers"
 import { refreshGoogleTokens } from "@/lib/google/refresh-token"
 
-
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -24,10 +23,7 @@ export async function POST(request: Request) {
 
     // Get user's Google Calendar tokens
     const db = getFirestore()
-    const userDoc = await db
-      .collection("users")
-      .doc(session.uid)
-      .get()
+    const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
     let tokens = userData?.googleCalendar?.tokens
@@ -40,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     // Check if access token needs refresh
-    const expiryDate = new Date((tokens.expiry_date || 0))
+    const expiryDate = new Date(tokens.expiry_date || 0)
     if (expiryDate <= new Date()) {
       try {
         tokens = await refreshGoogleTokens(session.uid)
@@ -69,11 +65,15 @@ export async function POST(request: Request) {
     // Calculate end time based on duration
     const calendarItem = task.calendarItem
     const startTime = new Date(calendarItem?.start?.dateTime)
-    const endTime = calendarItem?.end?.dateTime ? new Date(calendarItem?.end?.dateTime) : task.durationMinutes ? new Date(startTime.getTime() + (task.durationMinutes * 60 * 1000)) : new Date(startTime.getTime() + (15 * 60 * 1000))
+    const endTime = calendarItem?.end?.dateTime
+      ? new Date(calendarItem?.end?.dateTime)
+      : task.durationMinutes
+        ? new Date(startTime.getTime() + task.durationMinutes * 60 * 1000)
+        : new Date(startTime.getTime() + 15 * 60 * 1000)
 
     // Format event data
     const eventData = {
-      ...(operation === 'create' && {
+      ...(operation === "create" && {
         id: task.id
       }),
       summary: task.title,
@@ -92,17 +92,17 @@ export async function POST(request: Request) {
 
     switch (operation) {
       case "create":
-          response = await calendar.events.insert({
-            calendarId: "primary",
-            requestBody: eventData
-          })
+        response = await calendar.events.insert({
+          calendarId: "primary",
+          requestBody: eventData
+        })
         break
       case "update":
-        try{
-        response = await calendar.events.update({
-          calendarId: "primary",
-          eventId: task.calendarItem?.gcalEventId,
-          requestBody: eventData
+        try {
+          response = await calendar.events.update({
+            calendarId: "primary",
+            eventId: task.calendarItem?.gcalEventId,
+            requestBody: eventData
           })
         } catch (error) {
           console.info("Failed to update event trying insert instead", error)
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         )
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       eventId: response?.data?.id
     })
@@ -141,4 +141,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-} 
+}

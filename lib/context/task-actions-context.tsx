@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext } from "react"
-import { 
+import {
   addTaskAction as addTaskDb,
   deleteTaskAction as deleteTaskDb,
   updateTaskAction as updateTaskDb,
@@ -30,9 +30,15 @@ interface TaskActionsContextType {
   refreshBacklog: () => Promise<void>
 }
 
-const TaskActionsContext = createContext<TaskActionsContextType | undefined>(undefined)
+const TaskActionsContext = createContext<TaskActionsContextType | undefined>(
+  undefined
+)
 
-export function TaskActionsProvider({ children }: { children: React.ReactNode }) {
+export function TaskActionsProvider({
+  children
+}: {
+  children: React.ReactNode
+}) {
   const { refreshTasks } = useTasks()
   const { refreshBacklog } = useBacklog()
 
@@ -63,4 +69,4 @@ export function useTaskActions() {
     throw new Error("useTaskActions must be used within a TaskActionsProvider")
   }
   return context
-} 
+}

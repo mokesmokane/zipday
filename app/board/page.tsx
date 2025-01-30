@@ -13,11 +13,11 @@ export default async function BoardPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">      
+    <div className="flex h-full flex-col">
       <TaskBoardHeader />
       <div className="flex-1 overflow-hidden">
         <TaskBoardWrapper initialTasks={today.tasks} today={today} />
       </div>
     </div>
   )
-} 
+}

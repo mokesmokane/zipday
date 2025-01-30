@@ -11,9 +11,15 @@ interface SelectedTasksContextType {
   clearSelectedTasks: () => void
 }
 
-const SelectedTasksContext = createContext<SelectedTasksContextType | undefined>(undefined)
+const SelectedTasksContext = createContext<
+  SelectedTasksContextType | undefined
+>(undefined)
 
-export function SelectedTasksProvider({ children }: { children: React.ReactNode }) {
+export function SelectedTasksProvider({
+  children
+}: {
+  children: React.ReactNode
+}) {
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([])
 
   const selectTask = (task: Task) => {
@@ -33,13 +39,13 @@ export function SelectedTasksProvider({ children }: { children: React.ReactNode 
   }
 
   return (
-    <SelectedTasksContext.Provider 
-      value={{ 
-        selectedTasks, 
-        selectTask, 
-        deselectTask, 
+    <SelectedTasksContext.Provider
+      value={{
+        selectedTasks,
+        selectTask,
+        deselectTask,
         isTaskSelected,
-        clearSelectedTasks 
+        clearSelectedTasks
       }}
     >
       {children}
@@ -50,7 +56,9 @@ export function SelectedTasksProvider({ children }: { children: React.ReactNode 
 export function useSelectedTasks() {
   const context = useContext(SelectedTasksContext)
   if (!context) {
-    throw new Error("useSelectedTasks must be used within a SelectedTasksProvider")
+    throw new Error(
+      "useSelectedTasks must be used within a SelectedTasksProvider"
+    )
   }
   return context
-} 
+}

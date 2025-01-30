@@ -18,16 +18,16 @@ interface TaskColumnProps {
   onAddTask?: (task: Task) => void
 }
 
-export function TaskColumn({ 
-  id, 
-  children, 
-  isDragging, 
+export function TaskColumn({
+  id,
+  children,
+  isDragging,
   isOverCalendarZone,
   showCalendarZone,
   onAddTask
 }: TaskColumnProps) {
   const { setNodeRef: setColumnRef } = useDroppable({ id })
-  const { setNodeRef: setCalendarZoneRef } = useDroppable({ 
+  const { setNodeRef: setCalendarZoneRef } = useDroppable({
     id: `${id}-calendar-zone`
   })
 
@@ -41,11 +41,11 @@ export function TaskColumn({
         const textarea = e.currentTarget
         const start = textarea.selectionStart
         const end = textarea.selectionEnd
-        
-        setInputValue(prev => 
-          prev.substring(0, start) + "\n" + prev.substring(end)
+
+        setInputValue(
+          prev => prev.substring(0, start) + "\n" + prev.substring(end)
         )
-        
+
         // Set cursor position after the inserted newline
         setTimeout(() => {
           textarea.selectionStart = textarea.selectionEnd = start + 1
@@ -66,20 +66,16 @@ export function TaskColumn({
   return (
     <div
       ref={setColumnRef}
-      className="bg-muted/50 flex min-h-[200px] flex-col rounded-lg border p-4"
+      className="bg-muted/50 flex  h-[calc(100vh-8rem)] flex-col rounded-lg border p-4"
     >
-      <div className={`flex-1 max-h-[calc(100vh-${onAddTask ? "20" : "10"}rem)] overflow-y-auto space-y-4 scrollbar-hide`}>
+      <div className="scrollbar-hide flex-1 space-y-4 overflow-y-auto">
         {children}
 
         {/* Preview section */}
         {previewTasks.length > 0 && (
           <div className="space-y-4 opacity-50">
             {previewTasks.map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                isOverCalendarZone={false}
-              />
+              <TaskCard key={task.id} task={task} isOverCalendarZone={false} />
             ))}
           </div>
         )}
@@ -90,29 +86,33 @@ export function TaskColumn({
           ref={setCalendarZoneRef}
           id={`${id}-calendar-zone`}
           initial={{ opacity: 0, height: 0 }}
-          animate={{ 
-            opacity: 1, 
+          animate={{
+            opacity: 1,
             height: "auto",
-            backgroundColor: isOverCalendarZone ? "rgba(59, 130, 246, 0.2)" : "rgba(59, 130, 246, 0.1)"
+            backgroundColor: isOverCalendarZone
+              ? "rgba(59, 130, 246, 0.2)"
+              : "rgba(59, 130, 246, 0.1)"
           }}
           transition={{ duration: 0.2 }}
           className="mt-4 flex items-center justify-center rounded-md border-2 border-dashed border-blue-500 p-4"
         >
           <motion.div
-            animate={{ 
+            animate={{
               scale: isOverCalendarZone ? 1.5 : 1,
-              color: isOverCalendarZone ? "rgb(59, 130, 246)" : "rgba(59, 130, 246, 0.8)"
+              color: isOverCalendarZone
+                ? "rgb(59, 130, 246)"
+                : "rgba(59, 130, 246, 0.8)"
             }}
             transition={{ duration: 0.2 }}
           >
-            <Calendar className="h-6 w-6" />
+            <Calendar className="size-6" />
           </motion.div>
         </motion.div>
       ) : onAddTask ? (
         <div className="mt-4">
           <Textarea
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={e => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={`Title
 - subtask

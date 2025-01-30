@@ -15,10 +15,7 @@ export async function GET(request: Request) {
 
     // Check if user has Google Calendar connected
     const db = getFirestore()
-    const userDoc = await db
-      .collection("users")
-      .doc(session.uid)
-      .get()
+    const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
     const hasGoogleCalendar = userData?.googleCalendar?.connected || false
@@ -31,4 +28,4 @@ export async function GET(request: Request) {
       { status: 500 }
     )
   }
-} 
+}

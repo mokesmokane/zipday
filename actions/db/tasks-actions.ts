@@ -3,9 +3,9 @@
 import { auth, firestore } from "firebase-admin"
 import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
-import { Day, Task } from "@/types/daily-task-types"
+import { CalendarItem, Day, Importance, Task, Urgency } from "@/types/daily-task-types"
 import { addDays, format } from "date-fns"
-import { CreateTaskArgs, MoveTaskArgs, MarkTaskCompletedArgs, MarkSubtaskCompletedArgs } from "@/types/function-call-types"
+import { CreateTaskArgs, MoveTaskArgs, MarkTaskCompletedArgs, MarkSubtaskCompletedArgs, CreateBacklogTaskArgs } from "@/types/function-call-types"
 
 const db = firestore()
 
@@ -113,34 +113,38 @@ export async function addTaskAction(
 ): Promise<ActionState<Task>> {
   try {
     const userId = await getAuthenticatedUserId()
-    
+    console.log("Adding task:", task)
     const docRef = db
       .collection("userDays")
       .doc(userId)
       .collection("dailyTasks")
       .doc(dateDoc)
-
+    console.log("Doc ref:", docRef)
     const docSnap = await docRef.get()
+    console.log("Doc snap:", docSnap)
 
     let tasks: Task[] = []
     if (docSnap.exists) {
       const dailyData = docSnap.data() as { tasks: Task[] }
       tasks = dailyData.tasks || []
     }
-
+    console.log("Tasks:", tasks)
     // Add task to the end of the array to maintain order
     if (insertIndex !== undefined) {
       tasks.splice(insertIndex, 0, task)
     } else {
       tasks.push(task)
     }
+    console.log("Tasks after adding:", tasks)
+    const day = docSnap.data() as Day
+    day.tasks = tasks
     await docRef.set({ tasks }, { merge: true })
-
+    console.log("Tasks after setting:", tasks)
     // Sync with Google Calendar
     if (task.calendarItem) {
       await syncWithGoogleCalendar(userId, task, 'create')
     }
-
+    console.log("Task created successfully")
     return {
       isSuccess: true,
       message: "Task created successfully",
@@ -633,17 +637,87 @@ export async function setBacklogTasksAction(
 
 export async function createTask(args: CreateTaskArgs): Promise<ActionState<void>> {
   try {
-    const { title, description, due_date, due_time, subtasks, priority } = args
+    console.log("Creating task:", args)
+    console.log("typeof args:", typeof args)    
+    const title = args.title
+    const description = args.description
+    const date = args.date
+    const start_time = args.start_time
+    const duration_minutes = args.duration_minutes
+    const subtasks = args.subtasks
+    const urgency = args.urgency
+    const importance = args.importance
+    console.log("Title:", title);
+    console.log("Description:", description);
+    console.log("Date:", date);
+    console.log("Start Time:", start_time);
+    console.log("Duration Minutes:", duration_minutes);
+    console.log("Subtasks:", subtasks);
+    console.log("Urgency:", urgency);
+    console.log("Importance:", importance);
+    // Combine date and start_time to create a valid Date object
+    const startTime = new Date(`${date}T${start_time}:00`)
+    if (isNaN(startTime.getTime())) {
+      throw new Error("Invalid start time")
+    }
+    console.log("Start time:", startTime)
+    const endTime = duration_minutes ? new Date(startTime.getTime() + duration_minutes * 60000) : undefined
+    console.log("End time:", endTime)
+    const calendarItem: CalendarItem = {
+      start: {
+        dateTime: startTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: { dateTime: endTime?.toISOString() }
+    }
+    console.log("Calendar item:", calendarItem)
+    const task = {
+      id: crypto.randomUUID(),
+      title,
+      description,
+      subtasks: subtasks?.map(subtask => ({
+        text: subtask,
+        completed: false,
+        id: crypto.randomUUID()
+      })) || [],
+      durationMinutes: duration_minutes,
+      calendarItem,
+      urgency: urgency as Urgency,
+      importance: importance as Importance,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    console.log("Task:", task)
+    const result = await addTaskAction(date, task)
+    console.log("Result:", result)
+    return {
+      isSuccess: true,
+      message: "Task created successfully",
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error creating task:", error)
+    return {
+      isSuccess: false,
+      message: "Failed to create task"
+    }
+  }
+}
+
+export async function createBacklogTask(args: CreateBacklogTaskArgs): Promise<ActionState<void>> {
+  try {
+    const { title, description, subtasks, duration_minutes, urgency, importance } = args
     
     // Create task document
     const taskRef = db.collection("tasks").doc()
     await taskRef.set({
       title,
       description,
-      due_date,
-      due_time,
       subtasks,
-      priority,
+      duration_minutes,
+      urgency,
+      importance,
       completed: false,
       createdAt: new Date(),
       updatedAt: new Date()

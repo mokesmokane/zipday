@@ -2,12 +2,12 @@ const HOUR_HEIGHT = 60
 
 export function TimeLabels() {
   return (
-    <div className="absolute left-0 top-0 w-12 h-full pointer-events-none">
+    <div className="pointer-events-none absolute left-0 top-0 h-full w-12">
       {Array.from({ length: 24 }, (_, hour) => (
-        <div 
+        <div
           key={hour}
-          className={`absolute left-0 w-full ${hour < 23 ? 'border-b' : ''} text-xs text-muted-foreground px-2 flex items-start`}
-          style={{ 
+          className={`absolute left-0 w-full ${hour < 23 ? "border-b" : ""} text-muted-foreground flex items-start px-2 text-xs`}
+          style={{
             top: `${hour * HOUR_HEIGHT}px`,
             height: `${HOUR_HEIGHT}px`
           }}

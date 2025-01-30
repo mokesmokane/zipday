@@ -23,7 +23,6 @@ export const metadata = {
   description: "A productivity app for the modern age"
 }
 
-
 export default async function RootLayout({
   children
 }: {
@@ -44,25 +43,23 @@ export default async function RootLayout({
             <SidebarProvider>
               <DateProvider>
                 <RealtimeProvider>
-                <TasksProvider>
-                  <BacklogProvider>
-                    <TaskActionsProvider>
-                      <FilterProvider>
-                        <CurrentViewProvider>
-                          <GoogleCalendarProvider>
-                            <SelectedTasksProvider>
-                              <AiProvider>
-                                {children}
-                              </AiProvider>
-                            </SelectedTasksProvider>
-                          </GoogleCalendarProvider>
-                        </CurrentViewProvider>
-                      </FilterProvider>
-                    </TaskActionsProvider>
-                  </BacklogProvider>
-                </TasksProvider>
+                  <TasksProvider>
+                    <BacklogProvider>
+                      <TaskActionsProvider>
+                        <FilterProvider>
+                          <CurrentViewProvider>
+                            <GoogleCalendarProvider>
+                              <SelectedTasksProvider>
+                                <AiProvider>{children}</AiProvider>
+                              </SelectedTasksProvider>
+                            </GoogleCalendarProvider>
+                          </CurrentViewProvider>
+                        </FilterProvider>
+                      </TaskActionsProvider>
+                    </BacklogProvider>
+                  </TasksProvider>
                 </RealtimeProvider>
-                </DateProvider>
+              </DateProvider>
             </SidebarProvider>
           </RootProvider>
           <Toaster />

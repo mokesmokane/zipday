@@ -7,7 +7,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
+  TooltipTrigger
 } from "@/components/ui/tooltip"
 
 interface GoogleCalendarButtonProps {
@@ -71,12 +71,12 @@ export function GoogleCalendarButton({
           >
             {isConnected ? (
               <>
-                <Check className="h-4 w-4 text-green-500" />
-                <Calendar className="h-4 w-4" />
+                <Check className="size-4 text-green-500" />
+                <Calendar className="size-4" />
               </>
             ) : (
               <>
-                <Calendar className="h-4 w-4" />
+                <Calendar className="size-4" />
                 Connect Calendar
               </>
             )}
@@ -90,4 +90,4 @@ export function GoogleCalendarButton({
       </Tooltip>
     </TooltipProvider>
   )
-} 
+}

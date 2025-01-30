@@ -39,7 +39,9 @@ function formatDuration(durationMinutes?: number): string {
 }
 
 // Helper function to get urgency badge variant
-function getUrgencyVariant(urgency?: string): "default" | "destructive" | "secondary" | "outline" {
+function getUrgencyVariant(
+  urgency?: string
+): "default" | "destructive" | "secondary" | "outline" {
   switch (urgency) {
     case "immediate":
       return "destructive"
@@ -55,7 +57,9 @@ function getUrgencyVariant(urgency?: string): "default" | "destructive" | "secon
 }
 
 // Helper function to get importance badge variant
-function getImportanceVariant(importance?: string): "default" | "destructive" | "secondary" | "outline" {
+function getImportanceVariant(
+  importance?: string
+): "default" | "destructive" | "secondary" | "outline" {
   switch (importance) {
     case "critical":
       return "destructive"
@@ -72,17 +76,17 @@ function getImportanceVariant(importance?: string): "default" | "destructive" | 
 
 // Add the emoji constants at the top
 const URGENCY_EMOJIS: Record<string, string> = {
-  'someday': '🧘',
-  'later': '🚶',
-  'soon': '🏃',
-  'immediate': '🚀',
+  someday: "🧘",
+  later: "🚶",
+  soon: "🏃",
+  immediate: "🚀"
 }
 
 const IMPORTANCE_EMOJIS: Record<string, string> = {
-  'optional': '🟢',
-  'valuable': '🟠',
-  'significant': '🔴',
-  'critical': '🔥',
+  optional: "🟢",
+  valuable: "🟠",
+  significant: "🔴",
+  critical: "🔥"
 }
 
 interface TaskCardProps {
@@ -93,15 +97,17 @@ interface TaskCardProps {
   onTaskUpdate?: (updatedTask: Task) => void
 }
 
-export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate }: TaskCardProps) {
+export function TaskCard({
+  task,
+  day,
+  isOverCalendarZone,
+  onDelete,
+  onTaskUpdate
+}: TaskCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const { selectTask, deselectTask, isTaskSelected } = useSelectedTasks()
-
-  if (!task) {
-    return null
-  }
 
   const {
     attributes,
@@ -110,7 +116,14 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
     transform,
     transition,
     isDragging
-  } = useSortable({ id: task.id })
+  } = useSortable({
+    id: task?.id ?? "placeholder",
+    disabled: !task
+  })
+
+  if (!task) {
+    return null
+  }
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -167,9 +180,9 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
         ref={setNodeRef}
         style={style}
         className={cn(
-          "bg-card relative cursor-grab touch-none active:cursor-grabbing transition-colors duration-200 group",
+          "bg-card group relative cursor-grab touch-none transition-colors duration-200 active:cursor-grabbing",
           isOverCalendarZone && "border-blue-500",
-          isTaskSelected(task.id) && "ring-2 ring-primary"
+          isTaskSelected(task.id) && "ring-primary ring-2"
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -177,58 +190,60 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
         {...listeners}
       >
         {/* Action buttons that appear on hover */}
-        <div 
+        <div
           className={cn(
-            "absolute left-1/2 -translate-x-1/2 -bottom-4 flex items-center gap-1 transition-opacity duration-200 bg-background rounded-md shadow-md p-1 border border-border",
+            "bg-background border-border absolute -bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-md border p-1 shadow-md transition-opacity duration-200",
             isHovered ? "opacity-100" : "opacity-0"
           )}
         >
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
-            onClick={(e) => {
+            className="size-7"
+            onClick={e => {
               e.stopPropagation()
               handleSelect()
             }}
           >
-            <Check className={cn(
-              "h-4 w-4",
-              isTaskSelected(task.id) && "text-primary"
-            )} />
+            <Check
+              className={cn(
+                "size-4",
+                isTaskSelected(task.id) && "text-primary"
+              )}
+            />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
-            onClick={(e) => {
+            className="size-7"
+            onClick={e => {
               e.stopPropagation()
               navigator.clipboard.writeText(taskToShorthand(task))
             }}
           >
-            <Copy className="h-4 w-4" />
+            <Copy className="size-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
-            onClick={(e) => {
+            className="size-7"
+            onClick={e => {
               e.stopPropagation()
               setIsEditDialogOpen(true)
             }}
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil className="size-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 hover:text-destructive"
-            onClick={(e) => {
+            className="hover:text-destructive size-7"
+            onClick={e => {
               e.stopPropagation()
               handleDelete()
             }}
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="size-4" />
           </Button>
         </div>
 
@@ -236,7 +251,7 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
           <div className="flex items-start gap-2">
             <CustomCheckbox
               id={task.id}
-              className="h-6 w-6 mt-0.5"
+              className="mt-0.5 size-6"
               checked={task.completed}
               onCheckedChange={checked => {
                 if (!task) return
@@ -255,11 +270,11 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
                 onTaskUpdate?.(updatedTask)
               }}
             />
-            <div className="flex-1 flex items-start justify-between gap-2">
+            <div className="flex flex-1 items-start justify-between gap-2">
               <div className="space-y-1">
                 <h3 className="font-medium leading-none">{task.title}</h3>
                 {task.description && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {task.description}
                   </p>
                 )}
@@ -288,33 +303,40 @@ export function TaskCard({ task, day, isOverCalendarZone, onDelete, onTaskUpdate
             </div>
           )}
           <div className="mt-4 flex items-center justify-between">
-            <div className="flex-1 flex items-center gap-2">
+            <div className="flex flex-1 items-center gap-2">
               <div className="text-muted-foreground flex items-center text-sm">
-                {(task.calendarItem?.start.dateTime || task.durationMinutes) && (
+                {(task.calendarItem?.start.dateTime ||
+                  task.durationMinutes) && (
                   <>
-                    {task.calendarItem?.start.dateTime && <Clock className="mr-1 size-3" />}
+                    {task.calendarItem?.start.dateTime && (
+                      <Clock className="mr-1 size-3" />
+                    )}
                     {task.calendarItem?.start.dateTime && task.durationMinutes
                       ? `${formatStartTime(task.calendarItem?.start.dateTime)} - ${formatDuration(
                           task.durationMinutes
                         )}`
                       : task.calendarItem?.start.dateTime
-                      ? formatStartTime(task.calendarItem?.start.dateTime)
-                      : formatDuration(task.durationMinutes)}
+                        ? formatStartTime(task.calendarItem?.start.dateTime)
+                        : formatDuration(task.durationMinutes)}
                   </>
                 )}
               </div>
 
               <div className="flex items-center gap-1">
-                {task.tags && task.tags.length > 0 && task.tags.map((tag: string) => (
-                  <Badge variant="secondary" className="text-xs" key={tag}>
-                    {tag}
-                  </Badge>
-                ))}
+                {task.tags &&
+                  task.tags.length > 0 &&
+                  task.tags.map((tag: string) => (
+                    <Badge variant="secondary" className="text-xs" key={tag}>
+                      {tag}
+                    </Badge>
+                  ))}
               </div>
             </div>
 
             <div className="flex items-center gap-1">
-              {task.importance && <span>{IMPORTANCE_EMOJIS[task.importance]}</span>}
+              {task.importance && (
+                <span>{IMPORTANCE_EMOJIS[task.importance]}</span>
+              )}
               {task.urgency && <span>{URGENCY_EMOJIS[task.urgency]}</span>}
             </div>
           </div>

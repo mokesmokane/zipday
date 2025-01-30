@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { getAllFunctionDefinitions } from "@/lib/function-calls"  
+import { getAllFunctionDefinitions } from "@/lib/function-calls"
 
 export async function GET(request: Request) {
   try {
     // Get instructions from query params
     const { searchParams } = new URL(request.url)
-    const instructions = searchParams.get('instructions')
+    const instructions = searchParams.get("instructions")
 
     const res = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
@@ -17,16 +17,16 @@ export async function GET(request: Request) {
         model: "gpt-4o-realtime-preview-2024-12-17",
         voice: "alloy",
         input_audio_transcription: {
-            model: "whisper-1"
+          model: "whisper-1"
         },
         tools: getAllFunctionDefinitions(),
         tool_choice: "auto",
         turn_detection: {
-            type: "server_vad",
-            threshold: 1.0,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500,
-            create_response: true
+          type: "server_vad",
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 500,
+          create_response: true
         },
         // Only include instructions if provided
         ...(instructions && { instructions })

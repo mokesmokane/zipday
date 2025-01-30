@@ -27,7 +27,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             onClick={toggleSidebar}
-            className="h-12 w-12 p-3"
+            className="size-12 p-3"
           >
             <Zap className="!h-8 !w-8" />
           </Button>
@@ -37,34 +37,34 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className="h-8 w-8"
+            className="size-8"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="size-4" />
           </Button>
         )}
       </div>
-      
+
       {isExpanded && (
-      <nav className="flex-1 space-y-2 overflow-auto p-2 min-h-[100px]">
-        <Link href="/dashboard/todo">
-          <Button
-            variant="ghost"
-            className="hover:bg-accent w-full justify-start"
-          >
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Dashboard
-          </Button>
-        </Link>
-        <Link href="/board">
-          <Button
-            variant="ghost"
-            className="hover:bg-accent w-full justify-start"
-          >
-            <KanbanSquare className="mr-2 h-4 w-4" />
-            Plan
-          </Button>
-        </Link>
-      </nav>
+        <nav className="min-h-[100px] flex-1 space-y-2 overflow-auto p-2">
+          <Link href="/dashboard/todo">
+            <Button
+              variant="ghost"
+              className="hover:bg-accent w-full justify-start"
+            >
+              <LayoutDashboard className="mr-2 size-4" />
+              Dashboard
+            </Button>
+          </Link>
+          <Link href="/board">
+            <Button
+              variant="ghost"
+              className="hover:bg-accent w-full justify-start"
+            >
+              <KanbanSquare className="mr-2 size-4" />
+              Plan
+            </Button>
+          </Link>
+        </nav>
       )}
 
       {isExpanded && (
@@ -72,7 +72,7 @@ export function Sidebar() {
       )}
 
       <div className="w-full px-2">
-        <SidebarCalendar/>
+        <SidebarCalendar />
       </div>
 
       <div className="flex min-h-[300px] flex-col">

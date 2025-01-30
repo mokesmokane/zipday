@@ -94,4 +94,4 @@ Weekly planning session
 
     expect(taskToShorthand(task)).toBe("Task with Undefined Fields")
   })
-}) 
+})

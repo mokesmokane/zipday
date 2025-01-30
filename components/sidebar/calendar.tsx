@@ -2,14 +2,19 @@
 
 import * as React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Calendar as CalendarIcon, Maximize2, Minimize2, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  Calendar as CalendarIcon,
+  Maximize2,
+  Minimize2,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react"
 import { DayPicker } from "react-day-picker"
 import { useDate } from "@/lib/context/date-context"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/lib/context/sidebar-context"
-
 
 export function SidebarCalendar() {
   const { selectedDate, setSelectedDate } = useDate()
@@ -23,7 +28,7 @@ export function SidebarCalendar() {
   const initialSize = useRef({ width: 0, height: 0 })
   const initialPosition = useRef({ x: 0, y: 0 })
   const [month, setMonth] = useState<Date>(new Date())
-  const {isExpanded} = useSidebar()
+  const { isExpanded } = useSidebar()
 
   // Example dates with content - replace with actual data later
   const datesWithContent = [
@@ -146,7 +151,6 @@ export function SidebarCalendar() {
       year: "numeric"
     })
   }
-  
 
   const calendarContent = (
     <DayPicker
@@ -249,139 +253,136 @@ export function SidebarCalendar() {
   if (isPoppedOut) {
     return (
       <div
-      className="fixed z-50 flex flex-col rounded border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
-      style={{
-        top: position.y,
-        left: position.x,
-        width: size.width,
-        height: size.height,
-        position: "fixed"
-      }}
-    >
-      <div
-        className="flex shrink-0 cursor-move items-center border-b border-gray-300 bg-gray-100 p-2 dark:border-gray-700 dark:bg-gray-800"
-        onMouseDown={handleMouseDown}
+        className="fixed z-50 flex flex-col rounded border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+        style={{
+          top: position.y,
+          left: position.x,
+          width: size.width,
+          height: size.height,
+          position: "fixed"
+        }}
       >
-        <CalendarIcon className="size-5" />
-        <span className="ml-2 flex-1 text-sm font-medium">{formatMonth(month)}</span>
-        <div className="flex items-center space-x-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 bg-transparent opacity-50 hover:opacity-100"
-            onClick={handlePreviousMonth}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 bg-transparent opacity-50 hover:opacity-100"
-            onClick={handleNextMonth}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsPoppedOut(false)}
-            className="size-8 rounded-full hover:bg-blue-100 hover:text-blue-600"
-          >
-            <Minimize2 className="size-4" />
-          </Button>
+        <div
+          className="flex shrink-0 cursor-move items-center border-b border-gray-300 bg-gray-100 p-2 dark:border-gray-700 dark:bg-gray-800"
+          onMouseDown={handleMouseDown}
+        >
+          <CalendarIcon className="size-5" />
+          <span className="ml-2 flex-1 text-sm font-medium">
+            {formatMonth(month)}
+          </span>
+          <div className="flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 bg-transparent opacity-50 hover:opacity-100"
+              onClick={handlePreviousMonth}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 bg-transparent opacity-50 hover:opacity-100"
+              onClick={handleNextMonth}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsPoppedOut(false)}
+              className="size-8 rounded-full hover:bg-blue-100 hover:text-blue-600"
+            >
+              <Minimize2 className="size-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col p-3">
-        <DayPicker
-          mode="single"
-          selected={selectedDate}
-          onSelect={handleSelect}
-          month={month}
-          onMonthChange={setMonth}
-          formatters={{
-            formatWeekdayName: day => day.toString().charAt(0)
-          }}
-          showOutsideDays={true}
-          modifiers={{
-            hasContent: datesWithContent
-          }}
-          modifiersStyles={{
-            hasContent: {
-              fontWeight: "bold",
-              position: "relative"
-            }
-          }}
-          className="w-full"
-          classNames={{
-            months: "w-full",
-            month: "w-full",
-            caption: "hidden", // Hide the default caption since we moved controls to header
-            table: "w-full border-collapse space-y-1",
-            head_row: "flex w-full justify-between",
-            head_cell:
-              "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] uppercase",
-            row: "flex w-full mt-2 justify-between",
-            cell: cn(
-              "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-transparent",
-              "[&:has([aria-selected].day-range-end)]:rounded-r-md",
-              "[&:has([aria-selected].day-range-start)]:rounded-l-md"
-            ),
-            day: cn(
-              "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground size-8 rounded-full p-0 font-normal aria-selected:opacity-100",
-              "transition-all duration-200 ease-in-out"
-            ),
-            day_selected:
-              "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-            day_today: "bg-accent text-accent-foreground",
-            day_outside: "text-muted-foreground opacity-25",
-            day_disabled: "text-muted-foreground opacity-50",
-            day_hidden: "invisible hidden",
-            day_range_start: "rounded-full",
-            day_range_end: "rounded-full",
-            day_range_middle: "rounded-full"
-          }}
+        <div className="flex min-h-0 flex-1 flex-col p-3">
+          <DayPicker
+            mode="single"
+            selected={selectedDate}
+            onSelect={handleSelect}
+            month={month}
+            onMonthChange={setMonth}
+            formatters={{
+              formatWeekdayName: day => day.toString().charAt(0)
+            }}
+            showOutsideDays={true}
+            modifiers={{
+              hasContent: datesWithContent
+            }}
+            modifiersStyles={{
+              hasContent: {
+                fontWeight: "bold",
+                position: "relative"
+              }
+            }}
+            className="w-full"
+            classNames={{
+              months: "w-full",
+              month: "w-full",
+              caption: "hidden", // Hide the default caption since we moved controls to header
+              table: "w-full border-collapse space-y-1",
+              head_row: "flex w-full justify-between",
+              head_cell:
+                "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] uppercase",
+              row: "flex w-full mt-2 justify-between",
+              cell: cn(
+                "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-transparent",
+                "[&:has([aria-selected].day-range-end)]:rounded-r-md",
+                "[&:has([aria-selected].day-range-start)]:rounded-l-md"
+              ),
+              day: cn(
+                "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground size-8 rounded-full p-0 font-normal aria-selected:opacity-100",
+                "transition-all duration-200 ease-in-out"
+              ),
+              day_selected:
+                "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+              day_today: "bg-accent text-accent-foreground",
+              day_outside: "text-muted-foreground opacity-25",
+              day_disabled: "text-muted-foreground opacity-50",
+              day_hidden: "invisible hidden",
+              day_range_start: "rounded-full",
+              day_range_end: "rounded-full",
+              day_range_middle: "rounded-full"
+            }}
+          />
+        </div>
+
+        {/* Resize handles */}
+        <div
+          className="absolute inset-y-0 right-0 w-2 cursor-e-resize hover:bg-gray-300/20"
+          onMouseDown={e => handleResizeMouseDown(e, "e")}
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize hover:bg-gray-300/20"
+          onMouseDown={e => handleResizeMouseDown(e, "s")}
+        />
+        <div
+          className="absolute bottom-0 right-0 size-4 cursor-se-resize hover:bg-gray-300/20"
+          onMouseDown={e => handleResizeMouseDown(e, "se")}
         />
       </div>
-  
-      {/* Resize handles */}
-      <div
-        className="absolute inset-y-0 right-0 w-2 cursor-e-resize hover:bg-gray-300/20"
-        onMouseDown={e => handleResizeMouseDown(e, "e")}
-      />
-      <div
-        className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize hover:bg-gray-300/20"
-        onMouseDown={e => handleResizeMouseDown(e, "s")}
-      />
-      <div
-        className="absolute bottom-0 right-0 size-4 cursor-se-resize hover:bg-gray-300/20"
-        onMouseDown={e => handleResizeMouseDown(e, "se")}
-      />
-    </div>
     )
   }
-
 
   if (!isExpanded) {
     return (
       <div className="flex justify-center p-2">
-
         <Button
-          variant="ghost" 
+          variant="ghost"
           size="icon"
           className="text-muted-foreground hover:text-foreground hover:bg-accent size-10"
           onClick={() => setIsPoppedOut(true)}
         >
           <CalendarIcon className="size-4" />
         </Button>
-        </div>
+      </div>
     )
   }
   return (
-    
     <Card className="relative w-full border-none shadow-none">
-    <CardContent className="p-3">
-      {calendarContent}
-    </CardContent>
-  </Card>
+      <CardContent className="p-3">{calendarContent}</CardContent>
+    </Card>
   )
 }

@@ -8,7 +8,7 @@ function getTimePosition() {
   const now = new Date()
   const hours = now.getHours()
   const minutes = now.getMinutes()
-  return (hours * HOUR_HEIGHT) + (minutes / 60 * HOUR_HEIGHT)
+  return hours * HOUR_HEIGHT + (minutes / 60) * HOUR_HEIGHT
 }
 
 export function CurrentTimeLine() {
@@ -24,17 +24,17 @@ export function CurrentTimeLine() {
   }, [])
 
   return (
-    <div 
-      className="absolute left-0 right-0 pointer-events-none z-10"
-      style={{ 
+    <div
+      className="pointer-events-none absolute inset-x-0 z-10"
+      style={{
         top: `${position}px`,
-        transition: 'top 0.5s linear'
+        transition: "top 0.5s linear"
       }}
     >
       <div className="relative flex items-center">
-        <div className="absolute -left-1 w-2 h-2 rounded-full bg-red-500" />
+        <div className="absolute -left-1 size-2 rounded-full bg-red-500" />
         <div className="w-full border-t border-red-500" />
       </div>
     </div>
   )
-} 
+}

@@ -4,15 +4,14 @@ import { createContext, useContext, useState } from "react"
 import type { FunctionCall } from "@/types/function-call-types"
 
 export interface ITranscript {
-  role: 'user' | 'assistant'
+  role: "user" | "assistant"
   content: string
   timestamp: number
 }
 
-
 export class Transcript implements ITranscript {
   constructor(
-    public role: 'user' | 'assistant',
+    public role: "user" | "assistant",
     public content: string,
     public timestamp: number
   ) {}
@@ -48,6 +47,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
 export function useRealtime() {
   const context = useContext(RealtimeContext)
-  if (!context) throw new Error("useRealtime must be used within RealtimeProvider")
+  if (!context)
+    throw new Error("useRealtime must be used within RealtimeProvider")
   return context
 }

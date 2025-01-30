@@ -1,18 +1,29 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, useRef } from "react"
-import { getDaysByDateRangeAction, getIncompleteTasksAction } from "@/actions/db/tasks-actions"
+import {
+  getDaysByDateRangeAction,
+  getIncompleteTasksAction
+} from "@/actions/db/tasks-actions"
 import { useDate } from "./date-context"
 import { useAuth } from "./auth-context"
 import { Day, Task } from "@/types/daily-task-types"
-import { addTaskAction, updateTaskAction, deleteTaskAction, reorderDayTasksAction } from "@/actions/db/tasks-actions"
+import {
+  addTaskAction,
+  updateTaskAction,
+  deleteTaskAction,
+  reorderDayTasksAction
+} from "@/actions/db/tasks-actions"
 import { toast } from "@/components/ui/use-toast"
 import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
 import { useGoogleCalendar } from "./google-calendar-context"
-import { getIncompleteStartDateStr, getFutureEndDateStr } from "@/lib/utils/date-utils"
+import {
+  getIncompleteStartDateStr,
+  getFutureEndDateStr
+} from "@/lib/utils/date-utils"
 
-/** 
- * If you only need a flat list of tasks, you can keep 'tasks' the same. 
+/**
+ * If you only need a flat list of tasks, you can keep 'tasks' the same.
  * If you also want day-level data (like 'meta'), store it in dailyDocs.
  */
 interface TasksContextType {
@@ -39,8 +50,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const [incompleteTasks, setIncompleteTasks] = useState<Task[]>([])
   const [futureTasks, setFutureTasks] = useState<Task[]>([])
   const [taskDayLookup, setTaskDayLookup] = useState<Record<string, string>>({})
-  const [incompleteTimeRange, setTimeRange] = useState<"week" | "month" | "year" | "all">("week")
-  const [futureTimeRange, setFutureTimeRangeState] = useState<"week" | "month" | "year" | "all">("week")
+  const [incompleteTimeRange, setTimeRange] = useState<
+    "week" | "month" | "year" | "all"
+  >("week")
+  const [futureTimeRange, setFutureTimeRangeState] = useState<
+    "week" | "month" | "year" | "all"
+  >("week")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -71,7 +86,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       if (!alreadyEmpty) {
         console.log("[TasksContext] Clearing tasks because user is null.")
         setDailyTasks({})
-        setIncompleteTasks([])  
+        setIncompleteTasks([])
         setFutureTasks([])
       }
       setIsLoading(false)
@@ -88,7 +103,10 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Get tasks for date range
-      const result = await getDaysByDateRangeAction(startDateStr, futureEndDateStr)
+      const result = await getDaysByDateRangeAction(
+        startDateStr,
+        futureEndDateStr
+      )
       console.log("getDaysByDateRangeAction result:", result)
 
       if (result.isSuccess && result.data) {
@@ -104,7 +122,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const incompleteStartDateStr = getIncompleteStartDateStr(incompleteTimeRange)
+        const incompleteStartDateStr =
+          getIncompleteStartDateStr(incompleteTimeRange)
         console.log("incompleteStartDateStr:", incompleteStartDateStr)
         const incompleteResult = await getIncompleteTasksAction(
           incompleteStartDateStr,
@@ -117,9 +136,14 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
           console.log("incompleteResult.data:", incompleteResult.data)
           incompleteByDate = incompleteResult.data
 
-          setIncompleteTasks(Object.values(incompleteByDate).flatMap(day => day.tasks) || [])
+          setIncompleteTasks(
+            Object.values(incompleteByDate).flatMap(day => day.tasks) || []
+          )
         } else {
-          console.error("Error getting incomplete tasks:", incompleteResult.message)
+          console.error(
+            "Error getting incomplete tasks:",
+            incompleteResult.message
+          )
         }
 
         // Create a lookup table for taskId to date
@@ -144,7 +168,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
         // Before setting, check if it's actually changed
         const tasksChanged =
-          JSON.stringify(daysByDate) !== JSON.stringify(prevDailyTasksRef.current)
+          JSON.stringify(daysByDate) !==
+          JSON.stringify(prevDailyTasksRef.current)
         const futureChanged =
           JSON.stringify(futureByDate) !== JSON.stringify(prevFutureRef.current)
         const incompleteChanged =
@@ -158,11 +183,17 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         }
         if (futureChanged) {
           setFutureTasks(Object.values(futureByDate).flatMap(day => day.tasks))
-          prevFutureRef.current = Object.values(futureByDate).flatMap(day => day.tasks)
+          prevFutureRef.current = Object.values(futureByDate).flatMap(
+            day => day.tasks
+          )
         }
         if (incompleteChanged) {
-          setIncompleteTasks(Object.values(incompleteByDate).flatMap(day => day.tasks))
-          prevIncompleteRef.current = Object.values(incompleteByDate).flatMap(day => day.tasks)
+          setIncompleteTasks(
+            Object.values(incompleteByDate).flatMap(day => day.tasks)
+          )
+          prevIncompleteRef.current = Object.values(incompleteByDate).flatMap(
+            day => day.tasks
+          )
         }
       } else {
         setError(result.message || "Failed to load tasks")
@@ -193,7 +224,14 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       [date]: {
         id: prev[date]?.id || crypto.randomUUID(),
         date,
-        tasks: insertIndex !== undefined ? [...(prev[date]?.tasks || []).slice(0, insertIndex), tempTask, ...(prev[date]?.tasks || []).slice(insertIndex)] :  [...(prev[date]?.tasks || []), tempTask],
+        tasks:
+          insertIndex !== undefined
+            ? [
+                ...(prev[date]?.tasks || []).slice(0, insertIndex),
+                tempTask,
+                ...(prev[date]?.tasks || []).slice(insertIndex)
+              ]
+            : [...(prev[date]?.tasks || []), tempTask],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -218,9 +256,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       [date]: {
         id: prev[date]?.id || crypto.randomUUID(),
         date,
-        tasks: prev[date]?.tasks.map(t => 
-          t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
-        ) || [],
+        tasks:
+          prev[date]?.tasks.map(t =>
+            t.id === taskId
+              ? { ...t, ...updates, updatedAt: new Date().toISOString() }
+              : t
+          ) || [],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -299,7 +340,6 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-
   const setIncompleteTimeRange = (range: "week" | "month" | "year" | "all") => {
     setTimeRange(range)
   }
@@ -312,7 +352,13 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refreshTasks()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, dateWindow.startDate, dateWindow.endDate, incompleteTimeRange, futureTimeRange])
+  }, [
+    user,
+    dateWindow.startDate,
+    dateWindow.endDate,
+    incompleteTimeRange,
+    futureTimeRange
+  ])
 
   return (
     <TasksContext.Provider

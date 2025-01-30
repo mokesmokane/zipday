@@ -11,16 +11,12 @@ interface PulsatingSphereVisualizerProps {
   onClick?: () => void
 }
 
-export const PulsatingSphereVisualizer: React.FC<PulsatingSphereVisualizerProps> = ({
-  isActive,
-  audioLevel,
-  className = "",
-  color = "blue",
-  onClick
-}) => {
+export const PulsatingSphereVisualizer: React.FC<
+  PulsatingSphereVisualizerProps
+> = ({ isActive, audioLevel, className = "", color = "blue", onClick }) => {
   const scaleFactor = 1 + Math.min(audioLevel * 1.5, 1) * 0.4
-  const baseStiffness = 100 - (audioLevel * 50)
-  const baseDamping = 15 + (audioLevel * 5)
+  const baseStiffness = 100 - audioLevel * 50
+  const baseDamping = 15 + audioLevel * 5
 
   const gradientColors = {
     blue: {
@@ -49,14 +45,17 @@ export const PulsatingSphereVisualizer: React.FC<PulsatingSphereVisualizerProps>
   const colors = gradientColors[color]
 
   return (
-    <div className={`flex items-center justify-center ${className}`} onClick={onClick}>
+    <div
+      className={`flex items-center justify-center ${className}`}
+      onClick={onClick}
+    >
       <motion.div
         className={`size-full rounded-full bg-gradient-to-br ${colors.from} ${colors.to} shadow-lg`}
         style={{
-          boxShadow: `0 0 30px ${colors.shadow}`,
+          boxShadow: `0 0 30px ${colors.shadow}`
         }}
         animate={{
-          scale: isActive ? scaleFactor : 1,
+          scale: isActive ? scaleFactor : 1
         }}
         transition={{
           type: "spring",
@@ -69,7 +68,7 @@ export const PulsatingSphereVisualizer: React.FC<PulsatingSphereVisualizerProps>
         <motion.div
           className={`size-full rounded-full bg-gradient-to-br ${colors.innerFrom} ${colors.innerTo} opacity-75`}
           animate={{
-            scale: isActive ? 0.9 + (audioLevel * 0.1) : 0.85,
+            scale: isActive ? 0.9 + audioLevel * 0.1 : 0.85
           }}
           transition={{
             type: "spring",

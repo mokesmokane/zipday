@@ -20,30 +20,54 @@ interface CalendarColumnProps {
   onAddTask: (task: Task) => void
   onDeleteTask: (taskId: string) => void
   onResizeTask?: (taskId: string, durationMinutes: number) => void
-  onEventUpdate?: (id: string, updates: Partial<{ title: string, startTime: string, endTime: string, description: string }>) => void
+  onEventUpdate?: (
+    id: string,
+    updates: Partial<{
+      title: string
+      startTime: string
+      endTime: string
+      description: string
+    }>
+  ) => void
   onTaskUpdate?: (task: Task) => void
 }
 
-export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, onAddTask, onDeleteTask, onResizeTask, onEventUpdate, onTaskUpdate }: CalendarColumnProps) {
+export function CalendarColumn({
+  id,
+  date,
+  tasks,
+  singleColumn,
+  onScheduleTask,
+  onAddTask,
+  onDeleteTask,
+  onResizeTask,
+  onEventUpdate,
+  onTaskUpdate
+}: CalendarColumnProps) {
   const isCurrentDay = isToday(new Date(date))
   const { events } = useGoogleCalendar()
 
   // Filter events for this day
-  const dayEvents = events?.filter(event => {
-    const eventDate = parseISO(event.calendarItem?.start?.dateTime!)
-    return format(eventDate, "yyyy-MM-dd") === date
-  }) || []
+  const dayEvents =
+    events?.filter(event => {
+      const eventDate = parseISO(event.calendarItem?.start?.dateTime!)
+      return format(eventDate, "yyyy-MM-dd") === date
+    }) || []
 
   // Separate all-day and timed events
   const allDayEvents = dayEvents.filter(event => event.allDay)
-  const timedEvents = dayEvents.filter(event => !event.allDay).filter(event => !tasks.some(task => task.calendarItem?.gcalEventId === event.id))
+  const timedEvents = dayEvents
+    .filter(event => !event.allDay)
+    .filter(
+      event => !tasks.some(task => task.calendarItem?.gcalEventId === event.id)
+    )
 
   // Combine tasks and events for overlap calculation
   const allItems = [...tasks, ...timedEvents]
   const overlappingGroups = getOverlappingGroups(allItems)
-  
+
   // Create a map of item index to its position info
-  const positionMap = new Map<number, {index: number, total: number}>()
+  const positionMap = new Map<number, { index: number; total: number }>()
   overlappingGroups.forEach(group => {
     group.forEach((itemIndex, positionIndex) => {
       positionMap.set(itemIndex, {
@@ -55,7 +79,7 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
 
   return (
     <div className="bg-muted/50 flex h-[calc(100vh-8rem)] flex-col rounded-lg border">
-      <div className="border-b p-2 h-[72px] overflow-y-auto">
+      <div className="h-[72px] overflow-y-auto border-b p-2">
         {allDayEvents.length > 0 && (
           <div className="space-y-1">
             {allDayEvents.map(event => (
@@ -71,26 +95,22 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto relative scrollbar-hide">
+      <div className="scrollbar-hide relative min-h-0 flex-1 overflow-y-auto">
         {/* Time labels column */}
         <TimeLabels />
-        
+
         {/* Main calendar grid with absolute positioning */}
-        <div className="ml-12 relative">
+        <div className="relative ml-12">
           {HOURS.map(hour => (
-            <HourDroppable
-              key={hour}
-              id={id}
-              hour={hour}
-            />
+            <HourDroppable key={hour} id={id} hour={hour} />
           ))}
-          
+
           {tasks.map((task, idx) => {
             const position = positionMap.get(idx) || { index: 0, total: 1 }
             return (
-              <CalendarTask 
+              <CalendarTask
                 id={singleColumn ? `calendar-${task.id}` : task.id}
-                key={task.id} 
+                key={task.id}
                 task={task}
                 position={position}
                 onResize={onResizeTask}
@@ -108,7 +128,10 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
           })}
 
           {timedEvents.map((event, idx) => {
-            const position = positionMap.get(idx + tasks.length) || { index: 0, total: 1 }
+            const position = positionMap.get(idx + tasks.length) || {
+              index: 0,
+              total: 1
+            }
             return (
               <GoogleCalendarEvent
                 key={event.id}
@@ -128,4 +151,4 @@ export function CalendarColumn({ id, date, tasks, singleColumn, onScheduleTask, 
       </div>
     </div>
   )
-} 
+}

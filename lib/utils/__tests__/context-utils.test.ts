@@ -1,5 +1,9 @@
 import { Task } from "@/types/daily-task-types"
-import { createIdMapping, formatTasksContext, formatCalendarEvents } from "../context-utils"
+import {
+  createIdMapping,
+  formatTasksContext,
+  formatCalendarEvents
+} from "../context-utils"
 
 describe("createIdMapping", () => {
   const tasks: Task[] = [
@@ -32,7 +36,6 @@ describe("createIdMapping", () => {
       2: "task2"
     })
   })
-
 })
 
 describe("formatTasksContext", () => {
@@ -79,8 +82,12 @@ describe("formatTasksContext", () => {
     }
 
     const idMapping = { task1: 1 }
-    const result = formatTasksContext("Test Tasks", [taskWithMetadata], idMapping)
-    
+    const result = formatTasksContext(
+      "Test Tasks",
+      [taskWithMetadata],
+      idMapping
+    )
+
     expect(result).toContain("Test Tasks:")
     expect(result).toContain("[x]") // Completed checkbox
     expect(result).toContain("#1") // ID
@@ -162,6 +169,4 @@ describe("continuous ID mapping across sections", () => {
       subtasks: []
     }
   ]
-
- 
-}) 
+})

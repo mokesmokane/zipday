@@ -8,7 +8,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle
 } from "@/components/ui/alert-dialog"
 
 interface ConfirmDialogProps {
@@ -37,15 +37,17 @@ export function ConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {description}
-          </AlertDialogDescription>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className={variant === "destructive" ? "bg-destructive hover:bg-destructive/90" : undefined}
+            className={
+              variant === "destructive"
+                ? "bg-destructive hover:bg-destructive/90"
+                : undefined
+            }
           >
             {confirmText}
           </AlertDialogAction>
@@ -53,4 +55,4 @@ export function ConfirmDialog({
       </AlertDialogContent>
     </AlertDialog>
   )
-} 
+}

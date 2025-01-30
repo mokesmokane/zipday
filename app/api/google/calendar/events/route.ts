@@ -21,10 +21,7 @@ export async function GET(request: Request) {
 
     // Get user's Google Calendar tokens
     const db = getFirestore()
-    const userDoc = await db
-      .collection("users")
-      .doc(session.uid)
-      .get()
+    const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
     const tokens = userData?.googleCalendar?.tokens
@@ -44,7 +41,14 @@ export async function GET(request: Request) {
     const now = new Date()
     now.setHours(0, 0, 0, 0)
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59
+    )
 
     const response = await calendar.events.list({
       calendarId: "primary",
@@ -53,25 +57,30 @@ export async function GET(request: Request) {
       singleEvents: true,
       orderBy: "startTime"
     })
-    
-    const events = response.data.items?.map(event => {
-      const isAllDay = !event.start?.dateTime
-      return {
-        id: event.id,
-        title: event.summary || "Untitled Event",
-        description: event.description,
-        calendarItem: {
-          gcalEventId: event.id,
-          start: {
-            dateTime: isAllDay ? `${event.start?.date}T00:00:00` : event.start?.dateTime,
+
+    const events =
+      response.data.items?.map(event => {
+        const isAllDay = !event.start?.dateTime
+        return {
+          id: event.id,
+          title: event.summary || "Untitled Event",
+          description: event.description,
+          calendarItem: {
+            gcalEventId: event.id,
+            start: {
+              dateTime: isAllDay
+                ? `${event.start?.date}T00:00:00`
+                : event.start?.dateTime
+            },
+            end: {
+              dateTime: isAllDay
+                ? `${event.end?.date}T23:59:59`
+                : event.end?.dateTime
+            }
           },
-          end: {
-            dateTime: isAllDay ? `${event.end?.date}T23:59:59` : event.end?.dateTime,
-          }
-        },
-        allDay: isAllDay
-      }
-    }) || []
+          allDay: isAllDay
+        }
+      }) || []
 
     return NextResponse.json({ events })
   } catch (error) {
@@ -81,4 +90,4 @@ export async function GET(request: Request) {
       { status: 500 }
     )
   }
-} 
+}

@@ -11,21 +11,29 @@ import type { CSSProperties } from "react"
 const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
 
 // Helper to calculate task position and height
-function getTaskStyle(task: Task, index: number, total: number): CSSProperties | null {
+function getTaskStyle(
+  task: Task,
+  index: number,
+  total: number
+): CSSProperties | null {
   if (!task.calendarItem?.start) return null
-  
-  const startDate = task.calendarItem.start.dateTime ? new Date(task.calendarItem.start.dateTime) : task.calendarItem.start.date ? new Date(task.calendarItem.start.date) : null
+
+  const startDate = task.calendarItem.start.dateTime
+    ? new Date(task.calendarItem.start.dateTime)
+    : task.calendarItem.start.date
+      ? new Date(task.calendarItem.start.date)
+      : null
   if (!startDate) return null
   const startHour = startDate.getHours()
   const startMinute = startDate.getMinutes()
   const durationMinutes = task.durationMinutes || 60
-  
-  const top = (startHour * HOUR_HEIGHT) + (startMinute / 60 * HOUR_HEIGHT)
+
+  const top = startHour * HOUR_HEIGHT + (startMinute / 60) * HOUR_HEIGHT
   const height = (durationMinutes / 60) * HOUR_HEIGHT
-  
+
   const width = `${100 / total}%`
   const left = `${(index * 100) / total}%`
-  
+
   return {
     position: "absolute",
     top: `${top}px`,
@@ -36,19 +44,19 @@ function getTaskStyle(task: Task, index: number, total: number): CSSProperties |
   }
 }
 
-export function CalendarTask({ 
+export function CalendarTask({
   id,
-  task, 
-  onResize, 
+  task,
+  onResize,
   onDeleteTask,
-  position, 
+  position,
   day,
-  onTaskUpdate 
-}: { 
+  onTaskUpdate
+}: {
   id: string
   task: Task
-  onResize?: (taskId: string, durationMinutes: number) => void 
-  position: {index: number, total: number}
+  onResize?: (taskId: string, durationMinutes: number) => void
+  position: { index: number; total: number }
   day: Day
   onTaskUpdate?: (task: Task) => void
   onDeleteTask?: (taskId: string) => void
@@ -61,7 +69,7 @@ export function CalendarTask({
     transform,
     transition,
     isDragging
-  } = useSortable({ 
+  } = useSortable({
     id: id,
     data: {
       type: "calendar-task",
@@ -105,12 +113,12 @@ export function CalendarTask({
           onResize?.(task.id, newDurationMinutes)
         }}
       >
-        <div 
+        <div
           ref={setNodeRef}
           {...attributes}
           {...listeners}
           onClick={handleClick}
-          className="bg-primary/10 rounded p-2 text-xs h-full overflow-hidden select-none hover:bg-primary/20 transition-colors"
+          className="bg-primary/10 hover:bg-primary/20 h-full select-none overflow-hidden rounded p-2 text-xs transition-colors"
         >
           <div className="font-medium">{task.title}</div>
           {task.description && (
@@ -127,7 +135,7 @@ export function CalendarTask({
           task={task}
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
-          onSave={(updatedTask) => {
+          onSave={updatedTask => {
             onTaskUpdate?.(updatedTask)
             setIsEditDialogOpen(false)
           }}

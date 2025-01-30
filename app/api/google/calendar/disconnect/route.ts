@@ -15,13 +15,10 @@ export async function POST(request: Request) {
 
     // Remove Google Calendar connection from user's document
     const db = getFirestore()
-    await db
-      .collection("users")
-      .doc(session.uid)
-      .update({
-        "googleCalendar.connected": false,
-        "googleCalendar.tokens": null
-      })
+    await db.collection("users").doc(session.uid).update({
+      "googleCalendar.connected": false,
+      "googleCalendar.tokens": null
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -31,4 +28,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-} 
+}

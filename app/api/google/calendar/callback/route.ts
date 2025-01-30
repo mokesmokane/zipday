@@ -9,18 +9,20 @@ const oauth2Client = new google.auth.OAuth2(
 )
 
 // Get the base URL from environment variable or construct it
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}`
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}`
 
 async function setupWebhook(auth: any) {
   // Skip webhook setup in development
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === "development") {
     console.log("Development mode: Skipping webhook setup")
     return null
   }
 
   try {
     const calendar = google.calendar({ version: "v3", auth })
-    
+
     // Set up push notifications
     const response = await calendar.events.watch({
       calendarId: "primary",
@@ -84,6 +86,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/dashboard/todo`)
   } catch (error) {
     console.error("Failed to handle Google Calendar callback:", error)
-    return NextResponse.redirect(`${baseUrl}/dashboard?error=calendar_connection_failed`)
+    return NextResponse.redirect(
+      `${baseUrl}/dashboard?error=calendar_connection_failed`
+    )
   }
-} 
+}

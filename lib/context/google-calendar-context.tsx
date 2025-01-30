@@ -28,11 +28,19 @@ interface GoogleCalendarEvent {
 interface GoogleCalendarContextType {
   isConnected: boolean
   events: GoogleCalendarEvent[]
-  
+
   isLoading: boolean
   error: string | null
   refreshEvents: () => Promise<void>
-  updateEvent: (eventId: string, updates: Partial<{ title: string, startTime: string, endTime: string, description: string }>) => Promise<void>
+  updateEvent: (
+    eventId: string,
+    updates: Partial<{
+      title: string
+      startTime: string
+      endTime: string
+      description: string
+    }>
+  ) => Promise<void>
   deleteEvent: (eventId: string) => Promise<void>
 }
 
@@ -46,11 +54,7 @@ export const GoogleCalendarContext = createContext<GoogleCalendarContextType>({
   deleteEvent: async () => {}
 })
 
-export function GoogleCalendarProvider({
-  children
-}: {
-  children: ReactNode
-}) {
+export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [isConnected, setIsConnected] = useState(false)
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([])
@@ -102,7 +106,7 @@ export function GoogleCalendarProvider({
     fetchEvents()
 
     // In development, use polling
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       console.log("Development mode: Using polling for updates")
       const pollInterval = setInterval(fetchEvents, 30000) // Poll every 30 seconds
       return () => clearInterval(pollInterval)
@@ -117,7 +121,7 @@ export function GoogleCalendarProvider({
       setError(null)
     }
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = event => {
       console.log("SSE message received:", event.data)
       try {
         const data = JSON.parse(event.data)
@@ -130,7 +134,7 @@ export function GoogleCalendarProvider({
       }
     }
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = error => {
       console.error("SSE error:", error)
       setError("Lost connection to calendar updates")
     }
@@ -141,7 +145,15 @@ export function GoogleCalendarProvider({
     }
   }, [isConnected])
 
-  const updateEvent = async (eventId: string, updates: Partial<{ title: string, startTime: string, endTime: string, description: string }>) => {
+  const updateEvent = async (
+    eventId: string,
+    updates: Partial<{
+      title: string
+      startTime: string
+      endTime: string
+      description: string
+    }>
+  ) => {
     if (!isConnected) return
 
     try {
@@ -152,7 +164,7 @@ export function GoogleCalendarProvider({
         },
         body: JSON.stringify(updates)
       })
-      
+
       if (!response.ok) {
         throw new Error("Failed to update event")
       }
@@ -193,7 +205,7 @@ export function GoogleCalendarProvider({
       if (!response.ok) {
         throw new Error("Failed to delete event")
       }
-      
+
       // Refresh events after deletion
       await refreshEvents()
     } catch (error) {
@@ -221,4 +233,4 @@ export function GoogleCalendarProvider({
 
 export function useGoogleCalendar() {
   return useContext(GoogleCalendarContext)
-} 
+}

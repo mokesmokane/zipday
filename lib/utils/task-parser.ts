@@ -9,21 +9,31 @@ interface ParsedMetadata {
 
 function numberToImportance(num: number): Importance | undefined {
   switch (num) {
-    case 4: return "critical"
-    case 3: return "significant"
-    case 2: return "valuable"
-    case 1: return "optional"
-    default: return undefined
+    case 4:
+      return "critical"
+    case 3:
+      return "significant"
+    case 2:
+      return "valuable"
+    case 1:
+      return "optional"
+    default:
+      return undefined
   }
 }
 
 function numberToUrgency(num: number): Urgency | undefined {
   switch (num) {
-    case 4: return "immediate"
-    case 3: return "soon"
-    case 2: return "later"
-    case 1: return "someday"
-    default: return undefined
+    case 4:
+      return "immediate"
+    case 3:
+      return "soon"
+    case 2:
+      return "later"
+    case 1:
+      return "someday"
+    default:
+      return undefined
   }
 }
 
@@ -63,12 +73,12 @@ export function parseMetadata(line: string): ParsedMetadata | undefined {
     // Count ! and * separately
     const importanceCount = (markers.match(/!/g) || []).length
     const urgencyCount = (markers.match(/\*/g) || []).length
-    
+
     // Return undefined if either count is invalid
     if (importanceCount > 4 || urgencyCount > 4) {
       return undefined
     }
-    
+
     importanceNum = importanceCount
     urgencyNum = urgencyCount
   }
@@ -138,17 +148,28 @@ export function parseTaskInput(input: string): Task[] {
         const metadata = parseMetadata(line)
         if (metadata) {
           // Take the "higher" priority value if multiple are specified
-          importance = [metadata.importance, importance].filter((x): x is Importance => x !== undefined).sort((a, b) => {
-            const order = ["critical", "significant", "valuable", "optional", "none"]
-            return order.indexOf(a) - order.indexOf(b)
-          })[0] as Importance
+          importance = [metadata.importance, importance]
+            .filter((x): x is Importance => x !== undefined)
+            .sort((a, b) => {
+              const order = [
+                "critical",
+                "significant",
+                "valuable",
+                "optional",
+                "none"
+              ]
+              return order.indexOf(a) - order.indexOf(b)
+            })[0] as Importance
 
-          urgency = [metadata.urgency, urgency].filter((x): x is Urgency => x !== undefined).sort((a, b) => {
-            const order = ["immediate", "soon", "later", "someday", "none"]
-            return order.indexOf(a) - order.indexOf(b)
-          })[0] as Urgency
+          urgency = [metadata.urgency, urgency]
+            .filter((x): x is Urgency => x !== undefined)
+            .sort((a, b) => {
+              const order = ["immediate", "soon", "later", "someday", "none"]
+              return order.indexOf(a) - order.indexOf(b)
+            })[0] as Urgency
 
-          if (metadata.durationMinutes) durationMinutes = metadata.durationMinutes
+          if (metadata.durationMinutes)
+            durationMinutes = metadata.durationMinutes
         } else {
           // Any other non-empty line goes to description
           description.push(line)
@@ -174,4 +195,4 @@ export function parseTaskInput(input: string): Task[] {
   }
 
   return tasks
-} 
+}

@@ -26,10 +26,7 @@ export async function PATCH(
 
     // Get user's Google Calendar tokens
     const db = getFirestore()
-    const userDoc = await db
-      .collection("users")
-      .doc(session.uid)
-      .get()
+    const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
     const tokens = userData?.googleCalendar?.tokens
@@ -108,10 +105,7 @@ export async function DELETE(
 
     // Get user's Google Calendar tokens
     const db = getFirestore()
-    const userDoc = await db
-      .collection("users")
-      .doc(session.uid)
-      .get()
+    const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
     const tokens = userData?.googleCalendar?.tokens
@@ -141,4 +135,4 @@ export async function DELETE(
       { status: 500 }
     )
   }
-} 
+}

@@ -130,7 +130,7 @@ export function TaskInterestsStep({
                       taskInterests.includes(task.id)
                         ? `${getChipColor(task.label)} text-white`
                         : "bg-gray-200 text-gray-700"
-                    } transition-colors hover:bg-opacity-80`}
+                    } transition-colors hover:opacity-80`}
                   >
                     {task.label}
                   </Badge>

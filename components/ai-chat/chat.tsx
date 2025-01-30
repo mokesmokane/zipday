@@ -69,7 +69,11 @@ export function ChatForm({
 
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false)
   const [showContextDialog, setShowContextDialog] = useState(false)
-  const { messages: realtimeMessages, addMessage, clearMessages } = useRealtime() 
+  const {
+    messages: realtimeMessages,
+    addMessage,
+    clearMessages
+  } = useRealtime()
 
   const {
     isSessionActive,
@@ -145,13 +149,25 @@ export function ChatForm({
 
   const realtimeMessageList = (
     <div className="my-4 flex h-fit min-h-full flex-col gap-4">
-      {realtimeMessages.map((message, index) =>{
-        if(message instanceof FunctionCall) { 
-          return <FunctionCallDisplay key={index} functionCall={message} index={index} />
+      {realtimeMessages.map((message, index) => {
+        if (message instanceof FunctionCall) {
+          return (
+            <FunctionCallDisplay
+              key={index}
+              functionCall={message}
+              index={index}
+            />
+          )
         }
-        return <div key={index} data-role={message.role}
-          className="max-w-[80%] rounded-xl px-3 py-2 text-sm data-[role=assistant]:self-start data-[role=user]:self-end data-[role=assistant]:bg-gray-100 data-[role=user]:bg-blue-500 data-[role=assistant]:text-black data-[role=user]:text-white"
-        >{message.content}</div>
+        return (
+          <div
+            key={index}
+            data-role={message.role}
+            className="max-w-[80%] rounded-xl px-3 py-2 text-sm data-[role=assistant]:self-start data-[role=user]:self-end data-[role=assistant]:bg-gray-100 data-[role=user]:bg-blue-500 data-[role=assistant]:text-black data-[role=user]:text-white"
+          >
+            {message.content}
+          </div>
+        )
       })}
     </div>
   )
@@ -171,7 +187,7 @@ export function ChatForm({
               <PulsatingSphereVisualizer
                 isActive={isSessionActive}
                 audioLevel={audioLevels[0]}
-                className="size-48 cursor-pointer hover:opacity-80 transition-opacity"
+                className="size-48 cursor-pointer transition-opacity hover:opacity-80"
                 color="purple"
                 onClick={() => {
                   if (dataChannel && dataChannel.readyState === "open") {
@@ -181,10 +197,12 @@ export function ChatForm({
                       response: {
                         instructions: `
                         start the conversation with the user
-                      `,
-                      },
+                      `
+                      }
                     }
-                    dataChannel.send(JSON.stringify(startConversationInstruction))
+                    dataChannel.send(
+                      JSON.stringify(startConversationInstruction)
+                    )
                   }
                 }}
               />
@@ -222,7 +240,7 @@ export function ChatForm({
               onSubmit={handleSubmit}
               className="border-input bg-background focus-within:ring-ring/10 relative flex flex-1 items-center gap-2 rounded-[16px] border px-3 py-1.5 text-sm focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0"
             >
-              <AutoResizeTextarea 
+              <AutoResizeTextarea
                 onKeyDown={handleKeyDown}
                 onChange={v => setInput(v)}
                 value={input}
@@ -329,10 +347,7 @@ export function ChatForm({
                     { id: "shimmer", label: "Shimmer" },
                     { id: "verse", label: "Verse" }
                   ].map(voice => (
-                    <div
-                      key={voice.id}
-                      className="flex items-center space-x-2"
-                    >
+                    <div key={voice.id} className="flex items-center space-x-2">
                       <RadioGroupItem value={voice.id} id={voice.id} />
                       <Label htmlFor={voice.id}>{voice.label}</Label>
                     </div>
@@ -467,12 +482,14 @@ export function ChatForm({
   const headerContent = (
     <div className="flex items-center gap-2">
       <MessageCircle className="size-5" />
-      <CardTitle className="flex-1 text-sm font-medium">
-        AI Assistant
-      </CardTitle>
+      <CardTitle className="flex-1 text-sm font-medium">AI Assistant</CardTitle>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-7 opacity-50 hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 opacity-50 hover:opacity-100"
+          >
             <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -480,7 +497,9 @@ export function ChatForm({
           <DropdownMenuItem onClick={() => setShowContextDialog(true)}>
             View Context
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShowRealtimeMessages(!showRealtimeMessages)}>
+          <DropdownMenuItem
+            onClick={() => setShowRealtimeMessages(!showRealtimeMessages)}
+          >
             {showRealtimeMessages ? "Hide Messages" : "Show Messages"}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -491,18 +510,22 @@ export function ChatForm({
         onClick={handlePopOutToggle}
         className="size-7 opacity-50 hover:opacity-100"
       >
-        {isPoppedOut ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+        {isPoppedOut ? (
+          <Minimize2 className="size-4" />
+        ) : (
+          <Maximize2 className="size-4" />
+        )}
       </Button>
     </div>
   )
 
   if (!isPoppedOut) {
     // Inline mode
-    if(!isExpanded) {
+    if (!isExpanded) {
       return (
         <div className="flex justify-center p-2">
           <Button
-            variant="ghost" 
+            variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-foreground hover:bg-accent size-10 p-0"
             onClick={() => setIsPoppedOut(true)}
@@ -518,9 +541,7 @@ export function ChatForm({
           className="relative flex flex-col border-none shadow-none"
           style={{ height: size.height }}
         >
-          <CardHeader className="shrink-0 p-4">
-            {headerContent}
-          </CardHeader>
+          <CardHeader className="shrink-0 p-4">{headerContent}</CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col p-4 pt-0">
             {mainContent}
           </CardContent>

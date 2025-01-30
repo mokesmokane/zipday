@@ -27,12 +27,12 @@ export function createIdMapping(tasks: Task[]): IdMappingResult {
   // Add new mappings
   tasks.forEach((task, index) => {
     if (!mapping[task.id]) {
-      const shortId = (nextNumber + index)
+      const shortId = nextNumber + index
       mapping[task.id] = shortId
       reverseMapping[shortId] = task.id
     }
   })
-  
+
   return { mapping, reverseMapping }
 }
 
@@ -43,34 +43,44 @@ export function createIdMapping(tasks: Task[]): IdMappingResult {
  * @param idMapping Mapping from task IDs to short IDs
  * @returns Formatted text string
  */
-export function formatTasksContext(title: string, tasks: Task[], idMapping: Record<string, number>): string {
+export function formatTasksContext(
+  title: string,
+  tasks: Task[],
+  idMapping: Record<string, number>
+): string {
   if (!tasks.length) return ""
 
-  const formattedTasks = tasks.map(task => {
-    const metadata = []
-    if (task.urgency) metadata.push(`Urgency: ${task.urgency}`)
-    if (task.importance) metadata.push(`Importance: ${task.importance}`)
-    if (task.durationMinutes) metadata.push(`Duration: ${task.durationMinutes}m`)
-    if (task.tags?.length) metadata.push(`Tags: ${task.tags.join(", ")}`)
-    if (task.calendarItem?.start?.dateTime) {
-      const startTime = format(parseISO(task.calendarItem.start.dateTime), "h:mm a")
-      const endTime = task.calendarItem?.end?.dateTime ? 
-        format(parseISO(task.calendarItem.end.dateTime), "h:mm a") : 
-        undefined
-      metadata.push(`Time: ${startTime}${endTime ? ` - ${endTime}` : ""}`)
-    }
+  const formattedTasks = tasks
+    .map(task => {
+      const metadata = []
+      if (task.urgency) metadata.push(`Urgency: ${task.urgency}`)
+      if (task.importance) metadata.push(`Importance: ${task.importance}`)
+      if (task.durationMinutes)
+        metadata.push(`Duration: ${task.durationMinutes}m`)
+      if (task.tags?.length) metadata.push(`Tags: ${task.tags.join(", ")}`)
+      if (task.calendarItem?.start?.dateTime) {
+        const startTime = format(
+          parseISO(task.calendarItem.start.dateTime),
+          "h:mm a"
+        )
+        const endTime = task.calendarItem?.end?.dateTime
+          ? format(parseISO(task.calendarItem.end.dateTime), "h:mm a")
+          : undefined
+        metadata.push(`Time: ${startTime}${endTime ? ` - ${endTime}` : ""}`)
+      }
 
-    let taskStr = `  - [${task.completed ? "x" : " "}] #${idMapping[task.id]} ${task.title}`
-    if (task.description) taskStr += `\n    Description: ${task.description}`
-    if (metadata.length) taskStr += `\n    (${metadata.join(" | ")})`
-    if (task.subtasks?.length) {
-      taskStr += "\n    Subtasks:"
-      task.subtasks.forEach(subtask => {
-        taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text}`
-      })
-    }
-    return taskStr
-  }).join("\n")
+      let taskStr = `  - [${task.completed ? "x" : " "}] #${idMapping[task.id]} ${task.title}`
+      if (task.description) taskStr += `\n    Description: ${task.description}`
+      if (metadata.length) taskStr += `\n    (${metadata.join(" | ")})`
+      if (task.subtasks?.length) {
+        taskStr += "\n    Subtasks:"
+        task.subtasks.forEach(subtask => {
+          taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text}`
+        })
+      }
+      return taskStr
+    })
+    .join("\n")
 
   return `
 ${title}:
@@ -86,21 +96,27 @@ ${formattedTasks}
 export function formatCalendarEvents(events: any[]): string {
   if (!events.length) return ""
 
-  const formattedEvents = events.map(event => {
-    let eventStr = `  - ${event.title}`
-    if (event.calendarItem?.start?.dateTime) {
-      const startTime = format(parseISO(event.calendarItem.start.dateTime), "h:mm a")
-      const endTime = event.calendarItem?.end?.dateTime ? 
-        format(parseISO(event.calendarItem.end.dateTime), "h:mm a") : 
-        undefined
-      eventStr += ` (${startTime}${endTime ? ` - ${endTime}` : ""})`
-    }
-    if (event.description) eventStr += `\n    Description: ${event.description}`
-    return eventStr
-  }).join("\n")
+  const formattedEvents = events
+    .map(event => {
+      let eventStr = `  - ${event.title}`
+      if (event.calendarItem?.start?.dateTime) {
+        const startTime = format(
+          parseISO(event.calendarItem.start.dateTime),
+          "h:mm a"
+        )
+        const endTime = event.calendarItem?.end?.dateTime
+          ? format(parseISO(event.calendarItem.end.dateTime), "h:mm a")
+          : undefined
+        eventStr += ` (${startTime}${endTime ? ` - ${endTime}` : ""})`
+      }
+      if (event.description)
+        eventStr += `\n    Description: ${event.description}`
+      return eventStr
+    })
+    .join("\n")
 
   return `
 Calendar Events:
 ${formattedEvents}
 `
-} 
+}

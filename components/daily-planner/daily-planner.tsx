@@ -12,10 +12,7 @@ import {
   useSensors,
   closestCorners
 } from "@dnd-kit/core"
-import {
-  SortableContext,
-  verticalListSortingStrategy
-} from "@dnd-kit/sortable"
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { format } from "date-fns"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -33,7 +30,12 @@ import {
   deleteTaskAction
 } from "@/actions/db/tasks-actions"
 import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
-import type { Day, Task, DailyTasks, CalendarItem } from "@/types/daily-task-types"
+import type {
+  Day,
+  Task,
+  DailyTasks,
+  CalendarItem
+} from "@/types/daily-task-types"
 import { EditTaskDialog } from "./edit-task-dialog"
 import { useFilter } from "@/lib/context/filter-context"
 import { useCurrentView } from "@/lib/context/current-view-context"
@@ -92,7 +94,9 @@ export default function DailyPlanner() {
   const { activeFilters } = useFilter()
   const { currentView } = useCurrentView()
   const { updateEvent } = useGoogleCalendar()
-  const [localDailyTasks, setLocalDailyTasks] = useState<Record<string, Day>>({})
+  const [localDailyTasks, setLocalDailyTasks] = useState<Record<string, Day>>(
+    {}
+  )
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragStartDate, setDragStartDate] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -101,8 +105,12 @@ export default function DailyPlanner() {
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   const [newTaskDate, setNewTaskDate] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [isOverCalendarZone, setIsOverCalendarZone] = useState<string | null>(null)
-  const [previewColumnDate, setPreviewColumnDate] = useState<string | null>(null)
+  const [isOverCalendarZone, setIsOverCalendarZone] = useState<string | null>(
+    null
+  )
+  const [previewColumnDate, setPreviewColumnDate] = useState<string | null>(
+    null
+  )
   const [showCalendar, setShowCalendar] = useState<string | null>(null)
   const { selectedDate, setSelectedDate } = useDate()
   const debouncedCalendarZone = useDebounce(isOverCalendarZone, 1000)
@@ -133,13 +141,15 @@ export default function DailyPlanner() {
 
   // Build columns with filters
   const columns = days.map(dateStr => {
-    const doc = localDailyTasks[dateStr] ?? {
-      tasks: [],
-      id: "",
-      date: dateStr,
-      createdAt: "",
-      updatedAt: ""
-    } as Day
+    const doc =
+      localDailyTasks[dateStr] ??
+      ({
+        tasks: [],
+        id: "",
+        date: dateStr,
+        createdAt: "",
+        updatedAt: ""
+      } as Day)
     const filteredTasks =
       activeFilters.length > 0
         ? doc.tasks.filter(task =>
@@ -159,9 +169,7 @@ export default function DailyPlanner() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
-  function findTaskById(
-    id: string
-  ): { date: string; task: Task } | null {
+  function findTaskById(id: string): { date: string; task: Task } | null {
     for (const [date, dailyDoc] of Object.entries(localDailyTasks)) {
       const found = dailyDoc.tasks.find(t => t.id === id)
       if (found) {
@@ -196,11 +204,15 @@ export default function DailyPlanner() {
         calendarItem: {
           start: {
             date: format(new Date(event.startTime), "yyyy-MM-dd"),
-            dateTime: event.startTime,
+            dateTime: event.startTime
           }
         },
         description: event.description,
-        durationMinutes: Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000),
+        durationMinutes: Math.round(
+          (new Date(event.endTime).getTime() -
+            new Date(event.startTime).getTime()) /
+            60000
+        ),
         completed: false,
         tags: [],
         subtasks: [],
@@ -244,7 +256,7 @@ export default function DailyPlanner() {
       const hour = parseInt(hourStr, 10)
 
       // Update the task startTime for preview
-      const updatedTask:Task = {
+      const updatedTask: Task = {
         ...activeTask,
         calendarItem: {
           start: {
@@ -381,10 +393,14 @@ export default function DailyPlanner() {
           const event = activeData.event
           const startDate = new Date(event.startTime)
           const endDate = new Date(event.endTime)
-          const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+          const durationMinutes = Math.round(
+            (endDate.getTime() - startDate.getTime()) / 60000
+          )
 
           const newStartTime = createStartTimeISO(fullDate, hour)
-          const newEndTime = new Date(new Date(newStartTime).getTime() + durationMinutes * 60000).toISOString()
+          const newEndTime = new Date(
+            new Date(newStartTime).getTime() + durationMinutes * 60000
+          ).toISOString()
 
           // Update the event through the context
           await updateEvent(event.id, {
@@ -397,7 +413,9 @@ export default function DailyPlanner() {
         // Handle task drop to calendar
         const dateTime = createStartTimeISO(fullDate, hour)
         var calendarItem: CalendarItem = {
-          gcalEventId: activeTask.calendarItem?.gcalEventId?.replace(/-/g, '') || uuidv4().replace(/-/g, ''),
+          gcalEventId:
+            activeTask.calendarItem?.gcalEventId?.replace(/-/g, "") ||
+            uuidv4().replace(/-/g, ""),
           start: {
             date: fullDate,
             dateTime: dateTime
@@ -407,8 +425,14 @@ export default function DailyPlanner() {
         // Add end time if task already had end time
         if (activeTask.calendarItem?.end) {
           const endDate = new Date(activeTask.calendarItem.end.dateTime!)
-          const durationMinutes = Math.round((endDate.getTime() - new Date(activeTask.calendarItem.start.dateTime!).getTime()) / 60000)
-          const newEndTime = new Date(new Date(dateTime).getTime() + durationMinutes * 60000).toISOString()
+          const durationMinutes = Math.round(
+            (endDate.getTime() -
+              new Date(activeTask.calendarItem.start.dateTime!).getTime()) /
+              60000
+          )
+          const newEndTime = new Date(
+            new Date(dateTime).getTime() + durationMinutes * 60000
+          ).toISOString()
           calendarItem = {
             ...calendarItem,
             end: {
@@ -423,10 +447,16 @@ export default function DailyPlanner() {
           const updated = structuredClone(prev)
 
           // Remove from original date if different
-          if (dragStartDate && dragStartDate !== fullDate && updated[dragStartDate]) {
+          if (
+            dragStartDate &&
+            dragStartDate !== fullDate &&
+            updated[dragStartDate]
+          ) {
             updated[dragStartDate] = {
               ...updated[dragStartDate],
-              tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeTask.id)
+              tasks: updated[dragStartDate].tasks.filter(
+                t => t.id !== activeTask.id
+              )
             }
           }
 
@@ -509,7 +539,9 @@ export default function DailyPlanner() {
         // Calculate the correct insertion index
         let indexToInsert = updated[targetDate].tasks.length
         if (overId !== targetDate) {
-          const overTaskIndex = updated[targetDate].tasks.findIndex(t => t.id === overId)
+          const overTaskIndex = updated[targetDate].tasks.findIndex(
+            t => t.id === overId
+          )
           if (overTaskIndex !== -1) {
             indexToInsert = overTaskIndex
           }
@@ -558,8 +590,10 @@ export default function DailyPlanner() {
       const prevDay = prevLocalDailyTasksRef.current?.[dateStr]
       const prevTaskIds = new Set(prevDay?.tasks?.map(t => t.id) || [])
       const currentTaskIds = new Set(dayData?.tasks?.map(t => t.id) || [])
-      const tasksToUpdate = dayData?.tasks?.filter(t => prevTaskIds.has(t.id)) || []
-      const tasksToAdd = dayData?.tasks?.filter(t => !prevTaskIds.has(t.id)) || []
+      const tasksToUpdate =
+        dayData?.tasks?.filter(t => prevTaskIds.has(t.id)) || []
+      const tasksToAdd =
+        dayData?.tasks?.filter(t => !prevTaskIds.has(t.id)) || []
       const tasksToDelete =
         prevDay?.tasks?.filter(t => !currentTaskIds.has(t.id)) || []
 
@@ -654,7 +688,7 @@ export default function DailyPlanner() {
   }, [addToEndOfDateWindow, addToStartOfDateWindow])
 
   return (
-    <div className="relative size-full">
+    <div className="relative flex h-full flex-col">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -662,7 +696,7 @@ export default function DailyPlanner() {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="relative h-full">
+        <div className="relative flex flex-1 flex-col overflow-hidden">
           <Button
             variant="ghost"
             size="icon"
@@ -685,23 +719,23 @@ export default function DailyPlanner() {
 
           <div
             ref={containerRef}
-            className="flex h-full snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth px-12 scrollbar-hide"
+            className="scrollbar-hide flex flex-1 gap-6 overflow-x-auto scroll-smooth px-12"
             style={{
               scrollPaddingLeft: SCROLL_PADDING,
               scrollPaddingRight: SCROLL_PADDING
             }}
           >
             {columns.map(column => (
-              <div key={column.date} className="flex gap-6">
+              <div key={column.date} className="flex h-full gap-6">
                 <div
                   id={column.date}
-                  className="w-[300px] shrink-0 snap-center"
+                  className="flex w-[300px] shrink-0 snap-center flex-col"
                 >
-                  <div className="mb-4 flex justify-between items-center">
+                  <div className="mb-4 flex shrink-0 items-center justify-between">
                     <div className="space-y-1.5">
                       <h2 className="text-lg font-semibold">
                         {format(new Date(column.date), "EEEE")}
-                        <span className="text-muted-foreground text-sm ml-2">
+                        <span className="text-muted-foreground ml-2 text-sm">
                           {format(new Date(column.date), "MMM d")}
                         </span>
                       </h2>
@@ -720,6 +754,7 @@ export default function DailyPlanner() {
                     {currentView === "board" && showCalendar !== column.date ? (
                       <motion.div
                         key="board"
+                        className="flex-1 overflow-hidden"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
@@ -732,7 +767,9 @@ export default function DailyPlanner() {
                           <TaskColumn
                             id={column.date}
                             isDragging={isDragging}
-                            isOverCalendarZone={isOverCalendarZone === column.date}
+                            isOverCalendarZone={
+                              isOverCalendarZone === column.date
+                            }
                             showCalendarZone={
                               dragStartDate === column.date &&
                               (!activeId ||
@@ -781,12 +818,13 @@ export default function DailyPlanner() {
                                           updatedAt: ""
                                         }
                                       }
-                                      updated[column.date].tasks =
-                                        updated[column.date].tasks.map(t =>
-                                          t.id === updatedTask.id
-                                            ? updatedTask
-                                            : t
-                                        )
+                                      updated[column.date].tasks = updated[
+                                        column.date
+                                      ].tasks.map(t =>
+                                        t.id === updatedTask.id
+                                          ? updatedTask
+                                          : t
+                                      )
                                       return updated
                                     })
                                     await updateTaskAction(
@@ -797,7 +835,10 @@ export default function DailyPlanner() {
                                       }
                                     )
                                   } catch (error) {
-                                    console.error("Failed to update task:", error)
+                                    console.error(
+                                      "Failed to update task:",
+                                      error
+                                    )
                                   }
                                 }}
                               />
@@ -808,6 +849,7 @@ export default function DailyPlanner() {
                     ) : (
                       <motion.div
                         key="calendar"
+                        className="min-h-0 flex-1"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
@@ -851,16 +893,18 @@ export default function DailyPlanner() {
                                       updatedAt: ""
                                     }
                                   }
-                                  updated[column.date].tasks =
-                                    updated[column.date].tasks.map(t =>
-                                      t.id === activeTask.id
-                                        ? updatedTask
-                                        : t
-                                    )
+                                  updated[column.date].tasks = updated[
+                                    column.date
+                                  ].tasks.map(t =>
+                                    t.id === activeTask.id ? updatedTask : t
+                                  )
                                   return updated
                                 })
                               } catch (error) {
-                                console.error("Failed to update task time:", error)
+                                console.error(
+                                  "Failed to update task time:",
+                                  error
+                                )
                               }
                             }
                           }}
@@ -894,10 +938,11 @@ export default function DailyPlanner() {
                                     updatedAt: ""
                                   }
                                 }
-                                updated[column.date].tasks =
-                                  updated[column.date].tasks.map(t =>
-                                    t.id === taskId ? updatedTask : t
-                                  )
+                                updated[column.date].tasks = updated[
+                                  column.date
+                                ].tasks.map(t =>
+                                  t.id === taskId ? updatedTask : t
+                                )
                                 return updated
                               })
                               await updateTaskAction(

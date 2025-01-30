@@ -8,36 +8,44 @@ interface AllDayEventProps {
   id: string
   title: string
   description?: string
-  onEventUpdate?: (id: string, updates: Partial<{ title: string, startTime: string, endTime: string, description: string }>) => void
+  onEventUpdate?: (
+    id: string,
+    updates: Partial<{
+      title: string
+      startTime: string
+      endTime: string
+      description: string
+    }>
+  ) => void
 }
 
-export function AllDayEvent({ 
-  id, 
-  title, 
+export function AllDayEvent({
+  id,
+  title,
   description,
-  onEventUpdate 
+  onEventUpdate
 }: AllDayEventProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   return (
     <>
-      <Badge 
-        variant="secondary" 
-        className="w-full cursor-pointer truncate text-left justify-start hover:bg-accent"
+      <Badge
+        variant="secondary"
+        className="hover:bg-accent w-full cursor-pointer justify-start truncate text-left"
         onClick={() => setIsDialogOpen(true)}
       >
         {title}
       </Badge>
 
       <EditEventDialog
-        event={isDialogOpen ? { id, title,  description } : null}
+        event={isDialogOpen ? { id, title, description } : null}
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        onSave={(updates) => {
+        onSave={updates => {
           onEventUpdate?.(id, updates)
           setIsDialogOpen(false)
         }}
       />
     </>
   )
-} 
+}

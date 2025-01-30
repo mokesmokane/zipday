@@ -1,13 +1,17 @@
 "use client"
 
-import { FunctionCall } from "@/types/function-call-types"
+import {
+  FunctionCall,
+  FunctionCallArgs,
+  FunctionCallName
+} from "@/types/function-call-types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from "@/components/ui/dialog"
 import {
   DropdownMenu,
@@ -19,6 +23,7 @@ import { useState } from "react"
 import { Bot, MoreVertical, ChevronRight, ChevronDown } from "lucide-react"
 import { useRealtime, Transcript } from "@/lib/context/transcription-context"
 import { cn } from "@/lib/utils"
+import { processCall } from "@/lib/function-call-processor"
 
 interface FunctionCallDisplayProps {
   functionCall: FunctionCall
@@ -35,7 +40,7 @@ function JsonViewer({ data, level = 0 }: JsonViewerProps) {
 
   // If the data is a string that looks like JSON, try to parse it
   let parsedData = data
-  if (typeof data === 'string') {
+  if (typeof data === "string") {
     try {
       parsedData = JSON.parse(data)
     } catch {
@@ -44,16 +49,20 @@ function JsonViewer({ data, level = 0 }: JsonViewerProps) {
     }
   }
 
-  if (typeof parsedData !== 'object' || parsedData === null) {
+  if (typeof parsedData !== "object" || parsedData === null) {
     return (
-      <span className={cn(
-        "font-mono",
-        typeof parsedData === 'string' && "text-green-600",
-        typeof parsedData === 'number' && "text-blue-600",
-        typeof parsedData === 'boolean' && "text-purple-600",
-        parsedData === null && "text-gray-500"
-      )}>
-        {typeof parsedData === 'string' ? `"${parsedData}"` : String(parsedData)}
+      <span
+        className={cn(
+          "font-mono",
+          typeof parsedData === "string" && "text-green-600",
+          typeof parsedData === "number" && "text-blue-600",
+          typeof parsedData === "boolean" && "text-purple-600",
+          parsedData === null && "text-gray-500"
+        )}
+      >
+        {typeof parsedData === "string"
+          ? `"${parsedData}"`
+          : String(parsedData)}
       </span>
     )
   }
@@ -69,63 +78,69 @@ function JsonViewer({ data, level = 0 }: JsonViewerProps) {
   const ChevronIcon = isCollapsed ? ChevronRight : ChevronDown
 
   return (
-    <div style={{ marginLeft: level > 0 ? '1.5rem' : 0 }}>
+    <div style={{ marginLeft: level > 0 ? "1.5rem" : 0 }}>
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="group mb-1 flex items-center gap-1 hover:text-blue-500"
       >
         <ChevronIcon className="size-4 transition-transform" />
-        <span className="text-xs text-muted-foreground">
+        <span className="text-muted-foreground text-xs">
           {isArray ? `Array[${items.length}]` : `Object{${items.length}}`}
         </span>
       </button>
 
       {!isCollapsed && (
         <div className="border-l pl-4">
-          {!isArray && (items as [string, unknown][]).map(([key, value]) => (
-            <div key={key} className="group py-1">
-              <div className="flex items-start">
-                <span className="font-medium text-blue-600">{key}</span>
-                <span className="mx-2 text-muted-foreground">:</span>
-                <div className="flex-1">
-                  <JsonViewer data={value} level={level + 1} />
+          {!isArray &&
+            (items as [string, unknown][]).map(([key, value]) => (
+              <div key={key} className="group py-1">
+                <div className="flex items-start">
+                  <span className="font-medium text-blue-600">{key}</span>
+                  <span className="text-muted-foreground mx-2">:</span>
+                  <div className="flex-1">
+                    <JsonViewer data={value} level={level + 1} />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {isArray && items.map((item: unknown, index: number) => (
-            <div key={index} className="group py-1">
-              <div className="flex items-start">
-                <span className="font-medium text-muted-foreground">[{index}]</span>
-                <span className="mx-2 text-muted-foreground">=</span>
-                <div className="flex-1">
-                  <JsonViewer data={item} level={level + 1} />
+            ))}
+          {isArray &&
+            items.map((item: unknown, index: number) => (
+              <div key={index} className="group py-1">
+                <div className="flex items-start">
+                  <span className="text-muted-foreground font-medium">
+                    [{index}]
+                  </span>
+                  <span className="text-muted-foreground mx-2">=</span>
+                  <div className="flex-1">
+                    <JsonViewer data={item} level={level + 1} />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>
   )
 }
 
-export function FunctionCallDisplay({ functionCall, index }: FunctionCallDisplayProps) {
+export function FunctionCallDisplay({
+  functionCall,
+  index
+}: FunctionCallDisplayProps) {
   const [showDialog, setShowDialog] = useState(false)
   const [showMessages, setShowMessages] = useState(false)
   const { messages } = useRealtime()
 
   // Get messages around this function call (2 before and 2 after)
-  const surroundingMessages = messages.slice(
-    Math.max(0, index - 2),
-    Math.min(messages.length, index + 3)
-  ).filter((msg): msg is Transcript => msg instanceof Transcript)
+  const surroundingMessages = messages
+    .slice(Math.max(0, index - 2), Math.min(messages.length, index + 3))
+    .filter((msg): msg is Transcript => msg instanceof Transcript)
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           size="sm"
           onClick={() => setShowDialog(true)}
           className="flex items-center gap-2 self-start rounded-xl bg-purple-100 px-3 py-2 text-sm text-purple-700 hover:bg-purple-200"
@@ -136,8 +151,8 @@ export function FunctionCallDisplay({ functionCall, index }: FunctionCallDisplay
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               className="size-7 opacity-50 hover:opacity-100"
             >
@@ -179,12 +194,43 @@ export function FunctionCallDisplay({ functionCall, index }: FunctionCallDisplay
           </DialogHeader>
           <div className="mt-4">
             <h4 className="mb-4 font-medium">Arguments:</h4>
-            <div className="rounded-lg border bg-card p-4">
+            <div className="bg-card rounded-lg border p-4">
               <JsonViewer data={functionCall.args} />
             </div>
           </div>
+          <ExecuteFunctionButton functionCall={functionCall} />
         </DialogContent>
       </Dialog>
     </div>
   )
-} 
+}
+
+export function ExecuteFunctionButton({
+  functionCall
+}: {
+  functionCall: FunctionCall
+}) {
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  const handleExecute = async () => {
+    setIsProcessing(true)
+    try {
+      console.log("typeof functionCall.args:", typeof functionCall.args)
+      const result = await processCall(
+        functionCall.name as FunctionCallName,
+        functionCall.args as FunctionCallArgs
+      )
+      console.log("Function executed successfully:", result)
+    } catch (error) {
+      console.error("Error executing function:", error)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  return (
+    <Button onClick={handleExecute} disabled={isProcessing}>
+      {isProcessing ? "Processing..." : "Execute Function"}
+    </Button>
+  )
+}
