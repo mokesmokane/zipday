@@ -7,8 +7,8 @@ interface TasksContextResult {
 }
 
 interface IdMappingResult {
-  mapping: Record<string, number>
-  reverseMapping: Record<number, string>
+  mapping: Record<string, string>
+  reverseMapping: Record<string, string>
 }
 
 /**
@@ -18,8 +18,8 @@ interface IdMappingResult {
  * @returns Object containing forward and reverse ID mappings
  */
 export function createIdMapping(tasks: Task[]): IdMappingResult {
-  const reverseMapping: Record<number, string> = {}
-  const mapping: Record<string, number> = {}
+  const reverseMapping: Record<string, string> = {}
+  const mapping: Record<string, string> = {}
 
   // Get the next available number
   const nextNumber = Object.keys(reverseMapping).length + 1
@@ -27,7 +27,7 @@ export function createIdMapping(tasks: Task[]): IdMappingResult {
   // Add new mappings
   tasks.forEach((task, index) => {
     if (!mapping[task.id]) {
-      const shortId = nextNumber + index
+      const shortId = (nextNumber + index).toString()
       mapping[task.id] = shortId
       reverseMapping[shortId] = task.id
     }
@@ -46,7 +46,7 @@ export function createIdMapping(tasks: Task[]): IdMappingResult {
 export function formatTasksContext(
   title: string,
   tasks: Task[],
-  idMapping: Record<string, number>
+  idMapping: Record<string, string>
 ): string {
   if (!tasks.length) return ""
 
@@ -69,13 +69,13 @@ export function formatTasksContext(
         metadata.push(`Time: ${startTime}${endTime ? ` - ${endTime}` : ""}`)
       }
 
-      let taskStr = `  - [${task.completed ? "x" : " "}] #${idMapping[task.id]} ${task.title}`
+      let taskStr = `  - [${task.completed ? "x" : " "}] ${task.title} (TaskID:${idMapping[task.id]} )`
       if (task.description) taskStr += `\n    Description: ${task.description}`
       if (metadata.length) taskStr += `\n    (${metadata.join(" | ")})`
       if (task.subtasks?.length) {
         taskStr += "\n    Subtasks:"
         task.subtasks.forEach(subtask => {
-          taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text}`
+          taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text} (SubtaskID:${idMapping[subtask.id]})`
         })
       }
       return taskStr

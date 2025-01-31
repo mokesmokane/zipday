@@ -24,6 +24,7 @@ import { Bot, MoreVertical, ChevronRight, ChevronDown } from "lucide-react"
 import { useRealtime, Transcript } from "@/lib/context/transcription-context"
 import { cn } from "@/lib/utils"
 import { processCall } from "@/lib/function-call-processor"
+import { useFunctionCall } from "@/lib/context/function-call-context"
 
 interface FunctionCallDisplayProps {
   functionCall: FunctionCall
@@ -210,21 +211,14 @@ export function ExecuteFunctionButton({
 }: {
   functionCall: FunctionCall
 }) {
-  const [isProcessing, setIsProcessing] = useState(false)
+  const { processFunction, isProcessing } = useFunctionCall()
 
   const handleExecute = async () => {
-    setIsProcessing(true)
     try {
-      console.log("typeof functionCall.args:", typeof functionCall.args)
-      const result = await processCall(
-        functionCall.name as FunctionCallName,
-        functionCall.args as FunctionCallArgs
-      )
+      const result = await processFunction(functionCall)
       console.log("Function executed successfully:", result)
     } catch (error) {
       console.error("Error executing function:", error)
-    } finally {
-      setIsProcessing(false)
     }
   }
 

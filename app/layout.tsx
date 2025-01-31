@@ -15,6 +15,7 @@ import "./globals.css"
 import { RootProvider } from "@/components/utilities/root-provider"
 import { getServerUser } from "@/lib/firebaseAdmin"
 import { RealtimeProvider } from "@/lib/context/transcription-context"
+import { FunctionCallProvider } from "@/lib/context/function-call-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -45,6 +46,7 @@ export default async function RootLayout({
                 <RealtimeProvider>
                   <TasksProvider>
                     <BacklogProvider>
+                    <FunctionCallProvider>
                       <TaskActionsProvider>
                         <FilterProvider>
                           <CurrentViewProvider>
@@ -56,6 +58,7 @@ export default async function RootLayout({
                           </CurrentViewProvider>
                         </FilterProvider>
                       </TaskActionsProvider>
+                    </FunctionCallProvider>
                     </BacklogProvider>
                   </TasksProvider>
                 </RealtimeProvider>

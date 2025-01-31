@@ -39,21 +39,44 @@ export interface SetCallbackArgs {
   context: string
 }
 
-export interface MoveTaskArgs {
+export interface MoveTaskArgs{
   task_id: string
   new_date: string
-  new_start_time: string
-  new_end_time: string
+  new_start_time?: string
+  new_end_time?: string
 }
 
-export interface MarkTaskCompletedArgs {
-  task_id: string
+export function createMoveTaskArgs(args: MoveTaskArgs, idMappings: Record<string, string>): MoveTaskArgs {
+  return {
+    ...args,
+    task_id: idMappings[args.task_id]
+  }
+}
+
+export interface MarkTasksCompletedArgs{
+  task_ids: string[]
+}
+
+export function createMarkTasksCompletedArgs(args: MarkTasksCompletedArgs, idMappings: Record<string, string>): MarkTasksCompletedArgs {
+  return {
+    ...args,
+    task_ids: args.task_ids.map(id => idMappings[id])
+  }
 }
 
 export interface MarkSubtaskCompletedArgs {
   task_id: string
   subtask_id: string
 }
+
+export function createMarkSubtaskCompletedArgs(args: MarkSubtaskCompletedArgs, idMappings: Record<string, string>): MarkSubtaskCompletedArgs {
+  return {
+    ...args,
+    task_id: idMappings[args.task_id],
+    subtask_id: idMappings[args.subtask_id]
+  }
+}
+
 
 export interface GetCalendarForDateRangeArgs {
   start_date: string
@@ -77,20 +100,20 @@ export type FunctionCallArgs =
   | CreateTaskArgs
   | SetCallbackArgs
   | MoveTaskArgs
-  | MarkTaskCompletedArgs
+  | MarkTasksCompletedArgs
   | MarkSubtaskCompletedArgs
   | GetCalendarForDateRangeArgs
   | CreateBacklogTaskArgs
 
-export type FunctionCallName =
-  | "updatePlan"
+export type FunctionCallName = 
+  | "update_plan" 
+  | "add_user_notes" 
+  | "move_task" 
   | "create_task"
-  | "move_task"
-  | "mark_task_completed"
+  | "mark_tasks_completed"
   | "mark_subtask_completed"
   | "get_calendar_for_date_range"
   | "set_callback"
-  | "add_user_notes"
   | "create_backlog_task"
 
 export interface FunctionCallDefinition {
@@ -108,19 +131,16 @@ export class FunctionCall {
   name: string
   args: FunctionCallArgs
   executeImmediately: boolean
-  idMappings: Record<string, string>
-
   constructor(
     name: string,
     args: FunctionCallArgs,
-    idMappings: Record<string, string>,
     executeImmediately: boolean = false
   ) {
     this.name = name
     this.args = args
-    this.idMappings = idMappings
     this.executeImmediately = executeImmediately
   }
+
 }
 
 export type FunctionCallRegistry = Record<
@@ -130,7 +150,7 @@ export type FunctionCallRegistry = Record<
 
 export class FunctionCallFactory {
   private readonly _functionCallDefinitions: FunctionCallRegistry = {
-    updatePlan: {
+    update_plan: {
       type: "function",
       name: "update_plan",
       description:
@@ -269,19 +289,23 @@ export class FunctionCallFactory {
       }
     },
 
-    mark_task_completed: {
-      type: "function",
-      name: "mark_task_completed",
+    mark_tasks_completed: {
+      type: "function", 
+      name: "mark_tasks_completed",
       description: "Marks a specified task as completed",
       parameters: {
-        type: "object",
+        type: "object", 
         properties: {
-          task_id: {
-            type: "string",
-            description: "Unique identifier or reference for the task"
+          task_ids: {
+            type: "array",
+            description: "List of task IDs to mark as completed",
+            items: {
+              type: "string",
+              description: "Unique identifier or reference for the task"
+            }
           }
         },
-        required: ["task_id"]
+        required: ["task_ids"]
       }
     },
 
@@ -374,52 +398,22 @@ export class FunctionCallFactory {
   }
 
   createFunctionCall(
-    name: "updatePlan",
-    args: UpdatePlanArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "create_task",
-    args: CreateTaskArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "move_task",
-    args: MoveTaskArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "mark_task_completed",
-    args: MarkTaskCompletedArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "mark_subtask_completed",
-    args: MarkSubtaskCompletedArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "get_calendar_for_date_range",
-    args: GetCalendarForDateRangeArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "set_callback",
-    args: SetCallbackArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-  createFunctionCall(
-    name: "add_user_notes",
-    args: AddUserNotesArgs,
-    idMappings: Record<string, string>
-  ): FunctionCall
-
-  createFunctionCall(
     name: FunctionCallName,
     args: FunctionCallArgs,
-    idMappings: Record<string, string>
+    idMappings: Record<string, string>,
+    immediateExecution: boolean
   ): FunctionCall {
-    return new FunctionCall(name, args, idMappings)
+    // Handle ID mapping based on function name
+    switch (name) {
+      case "move_task":
+        return new FunctionCall(name, createMoveTaskArgs(args as MoveTaskArgs, idMappings), immediateExecution)
+      case "mark_tasks_completed":
+        return new FunctionCall(name, createMarkTasksCompletedArgs(args as MarkTasksCompletedArgs, idMappings), immediateExecution)
+      case "mark_subtask_completed":
+        return new FunctionCall(name, createMarkSubtaskCompletedArgs(args as MarkSubtaskCompletedArgs, idMappings), immediateExecution)
+      default:
+        return new FunctionCall(name, args, immediateExecution)
+    }
   }
 
   getFunctionDefinition(name: FunctionCallName): FunctionCallDefinition {

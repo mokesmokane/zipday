@@ -3,11 +3,12 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react"
 import {
   getDaysByDateRangeAction,
-  getIncompleteTasksAction
+  getIncompleteTasksAction,
+  markTasksCompletedAction
 } from "@/actions/db/tasks-actions"
 import { useDate } from "./date-context"
 import { useAuth } from "./auth-context"
-import { Day, Task } from "@/types/daily-task-types"
+import { CalendarItem, Day, Task } from "@/types/daily-task-types"
 import {
   addTaskAction,
   updateTaskAction,
@@ -37,7 +38,11 @@ interface TasksContextType {
   refreshTasks: () => Promise<void>
   addTask: (date: string, task: Task, insertIndex?: number) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
+  markTasksCompleted: (taskIds: string[]) => Promise<void>
+  moveTask: (taskId: string, newDate: string, newStartTime?: string, newEndTime?: string) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
+  cancelTasks: (taskIds: string[]) => Promise<void>
+
   setIncompleteTimeRange: (range: "week" | "month" | "year" | "all") => void
   setFutureTimeRange: (range: "week" | "month" | "year" | "all") => void
   reorderDayTasks: (date: string, taskIds: string[]) => Promise<void>
@@ -278,6 +283,173 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const moveTask = async (taskId: string, newDate: string, newStartTime?: string, newEndTime?: string) => {
+    const oldDate = taskDayLookup[taskId] || ""
+    const task = dailyTasks[oldDate]?.tasks.find(t => t.id === taskId)
+    var newCalendarItem: CalendarItem | undefined
+    if(newStartTime || newEndTime) {
+      const calendarItem = task?.calendarItem
+      if(calendarItem) {
+        newCalendarItem = {
+          ...calendarItem,
+          start: {
+            dateTime: newStartTime || calendarItem.start.dateTime,
+            timeZone: calendarItem.start.timeZone
+          },
+          end: {
+            dateTime: newEndTime || calendarItem.end?.dateTime
+          }
+        }
+      } else {
+        newCalendarItem = {
+          start: {
+            dateTime: newStartTime || new Date().toISOString(),
+            timeZone: "America/Los_Angeles"
+          },
+          end:newEndTime ?  {
+            dateTime: newEndTime || new Date().toISOString()
+          } : undefined
+        }
+      }
+    } else {
+      newCalendarItem = undefined
+    }
+    
+    if (!task) {
+      console.error("Task not found:", taskId)
+      return
+    }
+
+    const newTask = {
+      ...task,
+      calendarItem: newCalendarItem,
+      updatedAt: new Date().toISOString()
+    }
+
+    setDailyTasks(prev => {
+      const oldDateTasks = prev[oldDate]?.tasks.filter(t => t.id !== taskId) || []
+      const newDateTasks = [...(prev[newDate]?.tasks || []), newTask]
+
+      return {
+        ...prev,
+        [oldDate]: {
+          id: oldDate,
+          date: oldDate,
+          tasks: oldDateTasks,
+          createdAt: prev[oldDate]?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        [newDate]: {
+          id: newDate,
+          date: newDate,
+          tasks: newDateTasks,
+          createdAt: prev[newDate]?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      }
+    })
+
+    try {
+      // First delete from old date
+      const deleteResult = await deleteTaskAction(oldDate, taskId)
+      if (!deleteResult.isSuccess) {
+        throw new Error("Failed to delete task from old date")
+      }
+
+      // Then add to new date
+      const addResult = await addTaskAction(newDate, newTask)
+      if (!addResult.isSuccess) {
+        throw new Error("Failed to add task to new date")
+      }
+    } catch (error) {
+      console.error("Error moving task:", error)
+      await refreshTasks()
+      toast({
+        title: "Error",
+        description: "Failed to move task. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const markTasksCompleted = async (taskIds: string[]) => {
+    const dateIds: Record<string, string[]> = {}
+    for (const taskId of taskIds) {
+      const date = taskDayLookup[taskId]
+      dateIds[date] = [...(dateIds[date] || []), taskId]
+    }
+
+    for (const date of Object.keys(dateIds)) {
+      setDailyTasks(prev => ({
+        ...prev,
+        [date]: {
+          ...prev[date],
+          tasks: prev[date]?.tasks.map(t => {
+            // If this task is being marked complete
+            if (taskIds.includes(t.id)) {
+              // Mark the task and all its subtasks as complete
+              return {
+                ...t,
+                completed: true,
+                subtasks: t.subtasks?.map(st => ({
+                  ...st,
+                  completed: true
+                }))
+              }
+            }
+            return t
+          }) || []
+        }
+      }))
+    }
+
+    try {
+      const result = await markTasksCompletedAction(dateIds)
+      if (!result.isSuccess) {
+        await refreshTasks()
+      }
+    } catch (error) {
+      await refreshTasks()
+    }
+  }
+
+  const cancelTasks = async (taskIds: string[]) => {
+    const dateIds: Record<string, string[]> = {}
+    for (const taskId of taskIds) {
+      const date = taskDayLookup[taskId]
+      dateIds[date] = [...(dateIds[date] || []), taskId]
+    }
+
+    for (const date of Object.keys(dateIds)) {
+      setDailyTasks(prev => ({
+        ...prev,
+        [date]: {
+          ...prev[date],
+          tasks: prev[date]?.tasks.map(t => {
+            // If this task is being marked complete
+            if (taskIds.includes(t.id)) {
+              // Mark the task and all its subtasks as complete
+              return {
+                ...t,
+                cancelled: true
+              }
+            }
+            return t
+          }) || []
+        }
+      }))
+    }
+
+    try {
+      const result = await markTasksCompletedAction(dateIds)
+      if (!result.isSuccess) {
+        await refreshTasks()
+      }
+    } catch (error) {
+      await refreshTasks()
+    }
+  }
+
   const deleteTask = async (taskId: string) => {
     // Optimistic delete
     const date = taskDayLookup[taskId]
@@ -371,7 +543,10 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         refreshTasks,
         addTask,
         updateTask,
+        markTasksCompleted,
         deleteTask,
+        cancelTasks,
+        moveTask,
         reorderDayTasks,
         setIncompleteTimeRange,
         incompleteTimeRange,

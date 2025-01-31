@@ -25,6 +25,7 @@ export interface Task {
   title: string
   description?: string
   completed: boolean
+  cancelled?: boolean
   durationMinutes?: number
   subtasks: Subtask[]
   tags?: string[]

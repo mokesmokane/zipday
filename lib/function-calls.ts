@@ -23,3 +23,15 @@ export const getFunctionDefinition = (
 export const getAllFunctionDefinitions = (): FunctionCallDefinition[] => {
   return functionCallFactory.getAllFunctionDefinitions()
 }
+
+export const createFunctionCall = (
+  name: FunctionCallName,
+  args: FunctionCallArgs,
+  idMappings: Record<string, string>,
+  immediateExecution: boolean 
+): FunctionCall => {
+  console.log("idMappings", idMappings)
+  console.log("args", args)
+  console.log("name", name)
+  return functionCallFactory.createFunctionCall(name, args, idMappings, immediateExecution)
+}

@@ -7,8 +7,8 @@ import {
   Transcript
 } from "../context/transcription-context"
 import { FunctionCall, FunctionCallFactory } from "@/types/function-call-types"
-import { functionCallFactory } from "../function-calls"
-
+import { createFunctionCall, functionCallFactory } from "../function-calls"
+import { useFunctionCall } from "../context/function-call-context"
 interface UseRealtimeAudioProps {
   onDataChannelMessage?: (event: MessageEvent) => void
   context?: string
@@ -24,6 +24,8 @@ interface UseRealtimeAudioReturn {
   userAudioLevels: number[]
   realtimeMode: "debug" | "openai"
   voice: string
+  immediateExecution: boolean
+  setImmediateExecution: (immediateExecution: boolean) => void
   startSession: (context: string) => Promise<void>
   stopSession: () => void
   setRealtimeMode: (mode: "debug" | "openai") => void
@@ -36,9 +38,7 @@ export function useRealtimeAudio(
     context,
     idMappings,
     onResponse
-  }: UseRealtimeAudioProps = {
-    idMappings: {}
-  }
+  }: UseRealtimeAudioProps
 ) {
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
@@ -54,7 +54,8 @@ export function useRealtimeAudio(
   const analyser = useRef<AnalyserNode | null>(null)
   const userAnalyser = useRef<AnalyserNode | null>(null)
   const { addMessage, clearMessages } = useRealtime()
-
+  const { processFunction } = useFunctionCall()
+  const [immediateExecution, setImmediateExecution] = useState(false)
   const calculateLevels = (analyserNode: AnalyserNode) => {
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
     analyserNode.getByteFrequencyData(dataArray)
@@ -316,14 +317,10 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
             } else {
               try {
                 console.log(data)
+                const functionCall = createFunctionCall(data.name, JSON.parse(data.arguments), idMappings, immediateExecution)
+                processFunction(functionCall)
 
-                const newMessage = new FunctionCall(
-                  data.name,
-                  JSON.parse(data.arguments),
-                  idMappings
-                )
-
-                addMessage(newMessage)
+                addMessage(functionCall)
                 if (data.arguments.final) {
                   stopSession()
                 }
@@ -382,6 +379,8 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
     userAudioLevels,
     realtimeMode,
     voice,
+    immediateExecution,
+    setImmediateExecution,
     setVoice,
     setRealtimeMode,
     startSession,

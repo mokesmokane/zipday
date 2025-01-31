@@ -3,7 +3,7 @@
 import {
   FunctionCall,
   FunctionCallName,
-  MarkTaskCompletedArgs,
+  MarkTasksCompletedArgs,
   MarkSubtaskCompletedArgs,
   MoveTaskArgs,
   GetCalendarForDateRangeArgs,
@@ -16,29 +16,27 @@ import {
 } from "@/types/function-call-types"
 import {
   createTask,
-  createBacklogTask,
-  moveTask,
-  markTaskCompleted,
-  markSubtaskCompleted
+  addBacklogTaskAction,
+  markTasksCompletedAction
 } from "@/actions/db/tasks-actions"
 import { getCalendarForDateRange } from "@/actions/db/calendar-actions"
 import { addUserNotes } from "@/actions/db/user-actions"
 import { setCallback } from "@/actions/db/callback-actions"
 import { updatePlan } from "@/actions/db/plan-actions"
-
 // Create a Map to store processing queues
 const processingQueue = new Map<string, Promise<any>>()
 
 // Process a function call
-export async function processCall(
-  functionCallName: FunctionCallName,
-  args: FunctionCallArgs
+export async function processCall<T extends FunctionCallArgs>(
+  functionCallName: string,
+  args: T
 ): Promise<any> {
+
   // Generate a unique ID for this function call
   const callId = `${functionCallName}-${Date.now()}`
 
   // Create a promise for this function call
-  const processingPromise = executeCall(functionCallName, args)
+  const processingPromise = executeCall(functionCallName as FunctionCallName, args)
 
   // Add to queue
   processingQueue.set(callId, processingPromise)
@@ -54,6 +52,7 @@ export async function processCall(
   } catch (error) {
     // Remove from queue on error
     processingQueue.delete(callId)
+    console.error("Error processing call:", error)
     throw error
   }
 }
@@ -64,21 +63,24 @@ async function executeCall(
   args: FunctionCallArgs
 ): Promise<any> {
   try {
+    console.log("Executing function call:", name)
+    console.log("Arguments:", args)
+    console.log("typeof args", typeof args)
     switch (name as FunctionCallName) {
       case "create_task":
         return await createTask(args as CreateTaskArgs)
 
       case "create_backlog_task":
-        return await createBacklogTask(args as CreateBacklogTaskArgs)
+        return
 
       case "move_task":
-        return await moveTask(args as MoveTaskArgs)
+        return
 
-      case "mark_task_completed":
-        return await markTaskCompleted(args as MarkTaskCompletedArgs)
-
+      case "mark_tasks_completed":
+        return 
+        
       case "mark_subtask_completed":
-        return await markSubtaskCompleted(args as MarkSubtaskCompletedArgs)
+        return
 
       case "get_calendar_for_date_range":
         return await getCalendarForDateRange(
@@ -91,7 +93,7 @@ async function executeCall(
       case "add_user_notes":
         return await addUserNotes(args as AddUserNotesArgs)
 
-      case "updatePlan":
+      case "update_plan":
         return await updatePlan(args as UpdatePlanArgs)
 
       default:

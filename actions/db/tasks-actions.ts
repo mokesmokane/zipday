@@ -5,7 +5,7 @@ import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
 import { CalendarItem, Day, Importance, Task, Urgency } from "@/types/daily-task-types"
 import { addDays, format } from "date-fns"
-import { CreateTaskArgs, MoveTaskArgs, MarkTaskCompletedArgs, MarkSubtaskCompletedArgs, CreateBacklogTaskArgs } from "@/types/function-call-types"
+import { CreateTaskArgs, MoveTaskArgs, MarkTasksCompletedArgs, MarkSubtaskCompletedArgs, CreateBacklogTaskArgs } from "@/types/function-call-types"
 
 const db = firestore()
 
@@ -124,9 +124,20 @@ export async function addTaskAction(
     console.log("Doc snap:", docSnap)
 
     let tasks: Task[] = []
+    let day: Day | undefined = undefined
     if (docSnap.exists) {
       const dailyData = docSnap.data() as { tasks: Task[] }
       tasks = dailyData.tasks || []
+      day = docSnap.data() as Day
+    } else {
+      console.log("Daily doc not found")
+      day = {
+        id: dateDoc,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        date: dateDoc,
+        tasks: []
+      }
     }
     console.log("Tasks:", tasks)
     // Add task to the end of the array to maintain order
@@ -136,7 +147,7 @@ export async function addTaskAction(
       tasks.push(task)
     }
     console.log("Tasks after adding:", tasks)
-    const day = docSnap.data() as Day
+
     day.tasks = tasks
     await docRef.set({ tasks }, { merge: true })
     console.log("Tasks after setting:", tasks)
@@ -208,6 +219,47 @@ export async function updateTaskAction(
   } catch (error) {
     console.error("Error updating task:", error)
     return { isSuccess: false, message: "Failed to update task" }
+  }
+}
+
+
+export async function markTasksCompletedAction(dateIds: Record<string, string[]>):  Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    for (const date of Object.keys(dateIds)) { const docRef = db
+      .collection("userDays")
+      .doc(userId)
+      .collection("dailyTasks")
+      .doc(date)
+      
+      const docSnap = await docRef.get()
+      if (!docSnap.exists) {
+        return { isSuccess: false, message: "Daily doc not found" }
+      }
+      const day = docSnap.data() as Day
+      const tasks = day.tasks || []
+
+      const taskIds = dateIds[date]
+      for (const taskId of taskIds) {
+        const task = tasks.find((t: Task) => t.id === taskId)
+        if (task) {
+          task.completed = true
+          await docRef.update({ tasks })
+        }
+      }
+    }
+
+    return {
+      isSuccess: true,
+      message: "Task marked as completed",
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error marking task as completed:", error)
+    return {
+      isSuccess: false,
+      message: "Failed to mark task as completed"
+    }
   }
 }
 
@@ -705,131 +757,3 @@ export async function createTask(args: CreateTaskArgs): Promise<ActionState<void
   }
 }
 
-export async function createBacklogTask(args: CreateBacklogTaskArgs): Promise<ActionState<void>> {
-  try {
-    const { title, description, subtasks, duration_minutes, urgency, importance } = args
-    
-    // Create task document
-    const taskRef = db.collection("tasks").doc()
-    await taskRef.set({
-      title,
-      description,
-      subtasks,
-      duration_minutes,
-      urgency,
-      importance,
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    })
-
-    return {
-      isSuccess: true,
-      message: "Task created successfully",
-      data: undefined
-    }
-  } catch (error) {
-    console.error("Error creating task:", error)
-    return {
-      isSuccess: false,
-      message: "Failed to create task"
-    }
-  }
-}
-
-export async function moveTask(args: MoveTaskArgs): Promise<ActionState<void>> {
-  try {
-    const { task_id, new_date, new_start_time, new_end_time } = args
-    
-    // Update task document
-    const taskRef = db.collection("tasks").doc(task_id)
-    await taskRef.update({
-      due_date: new_date,
-      start_time: new_start_time,
-      end_time: new_end_time,
-      updatedAt: new Date()
-    })
-
-    return {
-      isSuccess: true,
-      message: "Task moved successfully",
-      data: undefined
-    }
-  } catch (error) {
-    console.error("Error moving task:", error)
-    return {
-      isSuccess: false,
-      message: "Failed to move task"
-    }
-  }
-}
-
-export async function markTaskCompleted(args: MarkTaskCompletedArgs): Promise<ActionState<void>> {
-  try {
-    const { task_id } = args
-    
-    // Update task document
-    const taskRef = db.collection("tasks").doc(task_id)
-    await taskRef.update({
-      completed: true,
-      updatedAt: new Date()
-    })
-
-    return {
-      isSuccess: true,
-      message: "Task marked as completed",
-      data: undefined
-    }
-  } catch (error) {
-    console.error("Error marking task as completed:", error)
-    return {
-      isSuccess: false,
-      message: "Failed to mark task as completed"
-    }
-  }
-}
-
-export async function markSubtaskCompleted(args: MarkSubtaskCompletedArgs): Promise<ActionState<void>> {
-  try {
-    const { task_id, subtask_id } = args
-    
-    // Get task document
-    const taskRef = db.collection("tasks").doc(task_id)
-    const taskDoc = await taskRef.get()
-    const taskData = taskDoc.data()
-
-    if (!taskData) {
-      return {
-        isSuccess: false,
-        message: "Task not found"
-      }
-    }
-
-    // Update subtask completion status
-    const subtasks = taskData.subtasks || []
-    const updatedSubtasks = subtasks.map((subtask: any) => {
-      if (subtask.id === subtask_id) {
-        return { ...subtask, completed: true }
-      }
-      return subtask
-    })
-
-    // Update task document
-    await taskRef.update({
-      subtasks: updatedSubtasks,
-      updatedAt: new Date()
-    })
-
-    return {
-      isSuccess: true,
-      message: "Subtask marked as completed",
-      data: undefined
-    }
-  } catch (error) {
-    console.error("Error marking subtask as completed:", error)
-    return {
-      isSuccess: false,
-      message: "Failed to mark subtask as completed"
-    }
-  }
-}

@@ -15,7 +15,7 @@ import {
 
 interface AiContextType {
   context: string
-  idMappings: Record<number, string>
+  idMappings: Record<string, string>
 }
 
 const AiContext = createContext<AiContextType | undefined>(undefined)
