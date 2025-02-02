@@ -16,8 +16,6 @@ import {
   reorderDayTasksAction
 } from "@/actions/db/tasks-actions"
 import { toast } from "@/components/ui/use-toast"
-import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
-import { useGoogleCalendar } from "./google-calendar-context"
 import {
   getIncompleteStartDateStr,
   getFutureEndDateStr
@@ -46,6 +44,7 @@ interface TasksContextType {
   setIncompleteTimeRange: (range: "week" | "month" | "year" | "all") => void
   setFutureTimeRange: (range: "week" | "month" | "year" | "all") => void
   reorderDayTasks: (date: string, taskIds: string[]) => Promise<void>
+  reorderTask: (date: string, taskId: string, newIndex: number) => Promise<void>
 }
 
 const TasksContext = createContext<TasksContextType | undefined>(undefined)
@@ -287,7 +286,9 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     const oldDate = taskDayLookup[taskId] || ""
     const task = dailyTasks[oldDate]?.tasks.find(t => t.id === taskId)
     var newCalendarItem: CalendarItem | undefined
-    if(newStartTime || newEndTime) {
+    newStartTime = `${newDate}T${newStartTime}:00Z`
+    newEndTime = `${newDate}T${newEndTime}:00Z`
+    if(newEndTime) {
       const calendarItem = task?.calendarItem
       if(calendarItem) {
         newCalendarItem = {
@@ -480,9 +481,49 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       await refreshTasks()
     }
   }
+  const reorderTask = async (date: string, taskId: string, newIndex: number) => {
+    // Calculate reordered tasks first so we can use it for both state update and API call
+    const currentTasks = dailyTasks[date]?.tasks || []
+    const taskToMove = currentTasks.find(t => t.id === taskId)
+    
+    if (!taskToMove) return
+    
+    // Remove task from current position
+    const tasksWithoutMoved = currentTasks.filter(t => t.id !== taskId)
+    
+    // Insert task at new position
+    const reorderedTasks = [
+      ...tasksWithoutMoved.slice(0, newIndex),
+      taskToMove,
+      ...tasksWithoutMoved.slice(newIndex)
+    ]
 
+    // Update state
+    setDailyTasks(prev => ({
+      ...prev,
+      [date]: {
+        id: prev[date]?.id || crypto.randomUUID(),
+        date,
+        tasks: reorderedTasks,
+        createdAt: prev[date]?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    }))
+
+    try {
+      // Use the reorderedTasks we calculated above
+      const newTaskIds = reorderedTasks.map(t => t.id)
+      const result = await reorderDayTasksAction(date, newTaskIds)
+      if (!result.isSuccess) {
+        // Revert on failure
+        await refreshTasks()
+      }
+    } catch (error) {
+      await refreshTasks()
+    }
+  }
   const reorderDayTasks = async (date: string, taskIds: string[]) => {
-    // Optimistic reorder
+    //Optimistic reorder
     setDailyTasks(prev => {
       const currentTasks = prev[date]?.tasks || []
       const reorderedTasks = taskIds
@@ -551,7 +592,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         setIncompleteTimeRange,
         incompleteTimeRange,
         setFutureTimeRange,
-        futureTimeRange
+        futureTimeRange,
+        reorderTask
       }}
     >
       {children}

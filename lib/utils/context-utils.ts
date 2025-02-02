@@ -59,6 +59,7 @@ export function formatTasksContext(
         metadata.push(`Duration: ${task.durationMinutes}m`)
       if (task.tags?.length) metadata.push(`Tags: ${task.tags.join(", ")}`)
       if (task.calendarItem?.start?.dateTime) {
+        console.log("task.calendarItem.start.dateTime", task.calendarItem.start.dateTime)
         const startTime = format(
           parseISO(task.calendarItem.start.dateTime),
           "h:mm a"

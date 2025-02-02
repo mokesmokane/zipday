@@ -89,7 +89,7 @@ export default function DailyPlanner() {
     isLoading: isLoadingDates,
     days
   } = useDate()
-  const { dailyTasks, isLoading: isLoadingTasks } = useTasks()
+  const { dailyTasks, isLoading: isLoadingTasks, reorderTask } = useTasks()
   const { setAvailableTags } = useFilter()
   const { activeFilters } = useFilter()
   const { currentView } = useCurrentView()
@@ -226,6 +226,8 @@ export default function DailyPlanner() {
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event
+    console.log("active", active)
+    console.log("over", over)
     if (!over || !activeTask || !dragStartDate) return
 
     const activeId = active.id as string
@@ -365,6 +367,208 @@ export default function DailyPlanner() {
     await deleteTaskAction(date, taskId)
   }
 
+  async function handleCalendarEventDrop(
+    fullDate: string,
+    hour: number,
+    event: { id: string; startTime: string; endTime: string }
+  ) {
+    const startDate = new Date(event.startTime)
+    const endDate = new Date(event.endTime)
+    const durationMinutes = Math.round(
+      (endDate.getTime() - startDate.getTime()) / 60000
+    )
+
+    const newStartTime = createStartTimeISO(fullDate, hour)
+    const newEndTime = new Date(
+      new Date(newStartTime).getTime() + durationMinutes * 60000
+    ).toISOString()
+
+    await updateEvent(event.id, {
+      startTime: newStartTime,
+      endTime: newEndTime
+    })
+  }
+
+  async function handleTaskToCalendarDrop(
+    fullDate: string,
+    hour: number,
+    activeTask: Task,
+    dragStartDate: string
+  ) {
+    const dateTime = createStartTimeISO(fullDate, hour)
+    let calendarItem: CalendarItem = {
+      gcalEventId:
+        activeTask.calendarItem?.gcalEventId?.replace(/-/g, "") ||
+        uuidv4().replace(/-/g, ""),
+      start: {
+        date: fullDate,
+        dateTime: dateTime
+      }
+    }
+
+    if (activeTask.calendarItem?.end) {
+      const endDate = new Date(activeTask.calendarItem.end.dateTime!)
+      const durationMinutes = Math.round(
+        (endDate.getTime() -
+          new Date(activeTask.calendarItem.start.dateTime!).getTime()) /
+          60000
+      )
+      const newEndTime = new Date(
+        new Date(dateTime).getTime() + durationMinutes * 60000
+      ).toISOString()
+      calendarItem = {
+        ...calendarItem,
+        end: {
+          date: fullDate,
+          dateTime: newEndTime
+        }
+      }
+    }
+
+    // Update local state first
+    setLocalDailyTasks(prev => {
+      const updated = structuredClone(prev)
+
+      // Remove from original date if different
+      if (dragStartDate && dragStartDate !== fullDate && updated[dragStartDate]) {
+        updated[dragStartDate] = {
+          ...updated[dragStartDate],
+          tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeTask.id)
+        }
+      }
+
+      // Add/update in new date
+      if (!updated[fullDate]) {
+        updated[fullDate] = {
+          tasks: [],
+          date: fullDate,
+          id: "",
+          createdAt: "",
+          updatedAt: ""
+        }
+      }
+
+      const updatedTask = {
+        ...activeTask,
+        calendarItem
+      }
+
+      const existingTaskIndex = updated[fullDate].tasks.findIndex(
+        t => t.id === activeTask.id
+      )
+      if (existingTaskIndex !== -1) {
+        updated[fullDate].tasks[existingTaskIndex] = updatedTask
+      } else {
+        updated[fullDate].tasks = [...updated[fullDate].tasks, updatedTask]
+      }
+
+      return updated
+    })
+
+    // Update task and calendar separately
+    if (dragStartDate === fullDate) {
+      // Same day - update task and calendar
+      await updateTaskAction(fullDate, activeTask.id, activeTask)
+      await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
+    } else {
+      // Different day - delete from old, add to new, and update calendar
+      await deleteTaskAction(dragStartDate, activeTask.id)
+      await addTaskAction(fullDate, {
+        ...activeTask,
+        calendarItem
+      })
+      await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
+    }
+  }
+
+  async function handleColumnDrop(
+    overId: string,
+    columns: Array<{ date: string; tasks: Task[] }>,
+    activeTask: Task,
+    dragStartDate: string
+  ) {
+    const targetDate = getTargetDate(overId, columns)
+    if (!targetDate) {
+      throw new Error("Could not find target date")
+    }
+
+    // If dropping in same column and same position, no need to update
+    if (dragStartDate === targetDate) {
+      const currentTasks = localDailyTasks[targetDate].tasks
+      const currentIndex = currentTasks.findIndex(t => t.id === activeTask.id)
+      const overIndex = currentTasks.findIndex(t => t.id === overId)
+      
+      if (currentIndex === overIndex) {
+        return // Task was dropped in its original position
+      }
+      console.log("reordering task", targetDate, activeTask.id, overIndex)
+      reorderTask(targetDate, activeTask.id, overIndex)
+      return
+    }
+
+    // Update local state first
+    setLocalDailyTasks(prev => {
+      const updated = structuredClone(prev)
+
+      // Remove from original date
+      if (dragStartDate && updated[dragStartDate]) {
+        updated[dragStartDate] = {
+          ...updated[dragStartDate],
+          tasks: updated[dragStartDate].tasks.filter(t => t.id !== activeTask.id)
+        }
+      }
+
+      // Add to new date
+      if (!updated[targetDate]) {
+        updated[targetDate] = {
+          tasks: [],
+          date: targetDate,
+          id: "",
+          createdAt: "",
+          updatedAt: ""
+        }
+      }
+
+      // Calculate the correct insertion index
+      let indexToInsert = updated[targetDate].tasks.length
+      if (overId !== targetDate) {
+        const overTaskIndex = updated[targetDate].tasks.findIndex(
+          t => t.id === overId
+        )
+        if (overTaskIndex !== -1) {
+          indexToInsert = overTaskIndex
+        }
+      }
+
+      // Remove the task from its current position if it exists
+      const existingTaskIndex = updated[targetDate].tasks.findIndex(
+        t => t.id === activeTask.id
+      )
+      if (existingTaskIndex !== -1) {
+        updated[targetDate].tasks.splice(existingTaskIndex, 1)
+        // Adjust insertion index if needed
+        if (existingTaskIndex < indexToInsert) {
+          indexToInsert--
+        }
+      }
+
+      // Insert the task at the correct position
+      updated[targetDate].tasks.splice(indexToInsert, 0, activeTask)
+
+      return updated
+    })
+
+    // Then update Firestore
+    if (dragStartDate === targetDate) {
+      await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
+    } else {
+      await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
+      if (localDailyTasks[dragStartDate]) {
+        await saveDayChangesToFirestore(dragStartDate, localDailyTasks[dragStartDate])
+      }
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setPreviewColumnDate(null)
@@ -378,11 +582,10 @@ export default function DailyPlanner() {
       return
     }
 
-    const overId = over.id.toString()
-    const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
-
     try {
-      // Handle calendar hour drop
+      const overId = over.id.toString()
+      const isOverCalendarHour = overId.match(/calendar-(.+)-hour-(\d+)/)
+
       if (isOverCalendarHour) {
         const [, fullDate, hourStr] = isOverCalendarHour
         const hour = parseInt(hourStr, 10)
@@ -390,193 +593,17 @@ export default function DailyPlanner() {
         // If dragging a calendar event
         const activeData = active.data.current
         if (activeData?.type === "calendar-event") {
-          const event = activeData.event
-          const startDate = new Date(event.startTime)
-          const endDate = new Date(event.endTime)
-          const durationMinutes = Math.round(
-            (endDate.getTime() - startDate.getTime()) / 60000
-          )
-
-          const newStartTime = createStartTimeISO(fullDate, hour)
-          const newEndTime = new Date(
-            new Date(newStartTime).getTime() + durationMinutes * 60000
-          ).toISOString()
-
-          // Update the event through the context
-          await updateEvent(event.id, {
-            startTime: newStartTime,
-            endTime: newEndTime
-          })
+          await handleCalendarEventDrop(fullDate, hour, activeData.event)
           return
         }
 
         // Handle task drop to calendar
-        const dateTime = createStartTimeISO(fullDate, hour)
-        var calendarItem: CalendarItem = {
-          gcalEventId:
-            activeTask.calendarItem?.gcalEventId?.replace(/-/g, "") ||
-            uuidv4().replace(/-/g, ""),
-          start: {
-            date: fullDate,
-            dateTime: dateTime
-          }
-        }
-
-        // Add end time if task already had end time
-        if (activeTask.calendarItem?.end) {
-          const endDate = new Date(activeTask.calendarItem.end.dateTime!)
-          const durationMinutes = Math.round(
-            (endDate.getTime() -
-              new Date(activeTask.calendarItem.start.dateTime!).getTime()) /
-              60000
-          )
-          const newEndTime = new Date(
-            new Date(dateTime).getTime() + durationMinutes * 60000
-          ).toISOString()
-          calendarItem = {
-            ...calendarItem,
-            end: {
-              date: fullDate,
-              dateTime: newEndTime
-            }
-          }
-        }
-
-        // Update local state first
-        setLocalDailyTasks(prev => {
-          const updated = structuredClone(prev)
-
-          // Remove from original date if different
-          if (
-            dragStartDate &&
-            dragStartDate !== fullDate &&
-            updated[dragStartDate]
-          ) {
-            updated[dragStartDate] = {
-              ...updated[dragStartDate],
-              tasks: updated[dragStartDate].tasks.filter(
-                t => t.id !== activeTask.id
-              )
-            }
-          }
-
-          // Add/update in new date
-          if (!updated[fullDate]) {
-            updated[fullDate] = {
-              tasks: [],
-              date: fullDate,
-              id: "",
-              createdAt: "",
-              updatedAt: ""
-            }
-          }
-
-          const updatedTask = {
-            ...activeTask,
-            calendarItem
-          }
-
-          const existingTaskIndex = updated[fullDate].tasks.findIndex(
-            t => t.id === activeTask.id
-          )
-          if (existingTaskIndex !== -1) {
-            updated[fullDate].tasks[existingTaskIndex] = updatedTask
-          } else {
-            updated[fullDate].tasks = [...updated[fullDate].tasks, updatedTask]
-          }
-
-          return updated
-        })
-
-        // Update task and calendar separately
-        if (dragStartDate === fullDate) {
-          // Same day - update task and calendar
-          await updateTaskAction(fullDate, activeTask.id, activeTask)
-          await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
-        } else {
-          // Different day - delete from old, add to new, and update calendar
-          await deleteTaskAction(dragStartDate, activeTask.id)
-          await addTaskAction(fullDate, {
-            ...activeTask,
-            calendarItem
-          })
-          await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
-        }
+        await handleTaskToCalendarDrop(fullDate, hour, activeTask, dragStartDate)
         return
       }
 
-      // Handle normal column drops (existing code)
-      const targetDate = getTargetDate(overId, columns)
-      if (!targetDate) {
-        throw new Error("Could not find target date")
-      }
-
-      // Update local state first
-      setLocalDailyTasks(prev => {
-        const updated = structuredClone(prev)
-
-        // Remove from original date
-        if (dragStartDate && updated[dragStartDate]) {
-          updated[dragStartDate] = {
-            ...updated[dragStartDate],
-            tasks: updated[dragStartDate].tasks.filter(
-              t => t.id !== activeTask.id
-            )
-          }
-        }
-
-        // Add to new date
-        if (!updated[targetDate]) {
-          updated[targetDate] = {
-            tasks: [],
-            date: targetDate,
-            id: "",
-            createdAt: "",
-            updatedAt: ""
-          }
-        }
-
-        // Calculate the correct insertion index
-        let indexToInsert = updated[targetDate].tasks.length
-        if (overId !== targetDate) {
-          const overTaskIndex = updated[targetDate].tasks.findIndex(
-            t => t.id === overId
-          )
-          if (overTaskIndex !== -1) {
-            indexToInsert = overTaskIndex
-          }
-        }
-
-        // Remove the task from its current position if it exists
-        const existingTaskIndex = updated[targetDate].tasks.findIndex(
-          t => t.id === activeTask.id
-        )
-        if (existingTaskIndex !== -1) {
-          updated[targetDate].tasks.splice(existingTaskIndex, 1)
-          // Adjust insertion index if needed
-          if (existingTaskIndex < indexToInsert) {
-            indexToInsert--
-          }
-        }
-
-        // Insert the task at the correct position
-        updated[targetDate].tasks.splice(indexToInsert, 0, activeTask)
-
-        return updated
-      })
-
-      // Then update Firestore
-      if (dragStartDate === targetDate) {
-        await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
-      } else {
-        await saveDayChangesToFirestore(targetDate, localDailyTasks[targetDate])
-        if (localDailyTasks[dragStartDate]) {
-          await saveDayChangesToFirestore(
-            dragStartDate,
-            localDailyTasks[dragStartDate]
-          )
-        }
-      }
+      // Handle normal column drops
+      await handleColumnDrop(overId, columns, activeTask, dragStartDate)
     } catch (error) {
       console.error("Failed to save changes:", error)
       if (prevLocalDailyTasksRef.current) {
@@ -691,7 +718,6 @@ export default function DailyPlanner() {
     <div className="relative flex h-full flex-col">
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -726,9 +752,12 @@ export default function DailyPlanner() {
             }}
           >
             {columns.map(column => (
-              <div key={column.date} className="flex h-full gap-6">
-                <div
+              <div
                   id={column.date}
+                key={column.date}
+                className="flex h-full gap-6"
+              >
+                <div
                   className="flex w-[300px] shrink-0 snap-center flex-col"
                 >
                   <div className="mb-4 flex shrink-0 items-center justify-between">
@@ -761,6 +790,7 @@ export default function DailyPlanner() {
                         transition={{ duration: 0.2 }}
                       >
                         <SortableContext
+                          id={`${column.id}-sortable`}
                           items={column.tasks.map(t => t.id)}
                           strategy={verticalListSortingStrategy}
                         >

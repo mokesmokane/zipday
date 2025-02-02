@@ -8,6 +8,7 @@ import { ChatForm } from "../ai-chat/chat"
 import { SidebarCalendar } from "./calendar"
 import Link from "next/link"
 import { ChevronLeft, KanbanSquare, LayoutDashboard, Zap } from "lucide-react"
+import { AgentStatusButton } from "@/components/agent/agent-status-button"
 
 export function Sidebar() {
   const { isExpanded, toggleSidebar } = useSidebar()
@@ -20,9 +21,12 @@ export function Sidebar() {
     >
       <div className="flex items-center justify-between p-2">
         {isExpanded ? (
-          <Link href="/" className="text-xl font-bold hover:opacity-80">
-            ZipDay
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/" className="text-xl font-bold hover:opacity-80">
+              ZipDay
+            </Link>
+            <AgentStatusButton />
+          </div>
         ) : (
           <Button
             variant="ghost"

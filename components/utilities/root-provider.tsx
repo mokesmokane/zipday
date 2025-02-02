@@ -3,6 +3,7 @@
 import { AuthProvider } from "@/lib/context/auth-context"
 import { SidebarProvider } from "@/lib/context/sidebar-context"
 import { SubscriptionProvider } from "@/lib/context/subscription-context"
+import { AgentProvider } from "@/lib/context/agent-context"
 import { Providers } from "./providers"
 import { PostHogUserIdentify } from "./posthog/posthog-user-identity"
 import { PostHogPageview } from "./posthog/posthog-pageview"
@@ -28,7 +29,9 @@ export function RootProvider({ children, serverUser }: RootProviderProps) {
           <PostHogPageview />
 
           <SubscriptionProvider>
-            <SidebarProvider>{children}</SidebarProvider>
+            <SidebarProvider>
+              <AgentProvider>{children}</AgentProvider>
+            </SidebarProvider>
           </SubscriptionProvider>
 
           <Toaster />

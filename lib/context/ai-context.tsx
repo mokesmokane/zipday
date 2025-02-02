@@ -1,11 +1,11 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import { useDate } from "./date-context"
 import { useTasks } from "./tasks-context"
 import { useBacklog } from "./backlog-context"
 import { useGoogleCalendar } from "./google-calendar-context"
-import { Task } from "@/types/daily-task-types"
 import { format, subDays, parseISO, isWeekend } from "date-fns"
 import {
   createIdMapping,
@@ -13,20 +13,31 @@ import {
   formatCalendarEvents
 } from "@/lib/utils/context-utils"
 
+export enum ContextType {
+  CALENDAR = "CALENDAR",
+  DAILY_PLANNER = "DAILY_PLANNER",
+  TASK_BOARD = "TASK_BOARD"
+}
+
 interface AiContextType {
-  context: string
+  name: ContextType
+  text: string
   idMappings: Record<string, string>
+  setContextType: (type: ContextType) => void
 }
 
 const AiContext = createContext<AiContextType | undefined>(undefined)
 
 export function AiProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const { selectedDate } = useDate()
   const { dailyTasks, incompleteTasks } = useTasks()
   const { backlogTasks } = useBacklog()
   const { events } = useGoogleCalendar()
-  const [contextData, setContextData] = useState<AiContextType>({
-    context: "",
+  const [manualContextType, setManualContextType] = useState<ContextType | null>(null)
+  const [contextData, setContextData] = useState<Omit<AiContextType, 'setContextType'>>({
+    name: ContextType.TASK_BOARD,
+    text: "",
     idMappings: {}
   })
 
@@ -36,6 +47,20 @@ export function AiProvider({ children }: { children: React.ReactNode }) {
       date = subDays(date, 1)
     }
     return date
+  }
+
+  // Determine context type based on pathname or manual override
+  const getContextType = (pathname: string | null) => {
+    if (manualContextType !== null) {
+      return manualContextType
+    }
+
+    if (pathname?.includes("/dashboard/calendar")) {
+      return ContextType.CALENDAR
+    } else if (pathname?.includes("/dashboard/todo")) {
+      return ContextType.DAILY_PLANNER
+    }
+    return ContextType.TASK_BOARD
   }
 
   useEffect(() => {
@@ -64,59 +89,113 @@ export function AiProvider({ children }: { children: React.ReactNode }) {
       dailyTasks[lastBusinessDay]?.tasks.filter(t => !t.completed) || []
 
     // Format all task sections and collect their ID mappings
-    let nextIndex = 1
+    const allTasks = Object.values(dailyTasks).flatMap(day => day.tasks)
     const { mapping, reverseMapping } = createIdMapping([
-      ...scheduledTasks,
-      ...unscheduledTasks,
-      ...lastBusinessDayTasks,
+      ...allTasks,
       ...backlogTasks
     ])
-    const scheduledTasksContext = formatTasksContext(
-      "Today's Scheduled Tasks",
-      scheduledTasks,
-      mapping
-    )
-    nextIndex += scheduledTasks.length
 
-    const unscheduledTasksContext = formatTasksContext(
-      "Today's Unscheduled Tasks",
-      unscheduledTasks,
-      mapping
-    )
-    nextIndex += unscheduledTasks.length
+    let contextSections: string[] = []
 
-    const lastBusinessDayTasksContext = formatTasksContext(
-      "Incomplete Tasks from Last Business Day",
-      lastBusinessDayTasks,
-      mapping
-    )
-    nextIndex += lastBusinessDayTasks.length
+    const contextType = getContextType(pathname)
 
-    const backlogTasksContext = formatTasksContext(
-      "Backlog Tasks",
-      backlogTasks,
-      mapping
-    )
+    // Build context sections based on context type
+    switch (contextType) {
+      case ContextType.CALENDAR:
+        contextSections = [
+          formatCalendarEvents(todaysEvents),
+          formatTasksContext(
+            "Today's Scheduled Tasks",
+            scheduledTasks,
+            mapping
+          )
+        ]
+        break
+      
+      case ContextType.DAILY_PLANNER:
+        // Add calendar events first
+        contextSections.push(formatCalendarEvents(todaysEvents))
 
-    // Combine all context
+        // Add each date's tasks
+        Object.entries(dailyTasks)
+          .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+          .forEach(([dateStr, day]) => {
+            if (!day?.tasks?.length) return
+
+            const dateScheduledTasks = day.tasks.filter(
+              task => task.calendarItem?.start?.dateTime
+            )
+            const dateUnscheduledTasks = day.tasks.filter(
+              task => !task.calendarItem?.start?.dateTime
+            )
+
+            const dayTitle = dateStr === today 
+              ? `Tasks for ${format(new Date(dateStr), "EEEE, MMMM d")} [Today]`
+              : `Tasks for ${format(new Date(dateStr), "EEEE, MMMM d")}`
+
+            const dayTasks = [
+              ...dateScheduledTasks.map(task => ({
+                ...task,
+                title: `${task.title} (Scheduled for ${format(new Date(task.calendarItem?.start?.dateTime || ''), "h:mm a")})`
+              })),
+              ...dateUnscheduledTasks.map(task => ({
+                ...task,
+                title: `${task.title} (Unscheduled)`
+              }))
+            ]
+
+            contextSections.push(formatTasksContext(dayTitle, dayTasks, mapping))
+          })
+        break
+      
+      case ContextType.TASK_BOARD:
+      default:
+        contextSections = [
+          formatCalendarEvents(todaysEvents),
+          formatTasksContext(
+            "Today's Scheduled Tasks",
+            scheduledTasks,
+            mapping
+          ),
+          formatTasksContext(
+            "Today's Unscheduled Tasks",
+            unscheduledTasks,
+            mapping
+          ),
+          formatTasksContext(
+            "Incomplete Tasks from Last Business Day",
+            lastBusinessDayTasks,
+            mapping
+          ),
+          formatTasksContext(
+            "Backlog Tasks",
+            backlogTasks,
+            mapping
+          )
+        ]
+        break
+    }
+
+    // Combine all context sections
     const context = `
 Current Context:
 
-${formatCalendarEvents(todaysEvents)}
-
-${scheduledTasksContext}
-
-${unscheduledTasksContext}
-
-${lastBusinessDayTasksContext}
-
-${backlogTasksContext}
+${contextSections.join("\n\n")}
 `.trim()
 
-    setContextData({ context, idMappings: reverseMapping })
-  }, [selectedDate, dailyTasks, backlogTasks, events])
+    setContextData({ 
+      name: contextType,
+      text: context, 
+      idMappings: reverseMapping 
+    })
+  }, [selectedDate, dailyTasks, backlogTasks, events, pathname, manualContextType])
 
-  return <AiContext.Provider value={contextData}>{children}</AiContext.Provider>
+  const contextValue: AiContextType = {
+    ...contextData,
+    setContextType: setManualContextType
+  }
+
+  return <AiContext.Provider value={contextValue}>{children}</AiContext.Provider>
 }
 
 export function useAiContext() {

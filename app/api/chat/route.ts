@@ -3,7 +3,7 @@ import { openai } from "@ai-sdk/openai"
 
 export async function POST(req: Request) {
   const { messages }: { messages: CoreMessage[] } = await req.json()
-
+  console.log("messages", messages)
   const result = streamText({
     model: openai("gpt-4o-mini"),
     system: "You are a helpful assistant.",

@@ -16,6 +16,8 @@ import { RootProvider } from "@/components/utilities/root-provider"
 import { getServerUser } from "@/lib/firebaseAdmin"
 import { RealtimeProvider } from "@/lib/context/transcription-context"
 import { FunctionCallProvider } from "@/lib/context/function-call-context"
+import { VoiceSessionProvider } from "@/lib/context/voice-session-context"
+import { PlanProvider } from "@/lib/context/plan-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -40,31 +42,35 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <RootProvider serverUser={user}>
-            <SidebarProvider>
-              <DateProvider>
-                <RealtimeProvider>
-                  <TasksProvider>
-                    <BacklogProvider>
-                    <FunctionCallProvider>
-                      <TaskActionsProvider>
-                        <FilterProvider>
-                          <CurrentViewProvider>
-                            <GoogleCalendarProvider>
-                              <SelectedTasksProvider>
-                                <AiProvider>{children}</AiProvider>
-                              </SelectedTasksProvider>
-                            </GoogleCalendarProvider>
-                          </CurrentViewProvider>
-                        </FilterProvider>
-                      </TaskActionsProvider>
-                    </FunctionCallProvider>
-                    </BacklogProvider>
-                  </TasksProvider>
-                </RealtimeProvider>
-              </DateProvider>
-            </SidebarProvider>
-          </RootProvider>
+          <VoiceSessionProvider>
+            <PlanProvider>
+            <RootProvider serverUser={user}>
+              <SidebarProvider>
+                <DateProvider>
+                  <RealtimeProvider>
+                    <TasksProvider>
+                      <BacklogProvider>
+                      <FunctionCallProvider>
+                        <TaskActionsProvider>
+                          <FilterProvider>
+                            <CurrentViewProvider>
+                              <GoogleCalendarProvider>
+                                <SelectedTasksProvider>
+                                  <AiProvider>{children}</AiProvider>
+                                </SelectedTasksProvider>
+                              </GoogleCalendarProvider>
+                            </CurrentViewProvider>
+                          </FilterProvider>
+                        </TaskActionsProvider>
+                      </FunctionCallProvider>
+                      </BacklogProvider>
+                    </TasksProvider>
+                  </RealtimeProvider>
+                </DateProvider>
+              </SidebarProvider>
+            </RootProvider>
+            </PlanProvider>
+          </VoiceSessionProvider>
           <Toaster />
         </ThemeProvider>
       </body>

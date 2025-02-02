@@ -66,7 +66,7 @@ export function ChatForm({
   const initialSize = useRef({ width: 0, height: 0 })
   const initialPosition = useRef({ x: 0, y: 0 })
   const { isExpanded } = useSidebar()
-  const { context, idMappings } = useAiContext()
+  const { text: context, idMappings } = useAiContext()
 
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false)
   const [showContextDialog, setShowContextDialog] = useState(false)
@@ -82,16 +82,9 @@ export function ChatForm({
     dataChannel,
     audioLevels,
     userAudioLevels,
-    realtimeMode,
-    voice,
     startSession,
-    stopSession,
-    setRealtimeMode,
-    setVoice,
-    immediateExecution,
-    setImmediateExecution
+    stopSession
   } = useRealtimeAudio({
-    context: context,
     idMappings: idMappings
   })
 
@@ -291,12 +284,6 @@ export function ChatForm({
       <RealtimeSessionDialog
         open={showRealtimeDialog}
         onOpenChange={setShowRealtimeDialog}
-        realtimeMode={realtimeMode}
-        setRealtimeMode={setRealtimeMode}
-        voice={voice}
-        setVoice={setVoice}
-        immediateExecution={immediateExecution}
-        setImmediateExecution={setImmediateExecution}
         onStartSession={() => {
           setShowRealtimeDialog(false)
           startSession(context)

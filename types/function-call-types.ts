@@ -124,7 +124,111 @@ export interface FunctionCallDefinition {
     type: "object"
     properties: Record<string, any>
     required?: string[]
+    additionalProperties: boolean
   }
+}
+
+export interface FunctionCallUIMetadata {
+  id: FunctionCallName
+  label: string
+  icon: string
+  description: string
+  category: "file" | "task" | "calendar" | "system"
+  planMode: boolean
+}
+
+export const FUNCTION_CALL_UI_METADATA: FunctionCallUIMetadata[] = [
+  {
+    id: "update_plan",
+    label: "Update Plan",
+    icon: "📝",
+    description: "Update the plan with new tasks",
+    category: "task",
+    planMode: true
+  },
+  {
+    id: "create_task",
+    label: "Create Task",
+    icon: "✨",
+    description: "Create a new task",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "create_backlog_task",
+    label: "Create Backlog Task",
+    icon: "📥",
+    description: "Add task to backlog",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "move_task",
+    label: "Move Task",
+    icon: "🔄",
+    description: "Reschedule a task",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "mark_tasks_completed",
+    label: "Complete Tasks",
+    icon: "✅",
+    description: "Mark tasks as done",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "mark_subtask_completed",
+    label: "Complete Subtask",
+    icon: "☑️",
+    description: "Mark subtask as done",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "get_calendar_for_date_range",
+    label: "Get Calendar",
+    icon: "📅",
+    description: "View calendar range",
+    category: "calendar",
+    planMode: false
+  },
+  {
+    id: "set_callback",
+    label: "Set Callback",
+    icon: "⏰",
+    description: "Schedule a reminder",
+    category: "calendar",
+    planMode: false
+  },
+  {
+    id: "add_user_notes",
+    label: "Add Notes",
+    icon: "📌",
+    description: "Store user preferences",
+    category: "system",
+    planMode: true
+  }
+]
+
+export function getFunctionCallMetadata(name: FunctionCallName): FunctionCallUIMetadata {
+  const metadata = FUNCTION_CALL_UI_METADATA.find(m => m.id === name)
+  if (!metadata) {
+    throw new Error(`No UI metadata found for function: ${name}`)
+  }
+  return metadata
+}
+
+export function getFunctionCallsByCategory(isPlanMode: boolean): Record<string, FunctionCallUIMetadata[]> {
+  const filteredMetadata = FUNCTION_CALL_UI_METADATA.filter(m => m.planMode === isPlanMode)
+  return filteredMetadata.reduce((acc, metadata) => {
+    if (!acc[metadata.category]) {
+      acc[metadata.category] = []
+    }
+    acc[metadata.category].push(metadata)
+    return acc
+  }, {} as Record<string, FunctionCallUIMetadata[]>)
 }
 
 export class FunctionCall {
@@ -168,7 +272,8 @@ export class FunctionCallFactory {
             }
           }
         },
-        required: ["todo_list"]
+        required: ["todo_list"],
+        additionalProperties: false
       }
     },
     create_task: {
@@ -217,7 +322,8 @@ export class FunctionCallFactory {
             description: "Importance level"
           }
         },
-        required: ["title", "date"]
+        required: ["title", "date"],
+        additionalProperties: false
       }
     },
     create_backlog_task: {
@@ -258,7 +364,8 @@ export class FunctionCallFactory {
             description: "Importance level"
           }
         },
-        required: ["title"]
+        required: ["title"],
+        additionalProperties: false
       }
     },
     move_task: {
@@ -285,7 +392,8 @@ export class FunctionCallFactory {
             description: "New end time in HH:MM (24-hour) format"
           }
         },
-        required: ["task_id", "new_date", "new_start_time", "new_end_time"]
+        required: ["task_id", "new_date", "new_start_time", "new_end_time"],
+        additionalProperties: false
       }
     },
 
@@ -305,7 +413,8 @@ export class FunctionCallFactory {
             }
           }
         },
-        required: ["task_ids"]
+        required: ["task_ids"],
+        additionalProperties: false
       }
     },
 
@@ -326,7 +435,8 @@ export class FunctionCallFactory {
             description: "Unique identifier or reference for the subtask"
           }
         },
-        required: ["task_id", "subtask_id"]
+        required: ["task_id", "subtask_id"],
+        additionalProperties: false
       }
     },
 
@@ -347,7 +457,8 @@ export class FunctionCallFactory {
             description: "End date in YYYY-MM-DD format"
           }
         },
-        required: ["start_date", "end_date"]
+        required: ["start_date", "end_date"],
+        additionalProperties: false
       }
     },
 
@@ -370,7 +481,8 @@ export class FunctionCallFactory {
               "A note or reference describing the purpose of the callback"
           }
         },
-        required: ["callback_datetime", "context"]
+        required: ["callback_datetime", "context"],
+        additionalProperties: false
       }
     },
     add_user_notes: {
@@ -392,7 +504,8 @@ export class FunctionCallFactory {
               "Additional observations or strategies for best interacting with the user, e.g. communication style, motivational tips, etc."
           }
         },
-        required: []
+        required: [],
+        additionalProperties: false
       }
     }
   }

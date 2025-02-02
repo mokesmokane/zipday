@@ -3,17 +3,19 @@
 import { useState, useRef, useEffect } from "react"
 import {
   useRealtime,
-  Message,
-  Transcript
+  Message
 } from "../context/transcription-context"
-import { FunctionCall, FunctionCallFactory } from "@/types/function-call-types"
-import { createFunctionCall, functionCallFactory } from "../function-calls"
+import { createFunctionCall } from "../function-calls"
 import { useFunctionCall } from "../context/function-call-context"
+import { useVoiceSession } from "../context/voice-session-context"
+import { useAiContext } from "../context/ai-context"
+import { usePlan } from "../context/plan-context"
+import { useAgent } from "../context/agent-context"
+
 interface UseRealtimeAudioProps {
   onDataChannelMessage?: (event: MessageEvent) => void
   context?: string
   onResponse?: (response: any) => void
-  vadEnabled?: boolean
   idMappings: Record<number, string>
 }
 
@@ -22,32 +24,20 @@ interface UseRealtimeAudioReturn {
   dataChannel: RTCDataChannel | null
   audioLevels: number[]
   userAudioLevels: number[]
-  realtimeMode: "debug" | "openai"
-  voice: string
-  immediateExecution: boolean
-  setImmediateExecution: (immediateExecution: boolean) => void
   startSession: (context: string) => Promise<void>
   stopSession: () => void
-  setRealtimeMode: (mode: "debug" | "openai") => void
-  setVoice: (voice: string) => void
 }
 
-export function useRealtimeAudio(
-  {
-    onDataChannelMessage,
-    context,
-    idMappings,
-    onResponse
-  }: UseRealtimeAudioProps
-) {
-  const [isSessionActive, setIsSessionActive] = useState(false)
+export function useRealtimeAudio({
+  onDataChannelMessage,
+  onResponse,
+  idMappings
+}: UseRealtimeAudioProps): UseRealtimeAudioReturn {
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
   const [audioLevels, setAudioLevels] = useState<number[]>(Array(30).fill(0))
   const [userAudioLevels, setUserAudioLevels] = useState<number[]>(
     Array(30).fill(0)
   )
-  const [realtimeMode, setRealtimeMode] = useState<"debug" | "openai">("debug")
-  const [voice, setVoice] = useState<string>("alloy")
   const peerConnection = useRef<RTCPeerConnection | null>(null)
   const audioElement = useRef<HTMLAudioElement | null>(null)
   const audioContext = useRef<AudioContext | null>(null)
@@ -55,7 +45,18 @@ export function useRealtimeAudio(
   const userAnalyser = useRef<AnalyserNode | null>(null)
   const { addMessage, clearMessages } = useRealtime()
   const { processFunction } = useFunctionCall()
-  const [immediateExecution, setImmediateExecution] = useState(false)
+  const { todo_list } = usePlan()
+  const { text: context, name: contextType } = useAiContext()
+  const { 
+    voice, 
+    immediateExecution, 
+    isSessionActive, 
+    setIsSessionActive,
+    getSessionInstructions,
+    selectedFunctions
+  } = useVoiceSession()
+  const { executePlan } = useAgent()
+
   const calculateLevels = (analyserNode: AnalyserNode) => {
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
     analyserNode.getByteFrequencyData(dataArray)
@@ -74,9 +75,6 @@ export function useRealtimeAudio(
     const mirror = res.slice(0, 15).reverse()
     res = [...mirror, ...res.slice(0, 15)]
 
-    if (res[0] > 0.05) {
-    }
-
     return res
   }
 
@@ -92,94 +90,10 @@ export function useRealtimeAudio(
     }
   }
 
-  const getInstructions = (
-    context: string
-  ) => `You are a highly efficient and professional personal assistant. Your role is to help your boss organize and prepare for their day in the most effective way possible.
-  Here is their current schedule:
-  ${context}
-  Your primary goal is to package the day in a way that maximizes their efficiency, keeps them focused on what matters, and reduces their stress.
-  They have ADHD so keep that in mind - though dont mention it.
-  Its up to you to get all the informationfrom thaem sop that you can plan their day. You should drive the cadence of the conversation. Be as succint as possible
-
-Your main task is to respond to your bosses commands
-
-When generating your response, act as if you are making the first phone call of the day to your boss.
-
-If your boss doesnt give you a clear instruction you can follow this structured approach:
-
-1. Greeting and Energy Check:
-Start the call by warmly greeting your boss and assessing their mindset:
-
-Provide a positive and professional tone.
-2. Quick Overview of the Day:
-Summarize the key aspects of their schedule:
-
-3. Highlight the primary focus or theme of the day (e.g., critical meetings, deadlines, or decisions).
-Mention any major events or time-sensitive items.
-
-4. Alert them to anything they may have missed from yesterday - ask them if they want to reschedule them or mark them as complete.
-
-5. Follow-ups and Questions:
-Ensure you understand their needs:
-
-Ask if they have any additional focus areas or adjustments for the day.
-Reassure them of your support and readiness to handle any tasks or updates they need.
-
-Provide encouragement to set a confident tone for the day.
-Confirm check-in points or next steps.
-Constraints for Responses:
-Be as concise as possible.
-Proactive and Calm: Always offer solutions for potential challenges and avoid overwhelming them with unnecessary details.
-Adapt to the Boss's Personality: Adjust tone and suggestions based on the boss's known preferences or mood.
-Your responses should sound like you are speaking directly to your boss, focusing on clarity, efficiency, and professionalism.
-
-As you are speaking, you should be making notes about what you need to do after the call. The way you do this is by calling the update_plan function.
-
-The list of things on that plan is like a todo list - it high level but should have enough detail when in context to be actionable. You should be updating it as you go.
-
-Your boss is called Mokes
-
-DO NOT MAKE ANYTHING UP.
-YOU MUST ONLY USE THE INFORMATION PROVIDED.
-
-If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN. 
-
-`
-
   // Start a realtime session
-  const startSession = async (context: string) => {
+  const startSession = async () => {
     try {
       clearMessages()
-
-      if (realtimeMode === "debug") {
-        // Debug mode - only set up local audio analysis
-        const ms = await navigator.mediaDevices.getUserMedia({
-          audio: true
-        })
-
-        if (audioContext.current) {
-          userAnalyser.current = audioContext.current.createAnalyser()
-          userAnalyser.current.fftSize = 2048
-          const userSource = audioContext.current.createMediaStreamSource(ms)
-          userSource.connect(userAnalyser.current)
-        }
-
-        setIsSessionActive(true)
-        return
-      }
-
-      // Original OpenAI connection logic
-      const url = new URL("/api/realtime-token", window.location.origin)
-      if (context) {
-        url.searchParams.append("instructions", getInstructions(context))
-      }
-
-      const tokenResponse = await fetch(url.toString())
-      const data = await tokenResponse.json()
-      const EPHEMERAL_KEY = data.client_secret.value
-
-      const pc = new RTCPeerConnection()
-      peerConnection.current = pc
 
       // Set up audio context and analyser
       audioContext.current = new AudioContext()
@@ -189,6 +103,21 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
       // Set up to play remote audio from the model
       audioElement.current = document.createElement("audio")
       audioElement.current.autoplay = true
+
+      // Original OpenAI connection logic
+      const url = new URL("/api/realtime-token", window.location.origin)
+      if (context) {
+        url.searchParams.append("instructions", getSessionInstructions(context, contextType))
+      }
+      url.searchParams.append("selectedFunctions", JSON.stringify(selectedFunctions))
+      url.searchParams.append("voice", voice)
+
+      const tokenResponse = await fetch(url.toString())
+      const data = await tokenResponse.json()
+      const EPHEMERAL_KEY = data.client_secret.value
+
+      const pc = new RTCPeerConnection()
+      peerConnection.current = pc
 
       pc.ontrack = e => {
         if (audioElement.current && audioContext.current && analyser.current) {
@@ -248,26 +177,12 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
     }
   }
 
-  const stopSession = () => {
-    if (realtimeMode === "debug") {
-      if (audioContext.current) {
-        audioContext.current.close()
-      }
-      setIsSessionActive(false)
-      setAudioLevels(Array(30).fill(0))
-      setUserAudioLevels(Array(30).fill(0))
-      clearMessages()
-      return
-    }
-
+  const stopSession = async () => {
     if (dataChannel) {
       dataChannel.close()
     }
     if (peerConnection.current) {
       peerConnection.current.close()
-    }
-    if (audioContext.current) {
-      audioContext.current.close()
     }
     setIsSessionActive(false)
     setDataChannel(null)
@@ -275,6 +190,11 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
     setAudioLevels(Array(30).fill(0))
     setUserAudioLevels(Array(30).fill(0))
     clearMessages()
+
+    // Execute plan if there's a todo_list when the session ends
+    if (todo_list && todo_list.length > 0) {
+      await executePlan(todo_list, context)
+    }
   }
 
   useEffect(() => {
@@ -283,14 +203,11 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
         setIsSessionActive(true)
       })
 
-      const handleMessage = (event: MessageEvent) => {
+      const handleMessage = async (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data)
           // Handle different message types from OpenAI
-          if (
-            data.type ===
-            "conversation.item.input_audio_transcription.completed"
-          ) {
+          if (data.type === "conversation.item.input_audio_transcription.completed") {
             console.log(data)
             const newMessage: Message = {
               role: "user",
@@ -317,10 +234,15 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
             } else {
               try {
                 console.log(data)
-                const functionCall = createFunctionCall(data.name, JSON.parse(data.arguments), idMappings, immediateExecution)
+                const functionCall = createFunctionCall(
+                  data.name, 
+                  JSON.parse(data.arguments), 
+                  idMappings, 
+                  immediateExecution
+                )
                 processFunction(functionCall)
-
                 addMessage(functionCall)
+
                 if (data.arguments.final) {
                   stopSession()
                 }
@@ -350,7 +272,7 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
         dataChannel.removeEventListener("message", handleMessage)
       }
     }
-  }, [dataChannel, onDataChannelMessage, onResponse])
+  }, [dataChannel, onDataChannelMessage, onResponse, immediateExecution])
 
   // Animation frame loop for updating audio levels
   useEffect(() => {
@@ -377,12 +299,6 @@ If your boss asks or commands you to do something ALWAYS UPDATE THE PLAN.
     dataChannel,
     audioLevels,
     userAudioLevels,
-    realtimeMode,
-    voice,
-    immediateExecution,
-    setImmediateExecution,
-    setVoice,
-    setRealtimeMode,
     startSession,
     stopSession
   }

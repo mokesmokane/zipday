@@ -2,10 +2,12 @@
 
 import { createContext, useContext, useState, useRef } from "react"
 import { processCall } from "@/lib/function-call-processor"
-import { FunctionCall, FunctionCallName, FunctionCallArgs, CreateTaskArgs, MarkTasksCompletedArgs, MoveTaskArgs } from "@/types/function-call-types"
+import { FunctionCall, FunctionCallName, FunctionCallArgs, CreateTaskArgs, MarkTasksCompletedArgs, MoveTaskArgs, UpdatePlanArgs } from "@/types/function-call-types"
 import { useTasks } from "./tasks-context"
 import { useBacklog } from "./backlog-context"
 import { Task, Day, Urgency, Importance } from "@/types/daily-task-types"
+import { updatePlan } from "@/actions/db/plan-actions"
+import { usePlan } from "./plan-context"
 
 interface QueuedFunction {
   name: FunctionCallName
@@ -27,6 +29,7 @@ export function FunctionCallProvider({ children }: { children: React.ReactNode }
   const [isProcessing, setIsProcessing] = useState(false)
   const { dailyTasks, markTasksCompleted, addTask, moveTask, cancelTasks } = useTasks()
   const { backlogTasks } = useBacklog()
+  const { todo_list, setTodoList } = usePlan()
   const functionQueue = useRef<QueuedFunction[]>([])
   const toBeProcessed = useRef<QueuedFunction[]>([])
   const isProcessingQueue = useRef(false)
@@ -100,6 +103,11 @@ export function FunctionCallProvider({ children }: { children: React.ReactNode }
         case "move_task": {
           const { task_id, new_date, new_start_time, new_end_time } = args as MoveTaskArgs
           moveTask(task_id, new_date, new_start_time, new_end_time)
+        }
+
+        case "update_plan": {
+          const { todo_list } = args as UpdatePlanArgs
+          setTodoList(todo_list)
         }
 
         // case "cancel_tasks": {

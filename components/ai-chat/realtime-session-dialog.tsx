@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,99 +13,155 @@ import {
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
+import { useVoiceSession } from "@/lib/context/voice-session-context"
+import { cn } from "@/lib/utils"
+import { getFunctionCallsByCategory, FUNCTION_CALL_UI_METADATA, FunctionCallUIMetadata } from "@/types/function-call-types"
+import React from "react"
 
 interface RealtimeSessionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  realtimeMode: "debug" | "openai"
-  setRealtimeMode: (mode: "debug" | "openai") => void
-  voice: string
-  setVoice: (voice: string) => void
   onStartSession: () => void
-  immediateExecution: boolean
-  setImmediateExecution: (enabled: boolean) => void
 }
 
 export function RealtimeSessionDialog({
   open,
   onOpenChange,
-  realtimeMode,
-  setRealtimeMode,
-  voice,
-  setVoice,
-  onStartSession,
-  immediateExecution,
-  setImmediateExecution
+  onStartSession
 }: RealtimeSessionDialogProps) {
+  const {
+    voice,
+    setVoice,
+    immediateExecution,
+    setImmediateExecution,
+    selectedFunctions,
+    setSelectedFunctions,
+    isPlanMode,
+    setIsPlanMode
+  } = useVoiceSession()
+
+  // Update selected functions when plan mode changes
+  React.useEffect(() => {
+    if (isPlanMode) {
+      // In plan mode, only allow plan-related functions
+      const planFunctions = FUNCTION_CALL_UI_METADATA
+        .filter((f: FunctionCallUIMetadata) => f.planMode)
+        .map((f: FunctionCallUIMetadata) => f.id)
+      setSelectedFunctions(planFunctions)
+    } else {
+      // In normal mode, reset to default functions
+      const defaultFunctions = FUNCTION_CALL_UI_METADATA
+        .filter((f: FunctionCallUIMetadata) => !f.planMode)
+        .map((f: FunctionCallUIMetadata) => f.id)
+      setSelectedFunctions(defaultFunctions)
+    }
+  }, [isPlanMode, setSelectedFunctions])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Start Realtime Session</DialogTitle>
+          <DialogTitle>Start Voice Session</DialogTitle>
           <DialogDescription>
-            Choose how you'd like to interact with the AI assistant in real-time.
+            Configure your voice interaction settings with the AI assistant.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-6">
-          <RadioGroup
-            value={realtimeMode}
-            onValueChange={value => setRealtimeMode(value as "debug" | "openai")}
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="openai" id="openai" />
-              <Label htmlFor="openai">Voice Conversation</Label>
-            </div>
-            <div className="mt-2 text-sm text-gray-500">
-              Speak naturally with the AI using your microphone
-            </div>
+        <div className="py-6 space-y-6">
+          {/* Voice Selection */}
+          <div>
+            <Label>Assistant Voice</Label>
+            <RadioGroup value={voice} onValueChange={setVoice} className="mt-2">
+              {[
+                { id: "alloy", label: "Alloy" },
+                { id: "echo", label: "Echo" },
+                { id: "fable", label: "Fable" },
+                { id: "onyx", label: "Onyx" },
+                { id: "nova", label: "Nova" },
+                { id: "shimmer", label: "Shimmer" }
+              ].map(voice => (
+                <div key={voice.id} className="flex items-center space-x-2">
+                  <RadioGroupItem value={voice.id} id={voice.id} />
+                  <Label htmlFor={voice.id}>{voice.label}</Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
 
-            <div className="mt-4 flex items-center space-x-2">
-              <RadioGroupItem value="debug" id="debug" />
-              <Label htmlFor="debug">Debug Mode</Label>
-            </div>
-            <div className="mt-2 text-sm text-gray-500">
-              Debug mode will not connect to the AI assistant.
-            </div>
-          </RadioGroup>
-
-          {realtimeMode === "openai" && (
-            <div className="mt-6">
-              <Label>Voice</Label>
-              <RadioGroup value={voice} onValueChange={setVoice} className="mt-2">
-                {[
-                  { id: "alloy", label: "Alloy" },
-                  { id: "ash", label: "Ash" },
-                  { id: "ballad", label: "Ballad" },
-                  { id: "coral", label: "Coral" },
-                  { id: "echo", label: "Echo" },
-                  { id: "sage", label: "Sage" },
-                  { id: "shimmer", label: "Shimmer" },
-                  { id: "verse", label: "Verse" }
-                ].map(voice => (
-                  <div key={voice.id} className="flex items-center space-x-2">
-                    <RadioGroupItem value={voice.id} id={voice.id} />
-                    <Label htmlFor={voice.id}>{voice.label}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-          )}
-
-          <div className="mt-6 space-y-4">
+          {/* Mode Selection */}
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Immediate Function Execution</Label>
+                <Label>Plan Mode</Label>
                 <div className="text-sm text-gray-500">
-                  Automatically execute function calls without confirmation
+                  Only allow the AI to update your plan
                 </div>
               </div>
               <Switch
-                checked={immediateExecution}
-                onCheckedChange={setImmediateExecution}
+                checked={isPlanMode}
+                onCheckedChange={setIsPlanMode}
               />
             </div>
           </div>
+
+          {/* Function Selection */}
+          <div className="space-y-6">
+            <Label>Available Functions</Label>
+            {Object.entries(getFunctionCallsByCategory(isPlanMode)).map(([category, functions]) => (
+              <div key={category} className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground capitalize">
+                  {category}
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {functions.map(func => {
+                    const isSelected = selectedFunctions.includes(func.id)
+                    return (
+                      <Badge
+                        key={func.id}
+                        variant="outline"
+                        className={cn(
+                          "cursor-pointer select-none px-3 py-2 hover:bg-primary/10",
+                          isSelected && "bg-primary/20 hover:bg-primary/30",
+                          isPlanMode && "cursor-not-allowed opacity-50"
+                        )}
+                        onClick={() => {
+                          if (!isPlanMode) {
+                            if (isSelected) {
+                              setSelectedFunctions(selectedFunctions.filter(f => f !== func.id))
+                            } else {
+                              setSelectedFunctions([...selectedFunctions, func.id])
+                            }
+                          }
+                        }}
+                        title={func.description}
+                      >
+                        <span className="mr-1">{func.icon}</span>
+                        {func.label}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Immediate Execution - Only show if not in plan mode */}
+          {!isPlanMode && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Immediate Function Execution</Label>
+                  <div className="text-sm text-gray-500">
+                    Automatically execute function calls without confirmation
+                  </div>
+                </div>
+                <Switch
+                  checked={immediateExecution}
+                  onCheckedChange={setImmediateExecution}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
