@@ -1,13 +1,12 @@
 "use server"
 
-import { auth, firestore } from "firebase-admin"
+import { adminAuth as auth, adminDb as db } from "@/lib/firebaseAdmin"
+import { FieldPath } from "firebase-admin/firestore"
 import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
 import { CalendarItem, Day, Importance, Task, Urgency } from "@/types/daily-task-types"
 import { addDays, format } from "date-fns"
 import { CreateTaskArgs, MoveTaskArgs, MarkTasksCompletedArgs, MarkSubtaskCompletedArgs, CreateBacklogTaskArgs } from "@/types/function-call-types"
-
-const db = firestore()
 
 // Helper function to get authenticated user ID
 async function getAuthenticatedUserId(): Promise<string> {
@@ -16,7 +15,7 @@ async function getAuthenticatedUserId(): Promise<string> {
   if (!sessionCookie) {
     throw new Error("No session cookie found")
   }
-  const decodedClaims = await auth().verifySessionCookie(sessionCookie)
+  const decodedClaims = await auth.verifySessionCookie(sessionCookie)
   return decodedClaims.uid
 }
 
@@ -222,6 +221,72 @@ export async function updateTaskAction(
   }
 }
 
+export async function findTaskAction(taskId: string): Promise<string | undefined> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const docRef = db.collection("userDays").doc(userId).collection("dailyTasks") 
+    //look thruogh all the daily tasks and find the task with the given id
+    const snapshot = await docRef.get()
+    const days = snapshot.docs.map(doc => doc.data() as Day)
+    const day = days.find(day => day.tasks.find(t => t.id === taskId))
+    return day ? day.id : undefined
+  } catch (error) {
+    console.error("Error finding task:", error)
+    return undefined
+  }
+}
+
+export async function markTaskCompletedAction(taskId: string): Promise<ActionState<void>>     {
+  try {
+
+    const userId = await getAuthenticatedUserId()
+    const dateDoc = await findTaskAction(taskId)
+    if (!dateDoc) {
+      return { isSuccess: false, message: "Task not found" }
+    }
+    const docRef = db.collection("userDays").doc(userId).collection("dailyTasks").doc(dateDoc)
+    const docSnap = await docRef.get()
+    if (!docSnap.exists) {
+        return { isSuccess: false, message: "Daily doc not found" }
+      }
+    
+    markTasksCompletedAction({ [dateDoc]: [taskId] })
+    return { isSuccess: true, message: "Task marked as completed" }
+  } catch (error) {
+    console.error("Error marking task as completed:", error)
+    return { isSuccess: false, message: "Failed to mark task as completed" }
+  }
+}
+
+
+export async function moveTaskAction(taskId: string, newDate: string, newStartTime?: string, newEndTime?: string): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const dateDoc = await findTaskAction(taskId)
+    if (!dateDoc) {
+      return { isSuccess: false, message: "Task not found" }
+    }
+    const docRef = db.collection("userDays").doc(userId).collection("dailyTasks").doc(dateDoc)
+    const docSnap = await docRef.get()
+    if (!docSnap.exists) {
+      return { isSuccess: false, message: "Daily doc not found" }
+    }
+    const day = docSnap.data() as Day
+    const tasks = day.tasks || []
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) {
+      return { isSuccess: false, message: "Task not found" }
+    }
+
+    const newTask = { ...task, startTime: newStartTime, endTime: newEndTime }
+    await addTaskAction(newDate, newTask)
+    await deleteTaskAction(dateDoc, taskId)
+    return { isSuccess: true, message: "Task moved successfully" }
+  } catch (error) {
+    console.error("Error moving task:", error)
+    return { isSuccess: false, message: "Failed to move task" }
+  }
+}
 
 export async function markTasksCompletedAction(dateIds: Record<string, string[]>):  Promise<ActionState<void>> {
   try {
@@ -608,7 +673,7 @@ export async function getIncompleteTasksAction(
       .collection("userDays")
       .doc(userId)
       .collection("dailyTasks")
-      .orderBy(firestore.FieldPath.documentId())
+      .orderBy(FieldPath.documentId())
       .startAt(startDate)
       .endBefore(endDate)
       .get()

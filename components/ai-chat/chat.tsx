@@ -42,8 +42,8 @@ import { useRealtimeAudio } from "@/lib/hooks/use-realtime-audio"
 import { useSidebar } from "@/lib/context/sidebar-context"
 import { useAiContext } from "@/lib/context/ai-context"
 import { Textarea } from "@/components/ui/textarea"
-import { useRealtime } from "@/lib/context/transcription-context"
-import { FunctionCall } from "@/types/function-call-types"
+import { Transcript, useRealtime } from "@/lib/context/transcription-context"
+import { ActionCall, FunctionCall, QueryCall } from "@/types/function-call-types"
 import { PulsatingSphereVisualizer } from "./ai-voice-sphere"
 import { FunctionCallDisplay } from "@/components/ai-chat/function-call-display"
 import { RealtimeMessagesWindow } from "@/components/ai-chat/realtime-messages-window"
@@ -145,7 +145,7 @@ export function ChatForm({
   const realtimeMessageList = (
     <div className="my-4 flex h-fit min-h-full flex-col gap-4">
       {realtimeMessages.map((message, index) => {
-        if (message instanceof FunctionCall) {
+        if (message instanceof ActionCall || message instanceof QueryCall) {
           return (
             <FunctionCallDisplay
               key={index}
@@ -157,10 +157,10 @@ export function ChatForm({
         return (
           <div
             key={index}
-            data-role={message.role}
+            data-role={(message as Transcript).role}
             className="max-w-[80%] rounded-xl px-3 py-2 text-sm data-[role=assistant]:self-start data-[role=user]:self-end data-[role=assistant]:bg-gray-100 data-[role=user]:bg-blue-500 data-[role=assistant]:text-black data-[role=user]:text-white"
           >
-            {message.content}
+            {(message as Transcript).content}
           </div>
         )
       })}
@@ -186,18 +186,22 @@ export function ChatForm({
                 color="purple"
                 onClick={() => {
                   if (dataChannel && dataChannel.readyState === "open") {
-                    console.log("Sending start conversation instruction")
-                    const startConversationInstruction = {
-                      type: "response.create",
-                      response: {
-                        instructions: `
-                        mark yesterdays tasks as completed
-                      `
+                    const event = {
+                      type: "conversation.item.create",
+                      item: {
+                        type: "message",
+                        role: "user",
+                        content: [
+                          {
+                            type: "input_text",
+                            text: "mark yesterdays tasks as completed and move any backlog tasks to this afternoon"
+                          }
+                        ]
                       }
                     }
-                    dataChannel.send(
-                      JSON.stringify(startConversationInstruction)
-                    )
+                    dataChannel.send(JSON.stringify(event))
+                    // Also request a response
+                    dataChannel.send(JSON.stringify({ type: "response.create" }))
                   }
                 }}
               />

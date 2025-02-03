@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   useRealtime,
   Message
@@ -11,6 +11,8 @@ import { useVoiceSession } from "../context/voice-session-context"
 import { useAiContext } from "../context/ai-context"
 import { usePlan } from "../context/plan-context"
 import { useAgent } from "../context/agent-context"
+import { useWorkflow } from "../context/agent-workflow-context"
+import { UpdatePlanArgs } from "@/types/function-call-types"
 
 interface UseRealtimeAudioProps {
   onDataChannelMessage?: (event: MessageEvent) => void
@@ -45,7 +47,7 @@ export function useRealtimeAudio({
   const userAnalyser = useRef<AnalyserNode | null>(null)
   const { addMessage, clearMessages } = useRealtime()
   const { processFunction } = useFunctionCall()
-  const { todo_list } = usePlan()
+  const [ todo_list, setTodoList ] = useState<string[]>([])
   const { text: context, name: contextType } = useAiContext()
   const { 
     voice, 
@@ -55,7 +57,7 @@ export function useRealtimeAudio({
     getSessionInstructions,
     selectedFunctions
   } = useVoiceSession()
-  const { executePlan } = useAgent()
+  const { startWorkflow } = useWorkflow()
 
   const calculateLevels = (analyserNode: AnalyserNode) => {
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
@@ -177,12 +179,17 @@ export function useRealtimeAudio({
     }
   }
 
-  const stopSession = async () => {
+  const stopSession = useCallback(async () => {
     if (dataChannel) {
       dataChannel.close()
     }
     if (peerConnection.current) {
       peerConnection.current.close()
+    }
+    console.log("Current todo_list at stop:", todo_list)
+    if (todo_list && todo_list.length > 0) {
+      console.log("Starting workflow with:", todo_list)
+      startWorkflow(todo_list, context)
     }
     setIsSessionActive(false)
     setDataChannel(null)
@@ -191,11 +198,8 @@ export function useRealtimeAudio({
     setUserAudioLevels(Array(30).fill(0))
     clearMessages()
 
-    // Execute plan if there's a todo_list when the session ends
-    if (todo_list && todo_list.length > 0) {
-      await executePlan(todo_list, context)
-    }
-  }
+    
+  }, [dataChannel, todo_list, context, clearMessages, startWorkflow])
 
   useEffect(() => {
     if (dataChannel) {
@@ -231,7 +235,8 @@ export function useRealtimeAudio({
             if (data.name === "hang_up") {
               stopSession()
               return
-            } else {
+            } 
+            else {
               try {
                 console.log(data)
                 const functionCall = createFunctionCall(
@@ -240,7 +245,17 @@ export function useRealtimeAudio({
                   idMappings, 
                   immediateExecution
                 )
-                processFunction(functionCall)
+                if (data.name === "update_plan") {
+                  console.log("update_plan")
+                  console.log("Previous todo_list:", todo_list)
+                  console.log("data.arguments", data.arguments)
+                  const { todo_list: newTodoList } =  JSON.parse(data.arguments) as UpdatePlanArgs
+                  console.log("Setting new todo_list:", newTodoList)
+                  setTodoList(newTodoList)
+                }else{ 
+                  processFunction(functionCall)
+                }
+
                 addMessage(functionCall)
 
                 if (data.arguments.final) {

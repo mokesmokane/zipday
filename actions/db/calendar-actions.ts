@@ -1,13 +1,12 @@
 "use server"
-import { auth, firestore } from "firebase-admin"
+import { adminAuth as auth, adminDb as db } from "@/lib/firebaseAdmin"
 import { cookies } from "next/headers"
 import { ActionState } from "@/types/server-action-types"
 import { Task, CalendarItem } from "@/types/daily-task-types"
 import { GetCalendarForDateRangeArgs } from "@/types/function-call-types"
 import { google } from "googleapis"
 import { getAuth } from "firebase-admin/auth"
-
-const db = firestore()
+import { createCalendarDateRange } from "@/lib/utils/date-utils"
 
 // Helper function to get authenticated user ID
 async function getAuthenticatedUserId(): Promise<string> {
@@ -16,7 +15,7 @@ async function getAuthenticatedUserId(): Promise<string> {
   if (!sessionCookie) {
     throw new Error("No session cookie found")
   }
-  const decodedClaims = await auth().verifySessionCookie(sessionCookie)
+  const decodedClaims = await auth.verifySessionCookie(sessionCookie)
   return decodedClaims.uid
 }
 
@@ -193,11 +192,16 @@ export async function getCalendarForDateRange(args: GetCalendarForDateRangeArgs)
     oauth2Client.setCredentials(tokens)
     const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 
+    // Get date range with debug logging in development
+    const dateRange = createCalendarDateRange(start_date, end_date, {
+      debug: process.env.NODE_ENV === "development"
+    })
+
     // Get events from Google Calendar
     const response = await calendar.events.list({
       calendarId: "primary",
-      timeMin: new Date(start_date).toISOString(),
-      timeMax: new Date(end_date).toISOString(),
+      timeMin: dateRange.timeMin,
+      timeMax: dateRange.timeMax,
       singleEvents: true,
       orderBy: "startTime"
     })
@@ -211,7 +215,7 @@ export async function getCalendarForDateRange(args: GetCalendarForDateRangeArgs)
     console.error("Error getting calendar events:", error)
     return {
       isSuccess: false,
-      message: "Failed to get calendar events"
+      message: error instanceof Error ? error.message : "Failed to get calendar events"
     }
   }
 } 

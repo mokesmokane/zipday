@@ -10,6 +10,7 @@ import {
 import { useAgent } from "@/lib/context/agent-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
+import { useWorkflow } from "@/lib/context/agent-workflow-context"
 
 interface AgentStatusDialogProps {
   open: boolean
@@ -17,7 +18,7 @@ interface AgentStatusDialogProps {
 }
 
 export function AgentStatusDialog({ open, onOpenChange }: AgentStatusDialogProps) {
-  const { state } = useAgent()
+  const { state } = useWorkflow()
   const isActive = state.stage !== "idle" && state.stage !== "completed"
 
   return (
@@ -64,18 +65,6 @@ export function AgentStatusDialog({ open, onOpenChange }: AgentStatusDialogProps
                     </li>
                   ))}
                 </ul>
-              </ScrollArea>
-            </div>
-          )}
-
-          {/* Chunks Log */}
-          {state.chunks.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Chunks Log</h4>
-              <ScrollArea className="h-[100px] rounded-md border p-2">
-                {state.chunks.map((chunk, index) => (
-                  <div key={index} className="text-sm">{chunk}</div>
-                ))}
               </ScrollArea>
             </div>
           )}

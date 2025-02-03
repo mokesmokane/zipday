@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { google } from "googleapis"
-import { getAuth } from "firebase-admin/auth"
-import { getFirestore } from "firebase-admin/firestore"
+import { adminAuth as auth, adminDb as db } from "@/lib/firebaseAdmin"
 import { cookies } from "next/headers"
+import { getAuth } from "firebase-admin/auth"
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -17,10 +17,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     // Get the current user's session
-    const session = await getAuth().verifySessionCookie(sessionCookie)
+    const session = await auth.verifySessionCookie(sessionCookie)
 
-    // Get user's Google Calendar tokens
-    const db = getFirestore()
     const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()

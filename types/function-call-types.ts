@@ -115,6 +115,9 @@ export type FunctionCallName =
   | "get_calendar_for_date_range"
   | "set_callback"
   | "create_backlog_task"
+  | "get_backlog_tasks"
+  | "get_incomplete_tasks"
+  | "get_future_tasks"
 
 export interface FunctionCallDefinition {
   type: "function"
@@ -209,6 +212,30 @@ export const FUNCTION_CALL_UI_METADATA: FunctionCallUIMetadata[] = [
     description: "Store user preferences",
     category: "system",
     planMode: true
+  },
+  {
+    id: "get_backlog_tasks",
+    label: "Get Backlog Tasks",
+    icon: "📥",
+    description: "Get all tasks from the backlog",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "get_incomplete_tasks",
+    label: "Get Incomplete Tasks",
+    icon: "📥",
+    description: "Get all incomplete tasks",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "get_future_tasks",
+    label: "Get Future Tasks",
+    icon: "📥",
+    description: "Get all tasks scheduled for the future",
+    category: "task",
+    planMode: false
   }
 ]
 
@@ -231,10 +258,16 @@ export function getFunctionCallsByCategory(isPlanMode: boolean): Record<string, 
   }, {} as Record<string, FunctionCallUIMetadata[]>)
 }
 
-export class FunctionCall {
+export type FunctionCall = {
   name: string
   args: FunctionCallArgs
   executeImmediately: boolean
+}
+
+export class ActionCall implements FunctionCall {
+  name: string
+  args: FunctionCallArgs
+  executeImmediately: boolean = true
   constructor(
     name: string,
     args: FunctionCallArgs,
@@ -244,7 +277,16 @@ export class FunctionCall {
     this.args = args
     this.executeImmediately = executeImmediately
   }
+}
 
+export class QueryCall implements FunctionCall {
+  name: string
+  args: FunctionCallArgs
+  executeImmediately: boolean = false
+  constructor(name: string, args: FunctionCallArgs) { 
+    this.name = name
+    this.args = args
+  }
 }
 
 export type FunctionCallRegistry = Record<
@@ -439,7 +481,39 @@ export class FunctionCallFactory {
         additionalProperties: false
       }
     },
-
+    get_backlog_tasks: {
+      type: "function",
+      name: "get_backlog_tasks",
+      description: "Retrieves all tasks from the backlog",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+        additionalProperties: false
+      }
+    },
+    get_incomplete_tasks: {
+      type: "function",
+      name: "get_incomplete_tasks",
+      description: "Retrieves all incomplete tasks within a default date range",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+        additionalProperties: false
+      }
+    },
+    get_future_tasks: {
+      type: "function",
+      name: "get_future_tasks",
+      description: "Retrieves all tasks scheduled for the future within a default date range",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+        additionalProperties: false
+      }
+    },
     get_calendar_for_date_range: {
       type: "function",
       name: "get_calendar_for_date_range",
@@ -461,7 +535,6 @@ export class FunctionCallFactory {
         additionalProperties: false
       }
     },
-
     set_callback: {
       type: "function",
       name: "set_callback",
@@ -519,13 +592,13 @@ export class FunctionCallFactory {
     // Handle ID mapping based on function name
     switch (name) {
       case "move_task":
-        return new FunctionCall(name, createMoveTaskArgs(args as MoveTaskArgs, idMappings), immediateExecution)
+        return new ActionCall(name, createMoveTaskArgs(args as MoveTaskArgs, idMappings))
       case "mark_tasks_completed":
-        return new FunctionCall(name, createMarkTasksCompletedArgs(args as MarkTasksCompletedArgs, idMappings), immediateExecution)
+        return new ActionCall(name, createMarkTasksCompletedArgs(args as MarkTasksCompletedArgs, idMappings))
       case "mark_subtask_completed":
-        return new FunctionCall(name, createMarkSubtaskCompletedArgs(args as MarkSubtaskCompletedArgs, idMappings), immediateExecution)
+        return new ActionCall(name, createMarkSubtaskCompletedArgs(args as MarkSubtaskCompletedArgs, idMappings))
       default:
-        return new FunctionCall(name, args, immediateExecution)
+        return new ActionCall(name, args)
     }
   }
 

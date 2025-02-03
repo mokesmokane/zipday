@@ -181,6 +181,9 @@ export function AiProvider({ children }: { children: React.ReactNode }) {
 Current Context:
 
 ${contextSections.join("\n\n")}
+
+The current date is ${format(new Date(), "yyyy-MM-dd")}
+The time is ${format(new Date(), "h:mm a")}
 `.trim()
 
     setContextData({ 

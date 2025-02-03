@@ -75,7 +75,6 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
           id: task.id || crypto.randomUUID(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          isBacklog: true
         }
 
         console.log("Adding task to backlog:", tempTask)

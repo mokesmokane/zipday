@@ -1,3 +1,59 @@
+import { format, isValid, parseISO } from "date-fns"
+
+interface CalendarDateRange {
+  timeMin: string
+  timeMax: string
+}
+
+export function createCalendarDateRange(
+  startDate: string,
+  endDate: string,
+  options = { debug: false }
+): CalendarDateRange {
+  if (options.debug) {
+    console.log("Input dates:", { startDate, endDate })
+  }
+
+  // Validate input format (should be YYYY-MM-DD)
+  const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateFormatRegex.test(startDate) || !dateFormatRegex.test(endDate)) {
+    throw new Error(
+      `Invalid date format. Expected YYYY-MM-DD, got startDate: ${startDate}, endDate: ${endDate}`
+    )
+  }
+
+  // Create the full ISO strings
+  const startDateTime = `${startDate}T00:00:00`
+  const endDateTime = `${endDate}T23:59:59`
+
+  if (options.debug) {
+    console.log("DateTime strings:", { startDateTime, endDateTime })
+  }
+
+  // Parse and validate the dates
+  const parsedStart = parseISO(startDateTime)
+  const parsedEnd = parseISO(endDateTime)
+
+  if (!isValid(parsedStart) || !isValid(parsedEnd)) {
+    throw new Error(
+      `Invalid date values. After parsing: startDate: ${format(
+        parsedStart,
+        "yyyy-MM-dd HH:mm:ss"
+      )}, endDate: ${format(parsedEnd, "yyyy-MM-dd HH:mm:ss")}`
+    )
+  }
+
+  // Convert to ISO strings
+  const timeMin = parsedStart.toISOString()
+  const timeMax = parsedEnd.toISOString()
+
+  if (options.debug) {
+    console.log("Final ISO strings:", { timeMin, timeMax })
+  }
+
+  return { timeMin, timeMax }
+}
+
 /**
  * Gets the start date string for incomplete tasks based on the specified time range
  */

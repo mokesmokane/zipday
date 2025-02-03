@@ -77,11 +77,13 @@ export async function POST(req: Request) {
         content: "Please gather all necessary information to execute this plan."
       }
     ], 
-    tool_choice: tools.length ? "auto" : "none",
+    tool_choice: tools.length ? "required" : "none",
     tools: tools as ChatCompletionTool[],
   }
+
   console.log("request:", request)
   // Call OpenAI API directly for information gathering
+  
   const completion = await client.chat.completions.create(request as ChatCompletionCreateParamsNonStreaming)
 
   console.log("completion:", completion)

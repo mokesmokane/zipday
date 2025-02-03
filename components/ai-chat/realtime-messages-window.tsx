@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react"
 import { Minimize2, MessageCircle, Maximize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CardTitle } from "@/components/ui/card"
-import { useRealtime } from "@/lib/context/transcription-context"
-import { FunctionCall } from "@/types/function-call-types"
+import { Transcript, useRealtime } from "@/lib/context/transcription-context"
+import { ActionCall, FunctionCall, QueryCall } from "@/types/function-call-types"
 import { FunctionCallDisplay } from "@/components/ai-chat/function-call-display"
 import { cn } from "@/lib/utils"
 
@@ -200,11 +200,11 @@ export function RealtimeMessagesWindow({ isOpen, onClose }: RealtimeMessagesWind
     >
       <div className="flex flex-col gap-4 p-4">
         {messages.map((message, index) => {
-          if (message instanceof FunctionCall) {
+          if (message instanceof ActionCall || message instanceof QueryCall) {
             return (
               <FunctionCallDisplay
                 key={index}
-                functionCall={message}
+                functionCall={message as ActionCall | QueryCall}
                 index={index}
               />
             )
@@ -212,10 +212,10 @@ export function RealtimeMessagesWindow({ isOpen, onClose }: RealtimeMessagesWind
           return (
             <div
               key={index}
-              data-role={message.role}
+              data-role={(message as Transcript).role}
               className="max-w-[80%] rounded-xl px-3 py-2 text-sm data-[role=assistant]:self-start data-[role=user]:self-end data-[role=assistant]:bg-gray-100 data-[role=user]:bg-blue-500 data-[role=assistant]:text-black data-[role=user]:text-white"
             >
-              {message.content}
+              {(message as Transcript).content}
             </div>
           )
         })}

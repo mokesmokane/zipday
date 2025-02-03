@@ -18,6 +18,7 @@ import { RealtimeProvider } from "@/lib/context/transcription-context"
 import { FunctionCallProvider } from "@/lib/context/function-call-context"
 import { VoiceSessionProvider } from "@/lib/context/voice-session-context"
 import { PlanProvider } from "@/lib/context/plan-context"
+import { WorkflowProvider } from "@/lib/context/agent-workflow-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -44,6 +45,7 @@ export default async function RootLayout({
         >
           <VoiceSessionProvider>
             <PlanProvider>
+            <WorkflowProvider>
             <RootProvider serverUser={user}>
               <SidebarProvider>
                 <DateProvider>
@@ -69,6 +71,7 @@ export default async function RootLayout({
                 </DateProvider>
               </SidebarProvider>
             </RootProvider>
+            </WorkflowProvider>
             </PlanProvider>
           </VoiceSessionProvider>
           <Toaster />
