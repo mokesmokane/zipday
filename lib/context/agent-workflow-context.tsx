@@ -6,7 +6,7 @@ import { AgentEventPayload } from "@/lib/agents/agent-types"
 
 export interface WorkflowState {
   stage: "idle" | "running" | "completed" | "error"
-  todo_list: string[]
+  todo_list: Record<string, boolean>
   context?: string
   currentMessage?: string
   error?: string
@@ -15,6 +15,7 @@ export interface WorkflowState {
 interface WorkflowContextType {
   state: WorkflowState
   startWorkflow: (todo_list: string[], context?: string) => Promise<void>
+  stopWorkflow: () => void
   getCoordinator: () => WorkflowCoordinator | null
 }
 
@@ -23,7 +24,7 @@ const WorkflowContext = createContext<WorkflowContextType | undefined>(undefined
 export function WorkflowProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WorkflowState>({
     stage: "idle",
-    todo_list: []
+    todo_list: {}
   })
 
   const [coordinator, setCoordinator] = useState<WorkflowCoordinator | null>(null)
@@ -31,7 +32,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   const initializeCoordinator = (todo_list: string[], context?: string) => {
     // Create a new coordinator instance with the provided todo_list and context
     const newCoordinator = new WorkflowCoordinator(
-      context || "",
+      "",
       Object.fromEntries(todo_list.map(task => [task, false]))
     )
 
@@ -89,7 +90,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
       // Update state to running
       setState({
         stage: "running",
-        todo_list,
+        todo_list: Object.fromEntries(todo_list.map(task => [task, false])),
         context,
         currentMessage: "Starting workflow..."
       })
@@ -120,6 +121,18 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const stopWorkflow = () => {
+    if (coordinator) {
+      coordinator.stop()
+      setState({
+        stage: "idle",
+        todo_list: {},
+        currentMessage: "Workflow stopped"
+      })
+      setCoordinator(null)
+    }
+  }
+
   const getCoordinator = () => coordinator
 
   return (
@@ -127,6 +140,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         startWorkflow,
+        stopWorkflow,
         getCoordinator
       }}
     >

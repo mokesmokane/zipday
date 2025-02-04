@@ -59,7 +59,7 @@ export function Sidebar() {
               Dashboard
             </Button>
           </Link>
-          <Link href="/board">
+          <Link href="/dashboard/plan">
             <Button
               variant="ghost"
               className="hover:bg-accent w-full justify-start"

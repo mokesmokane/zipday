@@ -19,6 +19,7 @@ import { FunctionCallProvider } from "@/lib/context/function-call-context"
 import { VoiceSessionProvider } from "@/lib/context/voice-session-context"
 import { PlanProvider } from "@/lib/context/plan-context"
 import { WorkflowProvider } from "@/lib/context/agent-workflow-context"
+import { Sidebar } from "@/components/sidebar/Sidebar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -37,7 +38,10 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider
+      <div className="flex min-h-screen flex-col">
+        <div className="flex flex-1">
+          <main className="flex-1 overflow-y-auto">
+            <div><ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
@@ -75,7 +79,10 @@ export default async function RootLayout({
             </PlanProvider>
           </VoiceSessionProvider>
           <Toaster />
-        </ThemeProvider>
+        </ThemeProvider></div>
+          </main>
+          </div>
+        </div>
       </body>
     </html>
   )

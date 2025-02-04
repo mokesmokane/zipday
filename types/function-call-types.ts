@@ -330,7 +330,7 @@ export class FunctionCallFactory {
             description: "The title of the task"
           },
           description: {
-            type: "string",
+            type: ["string", "null"],
             description: "Optional details or notes about the task"
           },
           date: {
@@ -338,33 +338,32 @@ export class FunctionCallFactory {
             description: "Date of the task in YYYY-MM-DD format"
           },
           start_time: {
-            type: "string",
+            type: ["string", "null"],
             description: "Start time of the task in HH:MM format"
           },
           subtasks: {
-            type: "array",
+            type: ["array", "null"],
             description: "List of subtasks associated with this task",
             items: {
               type: "string"
             }
           },
           duration_minutes: {
-            type: "number",
+            type: ["number", "null"],
             description: "Duration of the task in minutes"
           },
-
           urgency: {
-            type: "string",
+            type: ["string", "null"],
             enum: ["immediate", "soon", "later", "someday"],
             description: "Urgency level"
           },
           importance: {
-            type: "string",
+            type: ["string", "null"],
             enum: ["critical", "significant", "valuable", "optional"],
             description: "Importance level"
           }
         },
-        required: ["title", "date"],
+        required: ["title", "date", "description", "start_time", "subtasks", "duration_minutes", "urgency", "importance"],
         additionalProperties: false
       }
     },
@@ -380,7 +379,7 @@ export class FunctionCallFactory {
             description: "The title of the task"
           },
           description: {
-            type: "string",
+            type: ["string", "null"],
             description: "Optional details or notes about the task"
           },
           subtasks: {
@@ -391,22 +390,21 @@ export class FunctionCallFactory {
             }
           },
           duration_minutes: {
-            type: "string",
+            type: ["string", "null"],
             description: "Duration of the task in minutes in the format '1h30m'"
           },
-
           urgency: {
-            type: "string",
+            type: ["string", "null"],
             enum: ["immediate", "soon", "later", "someday"],
             description: "Urgency level"
           },
           importance: {
-            type: "string",
+            type: ["string", "null"],
             enum: ["critical", "significant", "valuable", "optional"],
             description: "Importance level"
           }
         },
-        required: ["title"],
+        required: ["title", "description", "subtasks", "duration_minutes", "urgency", "importance"],
         additionalProperties: false
       }
     },
@@ -426,11 +424,11 @@ export class FunctionCallFactory {
             description: "New date for the task in YYYY-MM-DD format"
           },
           new_start_time: {
-            type: "string",
+            type: ["string", "null"],
             description: "New start time in HH:MM (24-hour) format"
           },
           new_end_time: {
-            type: "string",
+            type: ["string", "null"],
             description: "New end time in HH:MM (24-hour) format"
           }
         },
@@ -561,23 +559,26 @@ export class FunctionCallFactory {
     add_user_notes: {
       type: "function",
       name: "add_user_notes",
-      description:
-        "Store user instructions or relevant notes about how to interact best with the user. This data is for the AI's private reference, not for external display.",
+      description: "Store user instructions or relevant notes about how to interact best with the user. This data is for the AI's private reference, not for external display.",
       parameters: {
         type: "object",
         properties: {
           explicit_instructions: {
-            type: "string",
-            description:
-              "Any explicit general instructions the user provides (e.g., preferences on how to be addressed, topics to avoid, etc.)"
+            type: ["array", "null"],
+            description: "Any explicit general instructions the user provides (e.g., preferences on how to be addressed, topics to avoid, etc.)",
+            items: {
+              type: "string"
+            }
           },
           interaction_notes: {
-            type: "string",
-            description:
-              "Additional observations or strategies for best interacting with the user, e.g. communication style, motivational tips, etc."
+            type: ["array", "null"],
+            description: "Additional observations or strategies for best interacting with the user, e.g. communication style, motivational tips, etc.",
+            items: {
+              type: "string"
+            }
           }
         },
-        required: [],
+        required: ["explicit_instructions", "interaction_notes"],
         additionalProperties: false
       }
     }

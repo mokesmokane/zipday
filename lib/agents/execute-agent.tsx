@@ -13,6 +13,10 @@ export class ExecuteAgent extends EventEmitter {
       
       const results: Record<string, string> = {}
       for (const action of plan) {
+        console.log("Executing action:", action)
+        console.log("typeof action", typeof action)
+        console.log("action.name", action.name)
+        console.log("action.parameters", action.parameters)
         const result = await processCall(action.name, action.parameters)
         results[action.name] = result
       }

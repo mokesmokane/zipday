@@ -16,6 +16,7 @@ export interface TodoResult {
 
   export interface DecideResponse {
     decision: AgentPhase | undefined
+    reason?: string
     message: string
     success: boolean
   }

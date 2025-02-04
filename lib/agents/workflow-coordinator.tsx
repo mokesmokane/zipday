@@ -7,9 +7,9 @@ import { ExecuteAgent } from "./execute-agent"
 import { ActionPlanItem, AgentPhase, AgentEventPayload } from "./agent-types"
 import { DecideAgent } from "./decide-agent"
 /**
- * The WorkflowCoordinator is the “conductor” of the round‐based workflow.
+ * The WorkflowCoordinator is the "conductor" of the round-based workflow.
  * It holds the global state (context, todo list, action plan, round count) and
- * delegates the “gather”, “plan”, and “execute” steps to the respective agents.
+ * delegates the "gather", "plan", and "execute" steps to the respective agents.
  */
 export class WorkflowCoordinator extends EventEmitter {
   private context: string
@@ -21,6 +21,7 @@ export class WorkflowCoordinator extends EventEmitter {
   private planAgent: PlanAgent
   private executeAgent: ExecuteAgent
   private decideAgent: DecideAgent
+  private stopRequested: boolean = false
   /**
    * @param initialContext A long string with initial information.
    * @param todoList       The list of tasks to be completed.
@@ -42,7 +43,7 @@ export class WorkflowCoordinator extends EventEmitter {
     this.todoList = todoList
     this.results = []
     this.actionPlan = []
-
+    this.stopRequested = false
     // Allow dependency injection so you can swap implementations as needed.
     this.gatherAgent = gatherAgent || new GatherAgent()
     this.planAgent = planAgent || new PlanAgent()
@@ -113,7 +114,7 @@ export class WorkflowCoordinator extends EventEmitter {
    * When finished, emit a finished event.
    */
   public async run(): Promise<void> {
-    while (!this.isFinished()) {
+    while (!this.isFinished() && !this.stopRequested) {
       this.round++
       this.emit("roundStart", {
         round: this.round,
@@ -127,17 +128,28 @@ export class WorkflowCoordinator extends EventEmitter {
         console.log("Todo List:", this.todoList)
         console.log("Action Plan:", this.actionPlan)
         console.log("Round:", this.round)
-        const phase = await this.decideAgent.decide(this.todoList, this.actionPlan, this.context, this.results.join("\n"))
-        this.emit("phaseDecision", { round: this.round, decision: phase } as AgentEventPayload)
+        
+        // Set up the event listener before calling decide
+        const decideCompletePromise = new Promise<{ decision: AgentPhase, reason: string }>(resolve => {
+          this.decideAgent.once("decideComplete", (payload) => {
+            resolve({ decision: payload.decision, reason: payload.reason })
+          })
+        })
+        
+        // Call decide after setting up the listener
+        const decideResponse = await this.decideAgent.decide(this.todoList, this.actionPlan, this.context, this.results.join("\n"))
+        const decideComplete = await decideCompletePromise
+        
+        this.emit("phaseDecision", { round: this.round, decision: decideComplete.decision, reason: decideComplete.reason } as AgentEventPayload)
 
       try {
-        if (phase === "gather") {
+        if (decideComplete.decision === "gather") {
           const newInfo = await this.gatherAgent.gather(this.context, this.todoList)
           this.updateContext(newInfo)
-        } else if (phase === "build_plan") {
+        } else if (decideComplete.decision === "build_plan") {
           const plan = await this.planAgent.buildPlan(this.context, this.todoList)
           this.actionPlan = plan
-        } else if (phase === "execute") {
+        } else if (decideComplete.decision === "execute") {
           const executionResults = await this.executeAgent.execute(this.todoList, this.actionPlan)
           this.updateTodoList(executionResults)
           // Optionally clear the plan once executed.
@@ -162,5 +174,16 @@ export class WorkflowCoordinator extends EventEmitter {
       todo: this.todoList,
       plan: this.actionPlan
     } as AgentEventPayload)
+  }
+
+  public stop() {
+    this.emit("STOP", {
+        round: this.round,
+        context: this.context,
+        todo: this.todoList,
+        plan: this.actionPlan
+      } as AgentEventPayload)    
+      this.stopRequested = true
+
   }
 }

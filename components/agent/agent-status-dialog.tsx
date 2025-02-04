@@ -54,14 +54,14 @@ export function AgentStatusDialog({ open, onOpenChange }: AgentStatusDialogProps
           )}
 
           {/* Todo List */}
-          {state.todo_list.length > 0 && (
+          {Object.keys(state.todo_list).length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Todo List</h4>
               <ScrollArea className="h-[100px] rounded-md border p-2">
                 <ul className="space-y-1">
-                  {state.todo_list.map((item, index) => (
+                  {Object.entries(state.todo_list).map(([task, done], index) => (
                     <li key={index} className="text-sm">
-                      {item}
+                      {task}
                     </li>
                   ))}
                 </ul>

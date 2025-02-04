@@ -38,20 +38,27 @@ export async function processCall<T extends FunctionCallArgs>(
   functionCallName: string,
   args: T | string
 ): Promise<any> {
+  console.log("Processing function call:", functionCallName)
+  console.log("Arguments:", args)
+  console.log("typeof args", typeof args)
 
   // Generate a unique ID for this function call
   const callId = `${functionCallName}-${Date.now()}`
 
+  console.log("callId", callId)
   // Parse args if they're a string
   const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args
 
+  console.log("parsedArgs", parsedArgs)
+  console.log("typeof parsedArgs", typeof parsedArgs)
   // Create a promise for this function call
-  const processingPromise = executeCall(functionCallName as FunctionCallName, parsedArgs)
+  const processingPromise = executeCall(functionCallName, parsedArgs)
 
   try {
     // Wait for execution
     const result = await processingPromise
 
+    console.log("result", result)
     return result
   } catch (error) {
     console.error("Error processing call:", error)
@@ -61,7 +68,7 @@ export async function processCall<T extends FunctionCallArgs>(
 
 // Execute a function call
 async function executeCall(
-  name: FunctionCallName,
+  name: string,
   args: FunctionCallArgs
 ): Promise<any> {
   try {
@@ -74,7 +81,8 @@ async function executeCall(
       throw new Error(`Invalid arguments type: ${typeof args}. Expected object.`)
     }
 
-    switch (name as FunctionCallName) {
+    console.log("name", name)
+    switch (name) {
       case "create_task": {
         const { title, description, date, subtasks, urgency, importance } = args as CreateTaskArgs
         const newTask: Task = {
@@ -102,6 +110,12 @@ async function executeCall(
       }
 
       case "mark_tasks_completed": {
+        const { task_ids } = args as MarkTasksCompletedArgs
+        for (const taskId of task_ids) {
+          markTaskCompletedAction(taskId)
+        }
+      }
+      case "mark_task_completed": {
         const { task_ids } = args as MarkTasksCompletedArgs
         for (const taskId of task_ids) {
           markTaskCompletedAction(taskId)
