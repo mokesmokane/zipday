@@ -51,7 +51,7 @@ describe("formatTasksContext", () => {
   ]
 
   it("formats tasks with basic information", () => {
-    const idMapping = { task1: 1 }
+    const idMapping = { task1: "1" }
     const result = formatTasksContext("Test Tasks", tasks, idMapping)
     expect(result).toContain("Test Tasks:")
     expect(result).toContain("[") // Check for checkbox
@@ -81,7 +81,7 @@ describe("formatTasksContext", () => {
       updatedAt: "2024-03-20T00:00:00Z"
     }
 
-    const idMapping = { task1: 1 }
+    const idMapping = { task1: "1" }
     const result = formatTasksContext(
       "Test Tasks",
       [taskWithMetadata],

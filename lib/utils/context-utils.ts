@@ -1,5 +1,6 @@
 import { Task } from "@/types/daily-task-types"
 import { format, parseISO } from "date-fns"
+import { GoogleCalendarEvent } from "@/components/daily-planner/calendar/google-calendar-event"
 
 interface TasksContextResult {
   text: string
@@ -17,23 +18,65 @@ interface IdMappingResult {
  * @param existingMapping Existing mapping to add to (optional)
  * @returns Object containing forward and reverse ID mappings
  */
-export function createIdMapping(tasks: Task[]): IdMappingResult {
+export function createIdMapping(tasks: Task[], existingMapping: Record<string, string> = {}): IdMappingResult {
+  
+  const mapping: Record<string, string> = existingMapping
   const reverseMapping: Record<string, string> = {}
-  const mapping: Record<string, string> = {}
+  for (const [key, value] of Object.entries(existingMapping)) {
+    reverseMapping[value] = key
+  }
+
+  // Get the next available number
+  const nextNumber = Object.keys(reverseMapping).length + 1
+
+  try {
+    // Add new mappings
+    tasks.forEach((task, index) => {
+      if (!mapping[task.id]) {
+        const shortId = (nextNumber + index).toString()
+        mapping[task.id] = shortId
+        reverseMapping[shortId] = task.id
+      }
+    })
+  } catch (error) {
+    console.error("tasks mapping error", tasks)
+    console.error("Error creating ID mapping:", error)
+    throw error
+  }
+
+  return { mapping, reverseMapping }
+}
+/**
+ * Creates or updates a mapping between task IDs and short numeric IDs
+ * @param tasks List of tasks to create mappings for
+ * @param existingMapping Existing mapping to add to (optional)
+ * @returns Object containing forward and reverse ID mappings
+ */
+export function createCalendarIdMapping(events: any[], existingMapping: Record<string, string> = {}): IdMappingResult {
+  
+  const mapping: Record<string, string> = existingMapping
+  const reverseMapping: Record<string, string> = {}
+  for (const [key, value] of Object.entries(existingMapping)) {
+    reverseMapping[value] = key
+  }
 
   // Get the next available number
   const nextNumber = Object.keys(reverseMapping).length + 1
 
   // Add new mappings
-  tasks.forEach((task, index) => {
-    if (!mapping[task.id]) {
+  events.forEach((event, index) => {
+    if (!mapping[event.id]) {
       const shortId = (nextNumber + index).toString()
-      mapping[task.id] = shortId
-      reverseMapping[shortId] = task.id
+      mapping[event.id] = shortId
+      reverseMapping[shortId] = event.id
     }
   })
 
   return { mapping, reverseMapping }
+}
+
+export function formatCalendarContext(events: any[]): string {
+  return formatCalendarEvents(events)
 }
 
 /**
@@ -59,7 +102,7 @@ export function formatTasksContext(
         metadata.push(`Duration: ${task.durationMinutes}m`)
       if (task.tags?.length) metadata.push(`Tags: ${task.tags.join(", ")}`)
       if (task.calendarItem?.start?.dateTime) {
-        console.log("task.calendarItem.start.dateTime", task.calendarItem.start.dateTime)
+        // console.log("task.calendarItem.start.dateTime", task.calendarItem.start.dateTime)
         const startTime = format(
           parseISO(task.calendarItem.start.dateTime),
           "h:mm a"
@@ -87,6 +130,18 @@ export function formatTasksContext(
 ${title}:
 ${formattedTasks}
 `
+}
+
+export function formatTasksContextForDayTasks(
+  title: string,
+  tasksByDay: Record<string, Task[]>,
+  idMapping: Record<string, string>
+): string {
+  let formattedTasks = ""
+  for (const day of Object.keys(tasksByDay)) {
+    formattedTasks += formatTasksContext(`${title} for ${day}`, tasksByDay[day], idMapping)
+  }
+  return formattedTasks
 }
 
 /**

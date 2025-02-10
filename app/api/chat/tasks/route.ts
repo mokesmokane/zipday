@@ -32,7 +32,8 @@ function getStageTools(functionDefs: FunctionCallDefinition[], stage: "gather" |
     "move_task",
     "mark_tasks_completed",
     "mark_subtask_completed",
-    "create_backlog_task"
+    "create_backlog_task",
+    "schedule_backlog_task"
   ]
 
   return functionDefs.filter(fn => 

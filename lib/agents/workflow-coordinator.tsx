@@ -6,6 +6,7 @@ import { PlanAgent } from "./plan-agent"
 import { ExecuteAgent } from "./execute-agent"
 import { ActionPlanItem, AgentPhase, AgentEventPayload } from "./agent-types"
 import { DecideAgent } from "./decide-agent"
+import { ExecuteCodeAgent } from "./execute-code-agent"
 /**
  * The WorkflowCoordinator is the "conductor" of the round-based workflow.
  * It holds the global state (context, todo list, action plan, round count) and
@@ -20,8 +21,10 @@ export class WorkflowCoordinator extends EventEmitter {
   private gatherAgent: GatherAgent
   private planAgent: PlanAgent
   private executeAgent: ExecuteAgent
+  private executeCodeAgent: ExecuteCodeAgent
   private decideAgent: DecideAgent
   private stopRequested: boolean = false
+  private mapping: Record<string, string> = {}
   /**
    * @param initialContext A long string with initial information.
    * @param todoList       The list of tasks to be completed.
@@ -36,11 +39,13 @@ export class WorkflowCoordinator extends EventEmitter {
     gatherAgent?: GatherAgent,
     planAgent?: PlanAgent,
     executeAgent?: ExecuteAgent,
+    executeCodeAgent?: ExecuteCodeAgent,
     decideAgent?: DecideAgent
   ) {
     super()
-    this.context = initialContext
+    this.context = initialContext + "\n\n" + "Todays date is " + new Date().toISOString()
     this.todoList = todoList
+    this.mapping = {}
     this.results = []
     this.actionPlan = []
     this.stopRequested = false
@@ -48,6 +53,7 @@ export class WorkflowCoordinator extends EventEmitter {
     this.gatherAgent = gatherAgent || new GatherAgent()
     this.planAgent = planAgent || new PlanAgent()
     this.executeAgent = executeAgent || new ExecuteAgent()
+    this.executeCodeAgent = executeCodeAgent || new ExecuteCodeAgent()
     this.decideAgent = decideAgent || new DecideAgent()
     // Forward agent events (optionally augmenting with round information).
     this.setupAgentEvents()
@@ -72,13 +78,27 @@ export class WorkflowCoordinator extends EventEmitter {
     this.executeAgent.on("executeComplete", (payload) =>
       this.emit("executeComplete", { round: this.round, ...payload })
     )
+    
+    // Add ExecuteCodeAgent event forwarding
+    this.executeCodeAgent.on("executeCodeStart", (payload) =>
+      this.emit("executeCodeStart", { round: this.round, ...payload })
+    )
+    this.executeCodeAgent.on("executeCodeError", (payload) =>
+      this.emit("executeCodeError", { round: this.round, ...payload })
+    )
+    this.executeCodeAgent.on("pseudoCode", (payload) =>
+      this.emit("pseudoCode", { round: this.round, ...payload })
+    )
+    this.executeCodeAgent.on("code", (payload) =>
+      this.emit("code", { round: this.round, ...payload })
+    )
   }
 
   /**
    * Returns true if every todo item has been marked as done.
    */
   private isFinished(): boolean {
-    return Object.values(this.todoList).every((task) => task)
+    return Object.values(this.todoList).every((task) => task) || this.stopRequested
   }
 
   /**
@@ -86,6 +106,10 @@ export class WorkflowCoordinator extends EventEmitter {
    */
   private updateContext(newInfo: string) {
     this.context += newInfo
+  }
+
+  private updateMapping(mapping: Record<string, string>) {
+    this.mapping = mapping
   }
 
   /**
@@ -116,6 +140,8 @@ export class WorkflowCoordinator extends EventEmitter {
   public async run(): Promise<void> {
     while (!this.isFinished() && !this.stopRequested) {
       this.round++
+
+      // Emit roundStart at the beginning of each round
       this.emit("roundStart", {
         round: this.round,
         context: this.context,
@@ -123,44 +149,64 @@ export class WorkflowCoordinator extends EventEmitter {
         plan: this.actionPlan,
         results: this.results.join("\n")
       } as AgentEventPayload)
-        console.log("Results:", this.results.join("\n"))
-        console.log("Context:", this.context)
-        console.log("Todo List:", this.todoList)
-        console.log("Action Plan:", this.actionPlan)
-        console.log("Round:", this.round)
-        
-        // Set up the event listener before calling decide
-        const decideCompletePromise = new Promise<{ decision: AgentPhase, reason: string }>(resolve => {
-          this.decideAgent.once("decideComplete", (payload) => {
-            resolve({ decision: payload.decision, reason: payload.reason })
-          })
+
+      console.log("Results:", this.results.join("\n"))
+      console.log("Context:", this.context)
+      console.log("Todo List:", this.todoList)
+      console.log("Action Plan:", this.actionPlan)
+      console.log("Round:", this.round)
+      
+      // Set up the event listener before calling decide
+      const decideCompletePromise = new Promise<{ decision: AgentPhase, reason: string }>(resolve => {
+        this.decideAgent.once("decideComplete", (payload) => {
+          resolve({ decision: payload.decision, reason: payload.reason }) 
         })
-        
-        // Call decide after setting up the listener
-        const decideResponse = await this.decideAgent.decide(this.todoList, this.actionPlan, this.context, this.results.join("\n"))
-        const decideComplete = await decideCompletePromise
-        
-        this.emit("phaseDecision", { round: this.round, decision: decideComplete.decision, reason: decideComplete.reason } as AgentEventPayload)
+      })
+      
+      // Call decide after setting up the listener
+      // const decideResponse = await this.decideAgent.decide(this.todoList, this.actionPlan, this.context, this.results.join("\n"))
+      // const decideComplete = await decideCompletePromise
+      const decideComplete = { decision: "execute_code", reason: "test" }
+      
+      // Emit phase decision
+      this.emit("phaseDecision", { 
+        round: this.round, 
+        decision: decideComplete.decision, 
+        reason: decideComplete.reason,
+        todo: this.todoList,
+        context: this.context
+      } as AgentEventPayload)
 
       try {
         if (decideComplete.decision === "gather") {
-          const newInfo = await this.gatherAgent.gather(this.context, this.todoList)
+          const {newInfo, mapping} = await this.gatherAgent.gather(this.context, this.todoList, {})
           this.updateContext(newInfo)
+          this.updateMapping(mapping)
         } else if (decideComplete.decision === "build_plan") {
           const plan = await this.planAgent.buildPlan(this.context, this.todoList)
           this.actionPlan = plan
+        } else if (decideComplete.decision === "execute_code") {
+          const executionResults = await this.executeCodeAgent.executeCode(this.round, this.context, this.todoList, this.mapping)
+          this.stop()     // Optionally clear the plan once executed.
+          this.actionPlan = []
         } else if (decideComplete.decision === "execute") {
-          const executionResults = await this.executeAgent.execute(this.todoList, this.actionPlan)
+          const executionResults = await this.executeAgent.execute(this.todoList, this.actionPlan, this.mapping, this.round)
           this.updateTodoList(executionResults)
           // Optionally clear the plan once executed.
           this.actionPlan = []
         }
       } catch (error) {
-        this.emit("error", { round: this.round, error } as AgentEventPayload)
+        this.emit("error", { 
+          round: this.round, 
+          error,
+          todo: this.todoList,
+          context: this.context
+        } as AgentEventPayload)
         // In production you might choose to handle or log errors and continue.
         throw error
       }
 
+      // Emit roundEnd with updated state
       this.emit("roundEnd", {
         round: this.round,
         context: this.context,
@@ -168,6 +214,8 @@ export class WorkflowCoordinator extends EventEmitter {
         plan: this.actionPlan
       } as AgentEventPayload)
     }
+
+    // Emit finished with final state
     this.emit("finished", {
       round: this.round,
       context: this.context,

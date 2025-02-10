@@ -57,6 +57,12 @@ ${results !== '' ? `The results of the previous phase are:
   gather: if there isnt enough information
   build_plan: if there are no steps in the plan, but there appears to be enough information to build a plan
   execute: if there is a plan that can be executed
+
+  DON NOT MAKE ANYTHING UP, JUST USE THE INFORMATION PROVIDED
+
+  If you dont have enough information to make a decision call the gather phase
+
+  Todays date is ${new Date().toISOString().split('T')[0]}
   `
 
   return prompt

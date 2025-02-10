@@ -31,7 +31,8 @@ function getExecuteTools(functionDefs: FunctionCallDefinition[]): FunctionCallDe
     "move_task",
     "mark_tasks_completed",
     "mark_subtask_completed",
-    "create_backlog_task"
+    "create_backlog_task",
+    "schedule_backlog_task"
   ]
   
   return functionDefs.filter(fn => executeTools.includes(fn.name))

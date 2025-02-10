@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, ReactNode } from "react"
 import { WorkflowCoordinator } from "@/lib/agents/workflow-coordinator"
 import { AgentEventPayload } from "@/lib/agents/agent-types"
 
@@ -12,22 +12,87 @@ export interface WorkflowState {
   error?: string
 }
 
+export const ALL_EVENT_TYPES = [
+  "roundStart",
+  "phaseDecision",
+  "roundEnd",
+  "gatherStart",
+  "gatherComplete",
+  "planBuildStart",
+  "planBuildComplete",
+  "executeStart",
+  "executeComplete",
+  "executeCodeStart",
+  "executeCodeError",
+  "executeCodeComplete",
+  "pseudoCode",
+  "code",
+  "STOP",
+  "finished",
+  "error"
+] as const
+
+export type EventType = typeof ALL_EVENT_TYPES[number]
+
+export interface EventItem {
+  id: string
+  type: EventType
+  timestamp: Date
+  payload: AgentEventPayload
+}
+
 interface WorkflowContextType {
   state: WorkflowState
+  events: EventItem[]
+  visibleEventTypes: Set<EventType>
   startWorkflow: (todo_list: string[], context?: string) => Promise<void>
   stopWorkflow: () => void
   getCoordinator: () => WorkflowCoordinator | null
+  clearEvents: () => void
+  toggleEventTypeVisibility: (type: EventType) => void
+  resetVisibleEventTypes: () => void
 }
 
 const WorkflowContext = createContext<WorkflowContextType | undefined>(undefined)
 
 export function WorkflowProvider({ children }: { children: ReactNode }) {
+  const [events, setEvents] = useState<EventItem[]>([])
+  const [visibleEventTypes, setVisibleEventTypes] = useState<Set<EventType>>(new Set(ALL_EVENT_TYPES))
   const [state, setState] = useState<WorkflowState>({
     stage: "idle",
     todo_list: {}
   })
-
   const [coordinator, setCoordinator] = useState<WorkflowCoordinator | null>(null)
+
+  const addEvent = useCallback((type: EventType, payload: AgentEventPayload) => {
+    console.log("Adding event:", type, payload)
+    setEvents(prev => [...prev, {
+      id: Math.random().toString(36).slice(2),
+      type,
+      timestamp: new Date(),
+      payload
+    }])
+  }, [])
+
+  const clearEvents = useCallback(() => {
+    setEvents([])
+  }, [])
+
+  const toggleEventTypeVisibility = useCallback((type: EventType) => {
+    setVisibleEventTypes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(type)) {
+        newSet.delete(type)
+      } else {
+        newSet.add(type)
+      }
+      return newSet
+    })
+  }, [])
+
+  const resetVisibleEventTypes = useCallback(() => {
+    setVisibleEventTypes(new Set(ALL_EVENT_TYPES))
+  }, [])
 
   const initializeCoordinator = (todo_list: string[], context?: string) => {
     // Create a new coordinator instance with the provided todo_list and context
@@ -39,6 +104,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     // Set up event listeners for this coordinator instance
     newCoordinator.on("roundStart", (payload: AgentEventPayload) => {
       console.log(`[Round ${payload.round}] Starting round with context: ${payload.context}`)
+      addEvent("roundStart", payload)
       setState(prev => ({
         ...prev,
         currentMessage: `Starting round ${payload.round} with context: ${payload.context}`
@@ -47,6 +113,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
 
     newCoordinator.on("phaseDecision", (payload: AgentEventPayload) => {
       console.log(`[Round ${payload.round}] Phase decision: ${payload.decision}`)
+      addEvent("phaseDecision", payload)
       setState(prev => ({
         ...prev,
         currentMessage: `Round ${payload.round}: ${payload.decision}`
@@ -55,6 +122,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
 
     newCoordinator.on("roundEnd", (payload: AgentEventPayload) => {
       console.log(`[Round ${payload.round}] Ending round; Todo: ${payload.todo}`)
+      addEvent("roundEnd", payload)
       setState(prev => ({
         ...prev,
         currentMessage: `Completed round ${payload.round}. Todo: ${payload.todo}`
@@ -63,6 +131,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
 
     newCoordinator.on("finished", (payload: AgentEventPayload) => {
       console.log(`[Round ${payload.round}] Workflow finished! Final context: ${payload.context}`)
+      addEvent("finished", payload)
       setState(prev => ({
         ...prev,
         stage: "completed",
@@ -71,13 +140,78 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
       }))
     })
 
+    newCoordinator.on("STOP", (payload: AgentEventPayload) => {
+      console.log(`[Round ${payload.round}] Workflow stopped`)
+      addEvent("STOP", payload)
+      setState(prev => ({
+        ...prev,
+        stage: "idle",
+        currentMessage: "Workflow stopped"
+      }))
+    })
+
+    newCoordinator.on("executeCodeStart", (payload: AgentEventPayload) => {
+      console.log(`[Round ${payload.round}] Starting code execution`)
+      addEvent("executeCodeStart", payload)
+      setState(prev => ({
+        ...prev,
+        currentMessage: `Round ${payload.round}: Executing code...`
+      }))
+    })
+
     newCoordinator.on("error", (payload: AgentEventPayload) => {
       console.error(`[Round ${payload.round}] Error encountered: ${payload.error}`)
+      addEvent("error", payload)
       setState(prev => ({
         ...prev,
         stage: "error",
         error: payload.error?.toString() || "Unknown error",
         currentMessage: `Error in round ${payload.round}: ${payload.error}`
+      }))
+    })
+
+    newCoordinator.on("executeCodeError", (payload: AgentEventPayload) => {
+      console.error(`[Round ${payload.round}] Code execution error: ${payload.error}`)
+      addEvent("executeCodeError", payload)
+      setState(prev => ({
+        ...prev,
+        currentMessage: `Error in round ${payload.round}: ${payload.error}`
+      }))
+    })
+
+    newCoordinator.on("executeCodeComplete", (payload: AgentEventPayload) => {
+      console.log(`[Round ${payload.round}] Code execution complete`)
+      addEvent("executeCodeComplete", payload)
+      setState(prev => ({
+        ...prev,
+        currentMessage: `Completed round ${payload.round}: Code execution complete`
+      }))
+    })
+
+    newCoordinator.on("executeComplete", (payload: AgentEventPayload) => {
+      console.log(`[Round ${payload.round}] Execution complete`)
+      addEvent("executeComplete", payload)
+      setState(prev => ({
+        ...prev,
+        currentMessage: `Completed round ${payload.round}: Execution complete`
+      }))
+    })
+
+    newCoordinator.on("code", (payload: AgentEventPayload) => {
+      console.log(`[Round ${payload.round}] Code: ${payload.code}`)
+      addEvent("code", payload)
+      setState(prev => ({
+        ...prev,
+        currentMessage: `Round ${payload.round}: Code: ${payload.code}`
+      }))
+    })
+    
+    newCoordinator.on("pseudoCode", (payload: AgentEventPayload) => {
+      console.log(`[Round ${payload.round}] Pseudo-code: ${payload.pseudoCode}`)
+      addEvent("pseudoCode", payload)
+      setState(prev => ({
+        ...prev,
+        currentMessage: `Round ${payload.round}: Pseudo-code: ${payload.pseudoCode}`
       }))
     })
 
@@ -133,15 +267,22 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  
+
   const getCoordinator = () => coordinator
 
   return (
     <WorkflowContext.Provider
       value={{
         state,
+        events,
+        visibleEventTypes,
         startWorkflow,
         stopWorkflow,
-        getCoordinator
+        getCoordinator,
+        clearEvents,
+        toggleEventTypeVisibility,
+        resetVisibleEventTypes
       }}
     >
       {children}

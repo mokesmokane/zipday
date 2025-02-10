@@ -92,7 +92,7 @@ export async function getDaysByDateRangeAction(
 
     return {
       isSuccess: true,
-      message: "Tasks retrieved successfully",
+      message: "Tasks for date range " + startDate + " to " + endDate + " retrieved successfully",
       data: days
     }
   } catch (error) {
@@ -148,6 +148,7 @@ export async function addTaskAction(
     console.log("Tasks after adding:", tasks)
 
     day.tasks = tasks
+    
     await docRef.set({ tasks }, { merge: true })
     console.log("Tasks after setting:", tasks)
     // Sync with Google Calendar
@@ -258,6 +259,36 @@ export async function markTaskCompletedAction(taskId: string): Promise<ActionSta
   }
 }
 
+export async function markSubtaskCompletedAction(taskId: string, subtaskId: string): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+    const dateDoc = await findTaskAction(taskId)
+    if (!dateDoc) {
+      return { isSuccess: false, message: "Task not found" }
+    }
+    const docRef = db.collection("userDays").doc(userId).collection("dailyTasks").doc(dateDoc)
+    const docSnap = await docRef.get()
+    if (!docSnap.exists) {
+      return { isSuccess: false, message: "Daily doc not found" }
+    }
+    const day = docSnap.data() as Day
+    const tasks = day.tasks || []
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) {
+      return { isSuccess: false, message: "Task not found" }
+    }
+    const subtask = task.subtasks?.find(s => s.id === subtaskId)
+    if (!subtask) {
+      return { isSuccess: false, message: "Subtask not found" }
+    }
+    subtask.completed = true
+    await docRef.update({ tasks })
+    return { isSuccess: true, message: "Subtask marked as completed" }
+  } catch (error) {
+    console.error("Error marking subtask as completed:", error)
+    return { isSuccess: false, message: "Failed to mark subtask as completed" }
+  }
+}
 
 export async function moveTaskAction(taskId: string, newDate: string, newStartTime?: string, newEndTime?: string): Promise<ActionState<void>> {
   try {
@@ -281,10 +312,83 @@ export async function moveTaskAction(taskId: string, newDate: string, newStartTi
     const newTask = { ...task, startTime: newStartTime, endTime: newEndTime }
     await addTaskAction(newDate, newTask)
     await deleteTaskAction(dateDoc, taskId)
-    return { isSuccess: true, message: "Task moved successfully" }
+    return { isSuccess: true, message: "Task moved successfully from " + dateDoc + " to " + newDate }
   } catch (error) {
     console.error("Error moving task:", error)
     return { isSuccess: false, message: "Failed to move task" }
+  }
+}
+
+export async function scheduleBacklogTaskAction(taskId: string, date: string, startTime?: string, endTime?: string): Promise<ActionState<void>> {
+  try {
+    const userId = await getAuthenticatedUserId()
+
+    // First get the backlog tasks
+    const backlogResult = await getBacklogTasksAction()
+    if (!backlogResult.isSuccess || !backlogResult.data) {
+      return { isSuccess: false, message: "Failed to get backlog tasks" }
+    }
+
+    const task = backlogResult.data.find(t => t.id === taskId)
+    if (!task) {
+      return { isSuccess: false, message: "Task not found in backlog" }
+    }
+
+    // Add detailed logging
+    console.log("Found task:", {
+      id: task.id,
+      title: task.title,
+      subtasks: task.subtasks,
+      calendarItem: task.calendarItem
+    })
+    let calendarItem = {
+      gcalEventId: "",
+      start: { 
+        dateTime: startTime,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    } as CalendarItem
+
+    if (endTime) {
+      calendarItem.end = { 
+        dateTime: endTime,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    }
+    // Create the calendar item if start time is provided
+    const newTask = startTime ? {
+      ...task,
+      
+    } : task
+
+    console.log("New task to be added:", {
+      id: newTask.id,
+      title: newTask.title,
+      subtasks: newTask.subtasks,
+      calendarItem: newTask.calendarItem
+    })
+
+    // Add to scheduled date first
+    const addResult = await addTaskAction(date, newTask)
+    if (!addResult.isSuccess) {
+      return { isSuccess: false, message: "Failed to add task to schedule" }
+    }
+
+    // Then delete from backlog
+    await deleteBacklogTaskAction(taskId)
+
+    return { 
+      isSuccess: true, 
+      message: "Task scheduled successfully from backlog to " + date,
+      data: undefined
+    }
+  } catch (error) {
+    console.error("Error scheduling backlog task:", error)
+    if (error instanceof Error) {
+      console.error("Error details:", error.message)
+      console.error("Error stack:", error.stack)
+    }
+    return { isSuccess: false, message: "Failed to schedule backlog task" }
   }
 }
 
@@ -666,6 +770,10 @@ export async function getIncompleteTasksAction(
   endDate: string
 ): Promise<ActionState<Record<string, Day>>> {
   try {
+    //if startdate == enddate add 1 day to enddate
+    if (startDate === endDate) {
+      endDate = new Date(new Date(endDate).setDate(new Date(endDate).getDate() + 1)).toISOString()
+    }
     const userId = await getAuthenticatedUserId()
     console.log("Getting incomplete tasks for date range:", startDate, endDate)
     // Get all documents in the date range by their IDs
@@ -694,7 +802,7 @@ export async function getIncompleteTasksAction(
 
     return {
       isSuccess: true,
-      message: "Incomplete tasks retrieved successfully",
+      message: "Incomplete tasks for date range " + startDate + " to " + endDate + " retrieved successfully",
       data: incompleteTasks
     }
   } catch (error) {

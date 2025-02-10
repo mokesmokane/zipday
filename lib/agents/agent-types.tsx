@@ -1,4 +1,4 @@
-export type AgentPhase = "gather" | "build_plan" | "execute"
+export type AgentPhase = "gather" | "build_plan" | "execute" | "execute_code"
 
 export interface ActionPlanItem {
   name: string
@@ -11,6 +11,8 @@ export interface AgentEventPayload {
   context?: string
   todo?: Record<string, boolean>
   plan?: ActionPlanItem[]
+  pseudoCode?: string
+  code?: string
   decision?: AgentPhase
   reason?: string
   newInfo?: string

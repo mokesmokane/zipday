@@ -39,7 +39,7 @@ export interface SetCallbackArgs {
   context: string
 }
 
-export interface MoveTaskArgs{
+export interface MoveTaskArgs {
   task_id: string
   new_date: string
   new_start_time?: string
@@ -53,7 +53,7 @@ export function createMoveTaskArgs(args: MoveTaskArgs, idMappings: Record<string
   }
 }
 
-export interface MarkTasksCompletedArgs{
+export interface MarkTasksCompletedArgs {
   task_ids: string[]
 }
 
@@ -92,6 +92,17 @@ export interface CreateBacklogTaskArgs {
   importance?: string
 }
 
+export interface ScheduleBacklogTaskArgs {
+  task_id: string
+  date: string
+  start_time?: string
+  end_time?: string
+}
+
+export interface ExecuteCodeArgs {
+  code: string
+}
+
 export type FunctionCallArgs =
   | UpdatePlanArgs
   | HangUpArgs
@@ -100,16 +111,19 @@ export type FunctionCallArgs =
   | CreateTaskArgs
   | SetCallbackArgs
   | MoveTaskArgs
+  | ExecuteCodeArgs
+  | ScheduleBacklogTaskArgs
   | MarkTasksCompletedArgs
   | MarkSubtaskCompletedArgs
   | GetCalendarForDateRangeArgs
   | CreateBacklogTaskArgs
 
-export type FunctionCallName = 
-  | "update_plan" 
-  | "add_user_notes" 
-  | "move_task" 
+export type FunctionCallName =
+  | "update_plan"
+  | "add_user_notes"
+  | "move_task"
   | "create_task"
+  | "schedule_backlog_task"
   | "mark_tasks_completed"
   | "mark_subtask_completed"
   | "get_calendar_for_date_range"
@@ -118,6 +132,7 @@ export type FunctionCallName =
   | "get_backlog_tasks"
   | "get_incomplete_tasks"
   | "get_future_tasks"
+  | "execute_code"
 
 export interface FunctionCallDefinition {
   type: "function"
@@ -170,6 +185,14 @@ export const FUNCTION_CALL_UI_METADATA: FunctionCallUIMetadata[] = [
     label: "Move Task",
     icon: "🔄",
     description: "Reschedule a task",
+    category: "task",
+    planMode: false
+  },
+  {
+    id: "schedule_backlog_task",
+    label: "Schedule Backlog Task",
+    icon: "🔄",
+    description: "Schedule a backlog task",
     category: "task",
     planMode: false
   },
@@ -236,6 +259,14 @@ export const FUNCTION_CALL_UI_METADATA: FunctionCallUIMetadata[] = [
     description: "Get all tasks scheduled for the future",
     category: "task",
     planMode: false
+  },
+  {
+    id: "execute_code",
+    label: "Execute Code",
+    icon: "💻",
+    description: "Execute code in typescript",
+    category: "system",
+    planMode: false
   }
 ]
 
@@ -283,7 +314,7 @@ export class QueryCall implements FunctionCall {
   name: string
   args: FunctionCallArgs
   executeImmediately: boolean = false
-  constructor(name: string, args: FunctionCallArgs) { 
+  constructor(name: string, args: FunctionCallArgs) {
     this.name = name
     this.args = args
   }
@@ -408,6 +439,34 @@ export class FunctionCallFactory {
         additionalProperties: false
       }
     },
+    schedule_backlog_task: {
+      type: "function",
+      name: "schedule_backlog_task",
+      description: "Move a task from the backlog to a specific date",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: {
+            type: "string",
+            description: "Unique identifier or reference for the task"
+          },
+          date: {
+            type: "string",
+            description: "Date of the task in YYYY-MM-DD format"
+          },
+          start_time: {
+            type: ["string", "null"],
+            description: "Start time of the task in HH:MM format"
+          },
+          end_time: {
+            type: ["string", "null"],
+            description: "End time of the task in HH:MM format"
+          }
+        },
+        required: ["task_id", "date", "start_time", "end_time"],
+        additionalProperties: false
+      }
+    },
     move_task: {
       type: "function",
       name: "move_task",
@@ -438,11 +497,11 @@ export class FunctionCallFactory {
     },
 
     mark_tasks_completed: {
-      type: "function", 
+      type: "function",
       name: "mark_tasks_completed",
-      description: "Marks a specified task as completed",
+      description: "Marks a specified task (and all its subtasks) as completed",
       parameters: {
-        type: "object", 
+        type: "object",
         properties: {
           task_ids: {
             type: "array",
@@ -581,6 +640,20 @@ export class FunctionCallFactory {
         required: ["explicit_instructions", "interaction_notes"],
         additionalProperties: false
       }
+    },
+    execute_code: {
+      type: "function",
+      name: "execute_code",
+      description: "Executes code in typescript",
+      parameters: {
+        type: "object",
+        properties: {
+          pseudo_code_plan: { type: "string", description: "Plan thoughtfully in pseudocode with a clear plan of action and comments" },
+          code: { type: "string", description: "The code to execute" }
+        },
+        required: ["pseudo_code_plan", "code"],
+        additionalProperties: false
+      }
     }
   }
 
@@ -609,6 +682,10 @@ export class FunctionCallFactory {
       throw new Error(`Unknown function definition: ${name}`)
     }
     return config
+  }
+
+  getCodeExecutionFunctionDefinitions(): FunctionCallDefinition[] {
+    return Object.values(this._functionCallDefinitions).filter(fn => fn.name === "execute_code")
   }
 
   getAllFunctionDefinitions(): FunctionCallDefinition[] {

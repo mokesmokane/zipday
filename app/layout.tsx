@@ -19,8 +19,6 @@ import { FunctionCallProvider } from "@/lib/context/function-call-context"
 import { VoiceSessionProvider } from "@/lib/context/voice-session-context"
 import { PlanProvider } from "@/lib/context/plan-context"
 import { WorkflowProvider } from "@/lib/context/agent-workflow-context"
-import { Sidebar } from "@/components/sidebar/Sidebar"
-
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
@@ -29,7 +27,7 @@ export const metadata = {
 }
 
 export default async function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode
 }) {
@@ -38,10 +36,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-      <div className="flex min-h-screen flex-col">
-        <div className="flex flex-1">
-          <main className="flex-1 overflow-y-auto">
-            <div><ThemeProvider
+        <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
@@ -49,40 +44,46 @@ export default async function RootLayout({
         >
           <VoiceSessionProvider>
             <PlanProvider>
-            <WorkflowProvider>
-            <RootProvider serverUser={user}>
-              <SidebarProvider>
-                <DateProvider>
-                  <RealtimeProvider>
-                    <TasksProvider>
-                      <BacklogProvider>
-                      <FunctionCallProvider>
-                        <TaskActionsProvider>
-                          <FilterProvider>
-                            <CurrentViewProvider>
-                              <GoogleCalendarProvider>
-                                <SelectedTasksProvider>
-                                  <AiProvider>{children}</AiProvider>
-                                </SelectedTasksProvider>
-                              </GoogleCalendarProvider>
-                            </CurrentViewProvider>
-                          </FilterProvider>
-                        </TaskActionsProvider>
-                      </FunctionCallProvider>
-                      </BacklogProvider>
-                    </TasksProvider>
-                  </RealtimeProvider>
-                </DateProvider>
-              </SidebarProvider>
-            </RootProvider>
-            </WorkflowProvider>
+              
+              <WorkflowProvider>
+                  <RootProvider serverUser={user}>
+                    <SidebarProvider>
+                      <DateProvider>
+                        <RealtimeProvider>
+                          <TasksProvider>
+                            <BacklogProvider>
+                              <FunctionCallProvider>
+                                <TaskActionsProvider>
+                                  <FilterProvider>
+                                    <CurrentViewProvider>
+                                      <GoogleCalendarProvider>
+                                        <SelectedTasksProvider>
+                                          <AiProvider>
+                                            <div className="flex min-h-screen flex-col">
+                                              <div className="flex flex-1">
+                                                <main className="flex-1 overflow-y-auto">
+                                                  {children}
+                                                </main>
+                                              </div>
+                                            </div>
+                                          </AiProvider>
+                                        </SelectedTasksProvider>
+                                      </GoogleCalendarProvider>
+                                    </CurrentViewProvider>
+                                  </FilterProvider>
+                                </TaskActionsProvider>
+                              </FunctionCallProvider>
+                            </BacklogProvider>
+                          </TasksProvider>
+                        </RealtimeProvider>
+                      </DateProvider>
+                    </SidebarProvider>
+                  </RootProvider>
+              </WorkflowProvider>
             </PlanProvider>
           </VoiceSessionProvider>
           <Toaster />
-        </ThemeProvider></div>
-          </main>
-          </div>
-        </div>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -46,6 +46,7 @@ export function DashHeader() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const { isExpanded, toggleSidebar } = useSidebar()
   const { currentView, setCurrentView } = useCurrentView()
+  const { backlogTasks } = useBacklog()
   const {
     activeFilters,
     recentTags,
@@ -93,12 +94,16 @@ export function DashHeader() {
 
   const handleConfirmBulkDelete = async () => {
     try {
-      // Delete each selected task
-      await Promise.all(
-        selectedTasks.map(task =>
-          task.isBacklog ? deleteBacklogTask(task.id) : deleteTask(task.id)
-        )
-      )
+      // Split tasks into backlog and regular tasks based on if they exist in backlogTasks
+      const backlogTaskIds = backlogTasks.map(t => t.id)
+      const backlogTasksToDelete = selectedTasks.filter(task => backlogTaskIds.includes(task.id))
+      const regularTasksToDelete = selectedTasks.filter(task => !backlogTaskIds.includes(task.id))
+
+      // Delete tasks from each collection
+      await Promise.all([
+        ...backlogTasksToDelete.map(task => deleteBacklogTask(task.id)),
+        ...regularTasksToDelete.map(task => deleteTask(task.id))
+      ])
       clearSelectedTasks()
       setIsDeleteDialogOpen(false)
     } catch (error) {
@@ -108,18 +113,28 @@ export function DashHeader() {
 
   const handleBulkAddTag = async (tag: string) => {
     try {
-      // Add tag to each selected task
-      await Promise.all(
-        selectedTasks.map(task => {
+      // Split tasks into backlog and regular tasks based on if they exist in backlogTasks
+      const backlogTaskIds = backlogTasks.map(t => t.id)
+      const backlogTasksToUpdate = selectedTasks.filter(task => backlogTaskIds.includes(task.id))
+      const regularTasksToUpdate = selectedTasks.filter(task => !backlogTaskIds.includes(task.id))
+
+      // Add tag to each task
+      await Promise.all([
+        ...backlogTasksToUpdate.map(task => {
           const updatedTask = {
             ...task,
             tags: [...new Set([...(task.tags || []), tag])]
           }
-          return task.isBacklog
-            ? deleteBacklogTask(task.id)
-            : updateTask(task.id, updatedTask)
+          return deleteBacklogTask(task.id)
+        }),
+        ...regularTasksToUpdate.map(task => {
+          const updatedTask = {
+            ...task,
+            tags: [...new Set([...(task.tags || []), tag])]
+          }
+          return updateTask(task.id, updatedTask)
         })
-      )
+      ])
       clearSelectedTasks()
     } catch (error) {
       console.error("Failed to add tag to selected tasks:", error)
@@ -128,18 +143,28 @@ export function DashHeader() {
 
   const handleBulkSetDuration = async (durationMinutes: number) => {
     try {
-      // Set duration for each selected task
-      await Promise.all(
-        selectedTasks.map(task => {
+      // Split tasks into backlog and regular tasks based on if they exist in backlogTasks
+      const backlogTaskIds = backlogTasks.map(t => t.id)
+      const backlogTasksToUpdate = selectedTasks.filter(task => backlogTaskIds.includes(task.id))
+      const regularTasksToUpdate = selectedTasks.filter(task => !backlogTaskIds.includes(task.id))
+
+      // Set duration for each task
+      await Promise.all([
+        ...backlogTasksToUpdate.map(task => {
           const updatedTask = {
             ...task,
             durationMinutes
           }
-          return task.isBacklog
-            ? deleteBacklogTask(task.id)
-            : updateTask(task.id, updatedTask)
+          return deleteBacklogTask(task.id)
+        }),
+        ...regularTasksToUpdate.map(task => {
+          const updatedTask = {
+            ...task,
+            durationMinutes
+          }
+          return updateTask(task.id, updatedTask)
         })
-      )
+      ])
       clearSelectedTasks()
     } catch (error) {
       console.error("Failed to set duration for selected tasks:", error)

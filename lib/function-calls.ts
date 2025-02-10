@@ -24,6 +24,10 @@ export const getAllFunctionDefinitions = (): FunctionCallDefinition[] => {
   return functionCallFactory.getAllFunctionDefinitions()
 }
 
+export const getCodeExecutionFunctionDefinitions = (): FunctionCallDefinition[] => {
+  return functionCallFactory.getCodeExecutionFunctionDefinitions()
+}
+
 export const getSelectedFunctionDefinitions = (selectedFunctions: FunctionCallName[]): FunctionCallDefinition[] => {
   return selectedFunctions.map(name => functionCallFactory.getFunctionDefinition(name))
 }

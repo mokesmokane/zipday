@@ -8,8 +8,8 @@ export class ExecuteAgent extends EventEmitter {
      * Execute all actions in the plan.
      * Here we simulate a successful execution for every action.
      */
-    public async execute(todoList: Record<string, boolean>, plan: ActionPlanItem[]): Promise<Record<string, boolean>> {
-      this.emit("executeStart", { plan })
+    public async execute(todoList: Record<string, boolean>, plan: ActionPlanItem[], mapping: Record<string, string>, round: number): Promise<Record<string, boolean>> {
+      this.emit("executeStart", { plan, round })
       
       const results: Record<string, string> = {}
       for (const action of plan) {
@@ -17,7 +17,7 @@ export class ExecuteAgent extends EventEmitter {
         console.log("typeof action", typeof action)
         console.log("action.name", action.name)
         console.log("action.parameters", action.parameters)
-        const result = await processCall(action.name, action.parameters)
+        const result = await processCall(action.name, action.parameters, mapping)
         results[action.name] = result
       }
 
