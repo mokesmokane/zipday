@@ -10,6 +10,7 @@ import { parseTaskInput } from '@/lib/utils/task-parser'
 import { determineNextEntryStage, getCurrentEntryStage, processEnterKey } from '@/lib/utils/entry-stage-manager'
 import { getSuggestions, SuggestionManager } from "@/lib/utils/suggestion-manager"
 import { useGoogleCalendar } from "@/lib/context/google-calendar-context"
+import { useDate } from "@/lib/context/date-context"
 interface AIInputProps {
     onSubmit: (value: string) => void
     onValueChanged: (previewTasks: Task[]) => void
@@ -26,8 +27,7 @@ interface AIInputProps {
     onCancel, 
     onValueChanged,
     initialValue = '', 
-    isEditing = false,
-    currentDate
+    isEditing = false
   }: AIInputProps) {
     const [inputValue, setInputValue] = useState(initialValue)
     const [suggestions, setSuggestions] = useState<string[]>([])
@@ -40,6 +40,7 @@ interface AIInputProps {
     const [currentTask, setCurrentTask] = useState<Task | null>(null)
     const [contextTasks, setContextTasks] = useState<Task[]>([])
     const [current_text, setCurrent_text] = useState<string>('')
+    const {selectedDate} = useDate()
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     // const { canvasTheme, formData } = useCanvas()
     const promptTimeoutRef = useRef<NodeJS.Timeout>()
@@ -139,7 +140,7 @@ interface AIInputProps {
             timeOptions: ['9:00', '10:00', '11:00', '14:00', '15:00'],
             events: events
           },
-          currentDate || ''
+          selectedDate
         )
         console.log('suggestions', suggestions)
         setSuggestions(suggestions)

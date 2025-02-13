@@ -18,53 +18,53 @@ const testOptions = {
 
 describe("getSuggestions", () => {
   describe("title and subtask suggestions", () => {
-
+    
     it("filters AI suggestions based on input", async () => {
-      const result = await getSuggestions("som", "som", "title", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("som", "som", "title", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["suggestion 1", "suggestion 2", "something else"])
     })
 
     it("handles subtask prefix correctly", async () => {
-      const result = await getSuggestions("Title\n- som", "- som", "subtask", mockSuggestionManager, testOptions, "2024-03-20")   
+      const result = await getSuggestions("Title\n- som", "- som", "subtask", mockSuggestionManager, testOptions, new Date('2024-03-20'))   
       expect(result).toEqual(["suggestion 1", "suggestion 2", "something else"])
     })
   })
 
   describe("category suggestions", () => {
     it("returns all categories when input is empty", async () => {
-      const result = await getSuggestions("", "", "category", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("", "", "category", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["work", "personal", "health"])
     })
 
     it("returns all categories when only # is typed", async () => {
-      const result = await getSuggestions("Title\n#", "#", "category", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Title\n#", "#", "category", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["work", "personal", "health"])
     })
 
     it("filters categories based on input after #", async () => {
-      const result = await getSuggestions("Title\n#per", "#per", "category", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Title\n#per", "#per", "category", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["personal"])
     })
 
     it("is case insensitive", async () => {
-      const result = await getSuggestions("Title\n#WORK", "#WORK", "category", mockSuggestionManager, testOptions, "2024-03-20"         )
+      const result = await getSuggestions("Title\n#WORK", "#WORK", "category", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["work"])
     })
   })
 
   describe("duration suggestions", () => {
     it("returns all durations when input is empty", async () => {
-      const result = await getSuggestions("Buy groceries\n#personal", "", "duration", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Buy groceries\n#personal", "", "duration", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["30m", "1h", "2h"])
     })
 
     it("filters durations based on input", async () => {
-      const result = await getSuggestions("Buy groceries\n#personal", "1", "duration", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Buy groceries\n#personal", "1", "duration", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["1h"])
     })
 
     it("handles no matches", async () => {
-      const result = await getSuggestions("Buy groceries\n#personal", "5h", "duration", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Buy groceries\n#personal", "5h", "duration", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual([])
     })
   })
@@ -87,7 +87,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events: [] },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
       expect(result[0]).toBe('09:30')
       expect(result[result.length - 1]).toBe('23:30')
@@ -102,7 +102,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events: [] },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
       expect(result[0]).toBe('09:30')
       expect(result[result.length - 1]).toBe('23:30')
@@ -115,7 +115,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events: [] },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
       expect(result).toEqual(['09:30'])
     })
@@ -127,7 +127,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events: [] },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
       // Should return all times starting with 1 (10:00, 11:00, 12:00, etc)
       expect(result).toContain('10:00')
@@ -170,7 +170,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // 10:00 should be excluded as it's the exact start time
@@ -196,7 +196,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // All times within the event should be excluded
@@ -237,7 +237,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // All times within both events should be excluded
@@ -268,7 +268,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // Times within the default 1-hour duration should be excluded
@@ -296,7 +296,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // Time should be available since event is on a different date
@@ -330,7 +330,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // Early and late slots should be excluded
@@ -359,7 +359,7 @@ describe("getSuggestions", () => {
         "time",
         mockSuggestionManager,
         { ...testOptions, events },
-        '2024-03-20'
+        new Date('2024-03-20')
       )
 
       // Should only include 13:00 and 13:30 as they match the prefix and don't overlap
@@ -369,17 +369,17 @@ describe("getSuggestions", () => {
 
   describe("edge cases", () => {
     it("handles unknown entry stage", async () => {
-      const result = await getSuggestions("Title\n- subtask\n#category\n@9:30-11:00\n1h30m", "test", "description" as EntryStage, mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Title\n- subtask\n#category\n@9:30-11:00\n1h30m", "test", "description" as EntryStage, mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual([])
     })
 
     it("handles undefined options by using defaults", async () => {
-      const result = await getSuggestions("Title\n- subtask\n#category\n@9:30-11:00\n1h30m", "", "category", mockSuggestionManager, {}, "2024-03-20")
+      const result = await getSuggestions("Title\n- subtask\n#category\n@9:30-11:00\n1h30m", "", "category", mockSuggestionManager, {}, new Date('2024-03-20'))
       expect(result.length).toBeGreaterThan(0)
     })
 
     it("trims whitespace from input", async () => {
-      const result = await getSuggestions("Title\n- subtask\n", "  #work  ", "category", mockSuggestionManager, testOptions, "2024-03-20")
+      const result = await getSuggestions("Title\n- subtask\n", "  #work  ", "category", mockSuggestionManager, testOptions, new Date('2024-03-20'))
       expect(result).toEqual(["work"])
     })
   })
@@ -400,7 +400,7 @@ describe('generateTimeSlots', () => {
   })
 
   it('should generate time slots from current time to end of day', () => {
-    const slots = generateTimeSlots([], '2024-03-20')
+    const slots = generateTimeSlots([], new Date('2024-03-20'))
     
     // First slot should be 09:30 (rounded up from 09:15)
     expect(slots[0]).toBe('09:30')
@@ -423,17 +423,17 @@ describe('generateTimeSlots', () => {
   it('should round up to nearest 30 minutes for start time', () => {
     // Set current time to 09:10
     jest.setSystemTime(new Date('2024-03-20T09:10:00'))
-    const slots = generateTimeSlots([], '2024-03-20')
+    const slots = generateTimeSlots([], new Date('2024-03-20'))
     expect(slots[0]).toBe('09:30')
 
     // Set current time to 09:31
     jest.setSystemTime(new Date('2024-03-20T09:31:00'))
-    const slots2 = generateTimeSlots([], '2024-03-20')
+    const slots2 = generateTimeSlots([], new Date('2024-03-20'))
     expect(slots2[0]).toBe('10:00')
 
     // Set current time to 09:59
     jest.setSystemTime(new Date('2024-03-20T09:59:00'))
-    const slots3 = generateTimeSlots([], '2024-03-20')
+    const slots3 = generateTimeSlots([], new Date('2024-03-20'))
     expect(slots3[0]).toBe('10:00')
   })
 
@@ -449,7 +449,7 @@ describe('generateTimeSlots', () => {
       }
     ]
 
-    const slots = generateTimeSlots(events, '2024-03-20')
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
 
     // These slots should be excluded due to the event
     expect(slots).not.toContain('10:00')
@@ -482,7 +482,7 @@ describe('generateTimeSlots', () => {
       }
     ]
 
-    const slots = generateTimeSlots(events, '2024-03-20')
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
 
     // These slots should be excluded due to the events
     expect(slots).not.toContain('10:00')
@@ -509,7 +509,7 @@ describe('generateTimeSlots', () => {
       }
     ]
 
-    const slots = generateTimeSlots(events, '2024-03-20')
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
 
     // These slots should be excluded due to the 1-hour default duration
     expect(slots).not.toContain('10:00')
@@ -522,7 +522,7 @@ describe('generateTimeSlots', () => {
   })
 
   it('should handle empty events array', () => {
-    const slots = generateTimeSlots([], '2024-03-20')
+    const slots = generateTimeSlots([], new Date('2024-03-20'))
     
     // Should generate all slots from current time to end of day
     expect(slots.length).toBeGreaterThan(0)
@@ -542,7 +542,7 @@ describe('generateTimeSlots', () => {
       }
     ]
 
-    const slots = generateTimeSlots(events, '2024-03-20')
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
     
     // Should not exclude any slots since event is on a different date
     expect(slots).toContain('10:00')
@@ -570,7 +570,7 @@ describe('generateTimeSlots', () => {
       }
     ]
 
-    const slots = generateTimeSlots(events, '2024-03-20')
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
 
     // Early slots should be excluded
     expect(slots).not.toContain('09:30')
@@ -582,5 +582,20 @@ describe('generateTimeSlots', () => {
     // Middle slots should be present
     expect(slots).toContain('10:00')
     expect(slots).toContain('22:30')
+  })
+
+  it("shouldnt generate suggestions that coincide with events", () => {
+    const events: GoogleCalendarEvent[] = [
+      {
+        id: '1',
+        title: 'Test Event',
+        calendarItem: { start: { dateTime: '2024-03-20T10:00:00' }, end: { dateTime: '2024-03-20T11:30:00' } }
+      }
+    ]
+
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
+    expect(slots).not.toContain('10:00')
+    expect(slots).not.toContain('10:30')
+    expect(slots).not.toContain('11:00')
   })
 }) 

@@ -29,7 +29,9 @@ export interface SuggestionManager {
   getAISuggestions: (params: GetAISuggestionsParams) => Promise<string[]>
 }
 
-export function generateTimeSlots(events: GoogleCalendarEvent[] = [], currentDate: string): string[] {
+export function generateTimeSlots(events: GoogleCalendarEvent[] = [], selectedDate: Date): string[] {
+    console.log("events", events.map(event => event.calendarItem?.start?.dateTime))
+    console.log("selectedDate", selectedDate)
   const now = new Date()
   const currentHour = now.getHours()
   const currentMinute = now.getMinutes()
@@ -60,7 +62,7 @@ export function generateTimeSlots(events: GoogleCalendarEvent[] = [], currentDat
       const startDateTime = event.calendarItem?.start?.dateTime!
       const eventDate = startDateTime.split('T')[0]
       // Only process events for the current date
-      if (eventDate !== currentDate.split('T')[0]) {
+      if (eventDate !== selectedDate.toISOString().split('T')[0]) {
         return null
       }
       
@@ -106,7 +108,7 @@ export async function getSuggestions(
   entryStage: EntryStage,
   suggestionManager: SuggestionManager,
   options: SuggestionOptions = DEFAULT_OPTIONS,
-  currentDate: string
+  selectedDate: Date
 ): Promise<string[]> {
   // Get the current line text without any prefixes
   const textWithoutPrefix = currentText
@@ -147,9 +149,7 @@ export async function getSuggestions(
     }
 
     case 'time': {
-        console.log(options.events)
-      const timeSlots = generateTimeSlots(options.events, currentDate)
-      console.log(timeSlots)
+      const timeSlots = generateTimeSlots(options.events, selectedDate)
       return textWithoutPrefix
         ? timeSlots.filter(time => time.startsWith(textWithoutPrefix))
         : timeSlots
