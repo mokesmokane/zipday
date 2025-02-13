@@ -59,11 +59,10 @@ interface AIInputProps {
       onValueChanged(tasks)
     }
     // Add this new function to format the suggestion preview
-    const getFormattedSuggestion = () => {
-      if (!currentSuggestion) return ''
-      
+    const getFormattedSuggestion = (suggestionToFormat: string) => {
+      if (!suggestionToFormat) return ''
       const currentLine = current_text.trim()
-      let suggestion = currentSuggestion
+      let suggestion = suggestionToFormat
 
       // Handle different prefixes based on entry stage
       if (entryStage === 'category') {
@@ -218,7 +217,7 @@ interface AIInputProps {
           await getSuggestionsByStage()
         } else if (suggestions.length > 0) {
           setCurrentSuggestionIndex((prev) => (prev + 1) % suggestions.length)
-          const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion())
+          const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion(suggestions[(currentSuggestionIndex+1) % suggestions.length]))
           setPreviewTasks(parsedTasks)
         }
       } else if (e.key === 'Enter') {
@@ -234,10 +233,10 @@ interface AIInputProps {
                 // Handle different prefixes based on entry stage
                 if (entryStage === 'category' && currentLine.startsWith('#')) {
                 // For category, remove the # from suggestion if current line has #
-                    suggestionToAppend = getFormattedSuggestion()
+                    suggestionToAppend = getFormattedSuggestion(suggestionToAppend)
                 } else if (entryStage === 'time' && currentLine.startsWith('@')) {
                 // For time, remove the @ from suggestion if current line has @
-                    suggestionToAppend = getFormattedSuggestion()
+                    suggestionToAppend = getFormattedSuggestion(suggestionToAppend)
                 }
     
                 // Replace the current line with the suggestion
@@ -298,7 +297,7 @@ interface AIInputProps {
             >
               <div className="pt-[9px] pl-[13px] whitespace-pre-wrap break-words text-base md:text-sm">
                 <span className="opacity-0">{inputValue}</span>
-                <span className="text-muted-foreground">{getFormattedSuggestion()}</span>
+                <span className="text-muted-foreground">{getFormattedSuggestion(currentSuggestion)}</span>
               </div>
             </div>
             <Textarea
