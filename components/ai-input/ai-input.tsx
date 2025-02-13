@@ -143,6 +143,7 @@ interface AIInputProps {
         )
         console.log('suggestions', suggestions)
         setSuggestions(suggestions)
+        return suggestions
       } catch (error) {
         console.error('Error getting suggestions:', error)
         setSuggestions([])
@@ -214,7 +215,11 @@ interface AIInputProps {
         e.preventDefault()
         if ((showTabPrompt || inputValue.trim().length === 0) && !isLoading && suggestions.length === 0) {
           setShowTabPrompt(false)
-          await getSuggestionsByStage()
+          const newSuggestions = await getSuggestionsByStage()
+          if (newSuggestions && newSuggestions.length > 0) {
+            const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion(newSuggestions[0]))
+            setPreviewTasks(parsedTasks)
+          }
         } else if (suggestions.length > 0) {
           setCurrentSuggestionIndex((prev) => (prev + 1) % suggestions.length)
           const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion(suggestions[(currentSuggestionIndex+1) % suggestions.length]))
