@@ -212,6 +212,8 @@ interface AIInputProps {
           await getSuggestionsByStage()
         } else if (suggestions.length > 0) {
           setCurrentSuggestionIndex((prev) => (prev + 1) % suggestions.length)
+          const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion())
+          setPreviewTasks(parsedTasks)
         }
       } else if (e.key === 'Enter') {
         setShowTabPrompt(true)

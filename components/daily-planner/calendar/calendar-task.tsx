@@ -7,6 +7,7 @@ import { useState } from "react"
 import { EditTaskDialog } from "../edit-task-dialog"
 import type { Task, Day } from "@/types/daily-task-types"
 import type { CSSProperties } from "react"
+import { cn } from "@/lib/utils"
 
 const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
 
@@ -44,23 +45,27 @@ function getTaskStyle(
   }
 }
 
+interface CalendarTaskProps {
+  id: string
+  task: Task
+  position: { index: number; total: number }
+  day: Day
+  isPreview?: boolean
+  onResize?: (taskId: string, durationMinutes: number) => void
+  onTaskUpdate?: (task: Task) => void
+  onDeleteTask?: (taskId: string) => void
+}
+
 export function CalendarTask({
   id,
   task,
-  onResize,
-  onDeleteTask,
   position,
   day,
-  onTaskUpdate
-}: {
-  id: string
-  task: Task
-  onResize?: (taskId: string, durationMinutes: number) => void
-  position: { index: number; total: number }
-  day: Day
-  onTaskUpdate?: (task: Task) => void
-  onDeleteTask?: (taskId: string) => void
-}) {
+  isPreview = false,
+  onResize,
+  onTaskUpdate,
+  onDeleteTask
+}: CalendarTaskProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const {
     attributes,
@@ -118,7 +123,10 @@ export function CalendarTask({
           {...attributes}
           {...listeners}
           onClick={handleClick}
-          className="bg-primary/10 hover:bg-primary/20 h-full select-none overflow-hidden rounded p-2 text-xs transition-colors"
+          className={cn(
+            "bg-primary/10 hover:bg-primary/20 h-full select-none overflow-hidden rounded p-2 text-xs transition-colors",
+            isPreview && "opacity-50"
+          )}
         >
           <div className="font-medium">{task.title}</div>
           {task.description && (

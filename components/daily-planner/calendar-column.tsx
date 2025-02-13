@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog"
 import { Trash2 } from "lucide-react"
 import { useState } from "react"
+import { usePreviewTasks } from "@/lib/context/preview-tasks-context"
 
 interface CalendarColumnProps {
   id: string
@@ -59,6 +60,7 @@ export function CalendarColumn({
   const isCurrentDay = isToday(new Date(date))
   const { events, deleteEvent } = useGoogleCalendar()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const { previewTasks } = usePreviewTasks()
 
   // Filter events for this day
   const dayEvents =
@@ -66,6 +68,16 @@ export function CalendarColumn({
       const eventDate = parseISO(event.calendarItem?.start?.dateTime!)
       return format(eventDate, "yyyy-MM-dd") === date
     }) || []
+
+  // Get preview tasks with calendar items for this day
+  const previewTasksForDay = Object.values(previewTasks)
+    .flat()
+    .filter(task => {
+      if (!task.calendarItem?.start) return false
+      console.log("startMOKES", task.calendarItem.start)
+      const taskDate = format(new Date(task.calendarItem.start.dateTime!.toString()), "yyyy-MM-dd")
+      return taskDate === date
+    })
 
   // Separate all-day and timed events
   const allDayEvents = dayEvents.filter(event => event.allDay)
@@ -75,8 +87,8 @@ export function CalendarColumn({
       event => !tasks.some(task => task.calendarItem?.gcalEventId === event.id)
     )
 
-  // Combine tasks and events for overlap calculation
-  const allItems = [...tasks, ...timedEvents]
+  // Combine tasks, preview tasks, and events for overlap calculation
+  const allItems = [...tasks, ...previewTasksForDay, ...timedEvents]
   const overlappingGroups = getOverlappingGroups(allItems)
 
   // Create a map of item index to its position info
@@ -181,8 +193,28 @@ export function CalendarColumn({
             )
           })}
 
+          {previewTasksForDay.map((task, idx) => {
+            const position = positionMap.get(idx + tasks.length) || { index: 0, total: 1 }
+            return (
+              <CalendarTask
+                id={`preview-${task.id}`}
+                key={task.id}
+                task={task}
+                position={position}
+                isPreview={true}
+                day={{
+                  date,
+                  tasks,
+                  id: "",
+                  createdAt: "",
+                  updatedAt: ""
+                }}
+              />
+            )
+          })}
+
           {timedEvents.map((event, idx) => {
-            const position = positionMap.get(idx + tasks.length) || {
+            const position = positionMap.get(idx + tasks.length + previewTasksForDay.length) || {
               index: 0,
               total: 1
             }

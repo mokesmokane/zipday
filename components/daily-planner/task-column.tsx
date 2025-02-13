@@ -8,6 +8,7 @@ import type { Task } from "@/types/daily-task-types"
 import { TaskCard } from "./task-card"
 import { parseTaskInput } from "@/lib/utils/task-parser"
 import { AIInput } from "../ai-input/ai-input"
+import { usePreviewTasks } from "@/lib/context/preview-tasks-context"
 
 interface TaskColumnProps {
   id: string
@@ -31,14 +32,9 @@ export function TaskColumn({
     id: `${id}-calendar-zone`
   })
 
-  // Get preview tasks from current input
-  const [previewTasks, setPreviewTasks] = useState<Task[]>([])
+  const { previewTasks, setPreviewTasksForColumn, clearPreviewTasks } = usePreviewTasks()
+  const columnPreviewTasks = previewTasks[id] || []
   
-  // Add effect to log state changes
-  useEffect(() => {
-    console.log("previewTasks updated:", previewTasks)
-  }, [previewTasks])
-
   return (
     <div
       ref={setColumnRef}
@@ -48,9 +44,9 @@ export function TaskColumn({
         {children}
 
         {/* Preview section */}
-        {previewTasks.length > 0 && (
+        {columnPreviewTasks.length > 0 && (
           <div className="space-y-4 opacity-50">
-            {previewTasks.map(task => (
+            {columnPreviewTasks.map(task => (
               <TaskCard key={task.id} task={task} isOverCalendarZone={false} />
             ))}
           </div>
@@ -88,12 +84,11 @@ export function TaskColumn({
         <div className="mt-4">
           <AIInput
             onSubmit={() => {
-              onAddTasks(previewTasks)
-              setPreviewTasks([])
+              onAddTasks(columnPreviewTasks)
+              clearPreviewTasks(id)
             }}
-            onValueChanged={(value) => {
-              setPreviewTasks(value)
-              console.log("previewTasksmokes", value)
+            onValueChanged={(tasks) => {
+              setPreviewTasksForColumn(id, tasks)
             }}
             placeholder={`Title
 - subtask

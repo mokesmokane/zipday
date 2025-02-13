@@ -11,6 +11,7 @@ import { CurrentViewProvider } from "@/lib/context/current-view-context"
 import { GoogleCalendarProvider } from "@/lib/context/google-calendar-context"
 import { SelectedTasksProvider } from "@/lib/context/selected-tasks-context"
 import { AiProvider } from "@/lib/context/ai-context"
+import { PreviewTasksProvider } from "@/lib/context/preview-tasks-context"
 import "./globals.css"
 import { RootProvider } from "@/components/utilities/root-provider"
 import { getServerUser } from "@/lib/firebaseAdmin"
@@ -58,15 +59,17 @@ export default async function RootLayout({
                                     <CurrentViewProvider>
                                       <GoogleCalendarProvider>
                                         <SelectedTasksProvider>
-                                          <AiProvider>
-                                            <div className="flex min-h-screen flex-col">
-                                              <div className="flex flex-1">
-                                                <main className="flex-1 overflow-y-auto">
-                                                  {children}
-                                                </main>
+                                          <PreviewTasksProvider>
+                                            <AiProvider>
+                                              <div className="flex min-h-screen flex-col">
+                                                <div className="flex flex-1">
+                                                  <main className="flex-1 overflow-y-auto">
+                                                    {children}
+                                                  </main>
+                                                </div>
                                               </div>
-                                            </div>
-                                          </AiProvider>
+                                            </AiProvider>
+                                          </PreviewTasksProvider>
                                         </SelectedTasksProvider>
                                       </GoogleCalendarProvider>
                                     </CurrentViewProvider>
