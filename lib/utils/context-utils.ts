@@ -8,7 +8,7 @@ interface TasksContextResult {
 }
 
 interface IdMappingResult {
-  mapping: Record<string, string>
+  mapping: Record<string, number>
   reverseMapping: Record<string, string>
 }
 
@@ -18,12 +18,15 @@ interface IdMappingResult {
  * @param existingMapping Existing mapping to add to (optional)
  * @returns Object containing forward and reverse ID mappings
  */
-export function createIdMapping(tasks: Task[], existingMapping: Record<string, string> = {}): IdMappingResult {
+export function createIdMapping(tasks: Task[], existingMapping: Record<string, string | number> = {}): IdMappingResult {
   
-  const mapping: Record<string, string> = existingMapping
+  const mapping: Record<string, number> = {}
   const reverseMapping: Record<string, string> = {}
+  
+  // Convert existing mapping to numbers and populate reverse mapping
   for (const [key, value] of Object.entries(existingMapping)) {
-    reverseMapping[value] = key
+    mapping[key] = typeof value === 'string' ? parseInt(value) : value
+    reverseMapping[mapping[key].toString()] = key
   }
 
   // Get the next available number
@@ -33,9 +36,9 @@ export function createIdMapping(tasks: Task[], existingMapping: Record<string, s
     // Add new mappings
     tasks.forEach((task, index) => {
       if (!mapping[task.id]) {
-        const shortId = (nextNumber + index).toString()
+        const shortId = nextNumber + index
         mapping[task.id] = shortId
-        reverseMapping[shortId] = task.id
+        reverseMapping[shortId.toString()] = task.id
       }
     })
   } catch (error) {
@@ -52,12 +55,15 @@ export function createIdMapping(tasks: Task[], existingMapping: Record<string, s
  * @param existingMapping Existing mapping to add to (optional)
  * @returns Object containing forward and reverse ID mappings
  */
-export function createCalendarIdMapping(events: any[], existingMapping: Record<string, string> = {}): IdMappingResult {
+export function createCalendarIdMapping(events: any[], existingMapping: Record<string, string | number> = {}): IdMappingResult {
   
-  const mapping: Record<string, string> = existingMapping
+  const mapping: Record<string, number> = {}
   const reverseMapping: Record<string, string> = {}
+  
+  // Convert existing mapping to numbers and populate reverse mapping
   for (const [key, value] of Object.entries(existingMapping)) {
-    reverseMapping[value] = key
+    mapping[key] = typeof value === 'string' ? parseInt(value) : value
+    reverseMapping[mapping[key].toString()] = key
   }
 
   // Get the next available number
@@ -66,9 +72,9 @@ export function createCalendarIdMapping(events: any[], existingMapping: Record<s
   // Add new mappings
   events.forEach((event, index) => {
     if (!mapping[event.id]) {
-      const shortId = (nextNumber + index).toString()
+      const shortId = nextNumber + index
       mapping[event.id] = shortId
-      reverseMapping[shortId] = event.id
+      reverseMapping[shortId.toString()] = event.id
     }
   })
 
@@ -89,7 +95,7 @@ export function formatCalendarContext(events: any[]): string {
 export function formatTasksContext(
   title: string,
   tasks: Task[],
-  idMapping: Record<string, string>
+  idMapping: Record<string, string | number>
 ): string {
   if (!tasks.length) return ""
 
@@ -102,7 +108,6 @@ export function formatTasksContext(
         metadata.push(`Duration: ${task.durationMinutes}m`)
       if (task.tags?.length) metadata.push(`Tags: ${task.tags.join(", ")}`)
       if (task.calendarItem?.start?.dateTime) {
-        // console.log("task.calendarItem.start.dateTime", task.calendarItem.start.dateTime)
         const startTime = format(
           parseISO(task.calendarItem.start.dateTime),
           "h:mm a"
@@ -113,13 +118,13 @@ export function formatTasksContext(
         metadata.push(`Time: ${startTime}${endTime ? ` - ${endTime}` : ""}`)
       }
 
-      let taskStr = `  - [${task.completed ? "x" : " "}] ${task.title} (TaskID:${idMapping[task.id]} )`
+      let taskStr = `  - [${task.completed ? "x" : " "}] ${task.title} (#${idMapping[task.id]})`
       if (task.description) taskStr += `\n    Description: ${task.description}`
       if (metadata.length) taskStr += `\n    (${metadata.join(" | ")})`
       if (task.subtasks?.length) {
         taskStr += "\n    Subtasks:"
         task.subtasks.forEach(subtask => {
-          taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text} (SubtaskID:${idMapping[subtask.id]})`
+          taskStr += `\n    - [${subtask.completed ? "x" : " "}] ${subtask.text} (#${idMapping[subtask.id]})`
         })
       }
       return taskStr

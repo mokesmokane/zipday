@@ -93,11 +93,9 @@ export function parseMetadata(line: string): ParsedMetadata | undefined {
 export function parseTaskInput(input: string): Task[] {
   const tasks: Task[] = []
   const taskBlocks = input.split("\n\n").filter(Boolean)
-
   for (const block of taskBlocks) {
     const lines = block.split("\n")
     if (lines.length === 0) continue
-
     let title = lines[0].trim()
     let subtasks = []
     let tags = []
@@ -115,11 +113,9 @@ export function parseTaskInput(input: string): Task[] {
       // Remove markers from title
       title = title.replace(/^[!*]+/, "").trim()
     }
-
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim()
       if (!line) continue
-
       if (line.startsWith("-")) {
         // Subtask
         subtasks.push({
@@ -176,9 +172,8 @@ export function parseTaskInput(input: string): Task[] {
         }
       }
     }
-
     const now = new Date().toISOString()
-    tasks.push({
+    const task = {
       id: uuidv4(),
       title,
       description: description.length > 0 ? description.join("\n") : undefined,
@@ -191,8 +186,8 @@ export function parseTaskInput(input: string): Task[] {
       completed: false,
       createdAt: now,
       updatedAt: now
-    })
+    }
+    tasks.push(task)
   }
-
   return tasks
 }

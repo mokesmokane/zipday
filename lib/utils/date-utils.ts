@@ -10,9 +10,6 @@ export function createCalendarDateRange(
   endDate: string,
   options = { debug: false }
 ): CalendarDateRange {
-  if (options.debug) {
-    console.log("Input dates:", { startDate, endDate })
-  }
 
   // Validate input format (should be YYYY-MM-DD)
   const dateFormatRegex = /^\d{4}-\d{2}-\d{2}$/
@@ -25,10 +22,6 @@ export function createCalendarDateRange(
   // Create the full ISO strings
   const startDateTime = `${startDate}T00:00:00`
   const endDateTime = `${endDate}T23:59:59`
-
-  if (options.debug) {
-    console.log("DateTime strings:", { startDateTime, endDateTime })
-  }
 
   // Parse and validate the dates
   const parsedStart = parseISO(startDateTime)
@@ -46,10 +39,6 @@ export function createCalendarDateRange(
   // Convert to ISO strings
   const timeMin = parsedStart.toISOString()
   const timeMax = parsedEnd.toISOString()
-
-  if (options.debug) {
-    console.log("Final ISO strings:", { timeMin, timeMax })
-  }
 
   return { timeMin, timeMax }
 }

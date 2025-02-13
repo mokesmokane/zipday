@@ -10,6 +10,25 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 )
 
+async function refreshAndUpdateTokens(userId: string, tokens: any) {
+  oauth2Client.setCredentials(tokens)
+  
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken()
+    
+    // Update tokens in Firestore
+    const db = getFirestore()
+    await db.collection("users").doc(userId).update({
+      'googleCalendar.tokens': credentials
+    })
+    
+    return credentials
+  } catch (error) {
+    console.error("Failed to refresh tokens:", error)
+    throw new Error("Failed to refresh Google Calendar access")
+  }
+}
+
 export async function PATCH(
   request: Request,
   context: { params: { eventId: string } }
@@ -29,7 +48,7 @@ export async function PATCH(
     const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
-    const tokens = userData?.googleCalendar?.tokens
+    let tokens = userData?.googleCalendar?.tokens
 
     if (!tokens) {
       return NextResponse.json(
@@ -38,10 +57,20 @@ export async function PATCH(
       )
     }
 
+    // Try to refresh tokens before making the calendar request
+    try {
+      tokens = await refreshAndUpdateTokens(session.uid, tokens)
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Failed to refresh Google Calendar access" },
+        { status: 401 }
+      )
+    }
+
     // Get update data from request
     const updates = await request.json()
 
-    // Set up Google Calendar client
+    // Set up Google Calendar client with refreshed tokens
     oauth2Client.setCredentials(tokens)
     const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 
@@ -108,7 +137,7 @@ export async function DELETE(
     const userDoc = await db.collection("users").doc(session.uid).get()
 
     const userData = userDoc.data()
-    const tokens = userData?.googleCalendar?.tokens
+    let tokens = userData?.googleCalendar?.tokens
 
     if (!tokens) {
       return NextResponse.json(
@@ -117,7 +146,17 @@ export async function DELETE(
       )
     }
 
-    // Set up Google Calendar client
+    // Try to refresh tokens before making the calendar request
+    try {
+      tokens = await refreshAndUpdateTokens(session.uid, tokens)
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Failed to refresh Google Calendar access" },
+        { status: 401 }
+      )
+    }
+
+    // Set up Google Calendar client with refreshed tokens
     oauth2Client.setCredentials(tokens)
     const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 

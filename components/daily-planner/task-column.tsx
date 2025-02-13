@@ -3,11 +3,11 @@
 import { useDroppable } from "@dnd-kit/core"
 import { motion } from "framer-motion"
 import { Calendar } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { Task } from "@/types/daily-task-types"
-import { Textarea } from "../ui/textarea"
 import { TaskCard } from "./task-card"
 import { parseTaskInput } from "@/lib/utils/task-parser"
+import { AIInput } from "../ai-input/ai-input"
 
 interface TaskColumnProps {
   id: string
@@ -31,37 +31,13 @@ export function TaskColumn({
     id: `${id}-calendar-zone`
   })
 
-  const [inputValue, setInputValue] = useState("")
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter") {
-      if (e.shiftKey) {
-        // Shift+Enter: insert new line at cursor position
-        e.preventDefault()
-        const textarea = e.currentTarget
-        const start = textarea.selectionStart
-        const end = textarea.selectionEnd
-
-        setInputValue(
-          prev => prev.substring(0, start) + "\n" + prev.substring(end)
-        )
-
-        // Set cursor position after the inserted newline
-        setTimeout(() => {
-          textarea.selectionStart = textarea.selectionEnd = start + 1
-        }, 0)
-      } else {
-        // Enter: create task(s)
-        e.preventDefault()
-        const tasks = parseTaskInput(inputValue)
-        tasks.forEach(task => onAddTask?.(task))
-        setInputValue("")
-      }
-    }
-  }
-
   // Get preview tasks from current input
-  const previewTasks = parseTaskInput(inputValue)
+  const [previewTasks, setPreviewTasks] = useState<Task[]>([])
+  
+  // Add effect to log state changes
+  useEffect(() => {
+    console.log("previewTasks updated:", previewTasks)
+  }, [previewTasks])
 
   return (
     <div
@@ -110,18 +86,21 @@ export function TaskColumn({
         </motion.div>
       ) : onAddTask ? (
         <div className="mt-4">
-          <Textarea
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
+          <AIInput
+            onSubmit={() => {
+              onAddTask(previewTasks[0])
+              setPreviewTasks([])
+            }}
+            onValueChanged={(value) => {
+              setPreviewTasks(value)
+              console.log("previewTasksmokes", value)
+            }}
             placeholder={`Title
 - subtask
 - another subtask
 #category
 @9:30
 1h30m`}
-            className="min-h-[130px] resize-none"
-            rows={6}
           />
         </div>
       ) : null}

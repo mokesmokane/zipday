@@ -80,11 +80,4 @@ describe("createCalendarDateRange", () => {
     expect(result.timeMin).toMatch(/^2025-02-02T00:00:00/)
     expect(result.timeMax).toMatch(/^2025-02-02T23:59:59/)
   })
-
-  it("should output debug information when debug option is true", () => {
-    const consoleSpy = jest.spyOn(console, "log")
-    createCalendarDateRange("2025-02-02", "2025-02-04", { debug: true })
-    expect(consoleSpy).toHaveBeenCalledTimes(3)
-    consoleSpy.mockRestore()
-  })
 })

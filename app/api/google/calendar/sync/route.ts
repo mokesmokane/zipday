@@ -71,10 +71,12 @@ export async function POST(request: Request) {
         ? new Date(startTime.getTime() + task.durationMinutes * 60 * 1000)
         : new Date(startTime.getTime() + 15 * 60 * 1000)
 
+    //need to remove - etc from task id to use as gcal id
+    const gcalId = task.calendarItem?.gcalEventId || task.id.replace(/-/g, '')
     // Format event data
     const eventData = {
       ...(operation === "create" && {
-        id: task.id
+        id: gcalId
       }),
       summary: task.title,
       description: task.description || "",
