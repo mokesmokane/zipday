@@ -94,7 +94,7 @@ export async function executeCodeAction(code: string): Promise<ActionState<CodeE
         return result.data
       },
       addTask: async (date: string, task: Task, insertIndex?: number) => {
-        const result = await taskActions.addTaskAction(date, task, insertIndex)
+        const result = await taskActions.addTasksAction(date, [task], insertIndex)
         if (!result.isSuccess) throw new Error(result.message)
         return result.data
       },
@@ -104,7 +104,7 @@ export async function executeCodeAction(code: string): Promise<ActionState<CodeE
         return result.data
       },
       createTask: async (date: string, task: Task) => {
-        const result = await taskActions.addTaskAction(date, task)
+        const result = await taskActions.addTasksAction(date, [task])
         if (!result.isSuccess) throw new Error(result.message)
         return result.data
       },

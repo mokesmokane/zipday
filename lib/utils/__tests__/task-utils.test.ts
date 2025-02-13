@@ -94,4 +94,90 @@ Weekly planning session
 
     expect(taskToShorthand(task)).toBe("Task with Undefined Fields")
   })
+
+  it("should format a task with urgency", () => {
+    const task: Task = {
+      id: "1",
+      title: "Urgent Task",
+      urgency: "immediate",
+      completed: false,
+      subtasks: [],
+      createdAt: now,
+      updatedAt: now
+    }
+
+    expect(taskToShorthand(task)).toBe("Urgent Task\n! (Immediate)")
+  })
+
+  it("should format a task with importance", () => {
+    const task: Task = {
+      id: "1",
+      title: "Important Task",
+      importance: "critical",
+      completed: false,
+      subtasks: [],
+      createdAt: now,
+      updatedAt: now
+    }
+
+    expect(taskToShorthand(task)).toBe("Important Task\n**** (Critical)")
+  })
+
+  it("should format a task with both urgency and importance", () => {
+    const task: Task = {
+      id: "1",
+      title: "Critical and Immediate Task",
+      urgency: "immediate",
+      importance: "valuable",
+      completed: false,
+      subtasks: [],
+      createdAt: now,
+      updatedAt: now
+    }
+
+    expect(taskToShorthand(task)).toBe("Critical and Immediate Task\n!!!!\n**")
+  })
+
+  it("should format all urgency levels correctly", () => {
+    const urgencyLevels: NonNullable<Task["urgency"]>[] = ["immediate", "soon", "later", "someday"]
+    
+    urgencyLevels.forEach(urgency => {
+      const task: Task = {
+        id: "1",
+        title: "Task",
+        urgency,
+        completed: false,
+        subtasks: [],
+        createdAt: now,
+        updatedAt: now
+      }
+
+      const capitalizedUrgency = urgency.charAt(0).toUpperCase() + urgency.slice(1)
+      expect(taskToShorthand(task)).toBe(`Task\n! (${capitalizedUrgency})`)
+    })
+  })
+
+  it("should format all importance levels correctly", () => {
+    const importanceLevels: [NonNullable<Task["importance"]>, string][] = [
+      ["critical", "****"],
+      ["significant", "***"],
+      ["valuable", "**"],
+      ["optional", "*"]
+    ]
+    
+    importanceLevels.forEach(([importance, stars]) => {
+      const task: Task = {
+        id: "1",
+        title: "Task",
+        importance,
+        completed: false,
+        subtasks: [],
+        createdAt: now,
+        updatedAt: now
+      }
+
+      const capitalizedImportance = importance.charAt(0).toUpperCase() + importance.slice(1)
+      expect(taskToShorthand(task)).toBe(`Task\n${stars} (${capitalizedImportance})`)
+    })
+  })
 })

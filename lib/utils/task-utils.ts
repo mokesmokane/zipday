@@ -42,9 +42,13 @@ export function taskToShorthand(task: Task): string {
 
   // Urgency
   if (task.urgency) {
-    lines.push(
-      `! (${task.urgency.charAt(0).toUpperCase() + task.urgency.slice(1)})`
-    )
+    const importanceChucks = {
+      immediate: "!!!!",
+      soon: "!!!",
+      later: "!!",
+      someday: "!"
+    }
+    lines.push(`${importanceChucks[task.urgency]}`)
   }
 
   // Importance (1-3 stars based on level)
@@ -56,7 +60,7 @@ export function taskToShorthand(task: Task): string {
       optional: "*"
     }
     lines.push(
-      `${importanceStars[task.importance]} (${task.importance.charAt(0).toUpperCase() + task.importance.slice(1)})`
+      `${importanceStars[task.importance]}`
     )
   }
 

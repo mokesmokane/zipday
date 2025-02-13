@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Task } from '@/types/daily-task-types'
 import { parseTaskInput } from '@/lib/utils/task-parser'
 import { determineNextEntryStage, getCurrentEntryStage, processEnterKey } from '@/lib/utils/entry-stage-manager'
+import { getSuggestions, SuggestionManager } from "@/lib/utils/suggestion-manager"
 
 interface AIInputProps {
     onSubmit: (value: string) => void
@@ -33,7 +34,7 @@ interface AIInputProps {
     const [isLoading, setIsLoading] = useState(false)
     const [isFocused, setIsFocused] = useState(false)
     const [showButton, setShowButton] = useState(false)
-    const [previewTasks, setPreviewTasks] = useState<Task[]>([])
+    const [previewTasks, setPrevTasks] = useState<Task[]>([])
     const [currentTask, setCurrentTask] = useState<Task | null>(null)
     const [contextTasks, setContextTasks] = useState<Task[]>([])
     const [current_text, setCurrent_text] = useState<string>('')
@@ -47,12 +48,64 @@ interface AIInputProps {
     // var { hasAccessToProFeatures } = useSubscription()
     const [flashUpgrade, setFlashUpgrade] = useState(false)
     const [entryStage, setEntryStage] = useState<'title' | 'subtask' | 'category' | 'time' | 'duration' | 'description'>('title')
-    const [previousLineCount, setPreviousLineCount] = useState(1)
     const [scrollTop, setScrollTop] = useState(0)
+
+    const setPreviewTasks = (tasks: Task[]) => {
+      setPrevTasks(tasks)
+      onValueChanged(tasks)
+    }
+    // Add this new function to format the suggestion preview
+    const getFormattedSuggestion = () => {
+      if (!currentSuggestion) return ''
+      
+      const currentLine = current_text.trim()
+      let suggestion = currentSuggestion
+
+      // Handle different prefixes based on entry stage
+      if (entryStage === 'category') {
+        suggestion = suggestion.replace(/^#/, '')
+        if (currentLine.startsWith('#')) {
+          const textAfterHash = currentLine.slice(1)
+          if (suggestion.startsWith(textAfterHash)) {
+            return suggestion.slice(textAfterHash.length)
+          }
+        }
+      } else if (entryStage === 'time') {
+        suggestion = suggestion.replace(/^@/, '')
+        if (currentLine.startsWith('@')) {
+          const textAfterAt = currentLine.slice(1)
+          if (suggestion.startsWith(textAfterAt)) {
+            return suggestion.slice(textAfterAt.length)
+          }
+        }
+      }
+      
+      // For other cases, only show what would be appended
+      if (suggestion.startsWith(currentLine)) {
+        return suggestion.slice(currentLine.length)
+      }
+      
+      return suggestion
+    }
 
     // Add predefined options for duration and categories
     const durationOptions = ['30m', '1h', '1h30m', '2h', '3h', '4h']
     const categoryOptions = ['work', 'personal', 'health', 'errands', 'meeting'] // These are example categories, you might want to fetch these from somewhere
+
+    const aiSuggestionManager: SuggestionManager = {
+      getAISuggestions: async ({ currentTask, contextTasks, completionType, currentText }) => {
+        const response = await fetch('/api/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ current_task: currentTask, context_tasks: contextTasks, completion_type: completionType, current_text: currentText })
+        })
+        if (!response.ok) throw new Error('Failed to get suggestions')
+        const data = await response.json()
+        return data.completions
+      }
+    }
 
     const handleSubmit = () => {
       if (inputValue.trim()) {
@@ -70,62 +123,21 @@ interface AIInputProps {
     const getSuggestionsByStage = async () => {
       setIsLoading(true)
       try {
-        // Get the current line text without any prefixes
-        const currentLineText = current_text.trim()
-        const textWithoutPrefix = currentLineText
-          .replace(/^-\s*/, '') // Remove subtask prefix
-          .replace(/^#\s*/, '') // Remove category prefix
-          .replace(/^@\s*/, '') // Remove time prefix
-          .toLowerCase() // Case insensitive matching
+        console.log('getSuggestionsByStage', current_text, entryStage)
 
-        switch (entryStage) {
-          case 'title':
-          case 'subtask':
-            // Call AI API for title and subtask suggestions
-            const response = await fetch('/api/complete', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ current_task: currentTask, context_tasks: contextTasks, completion_type: entryStage, current_text: current_text })
-            })
-            if (!response.ok) throw new Error('Failed to get suggestions')
-            const data = await response.json()
-            // Filter AI suggestions based on current input
-            const filteredCompletions = data.completions.filter(
-              (completion: string) => completion.toLowerCase().startsWith(textWithoutPrefix)
-            )
-            setSuggestions(filteredCompletions)
-            break
-
-          case 'category':
-            // Filter categories that match the current input
-            const matchingCategories = categoryOptions.filter(
-              cat => cat.toLowerCase().startsWith(textWithoutPrefix)
-            )
-            setSuggestions(matchingCategories)
-            break
-
-          case 'duration':
-            // Filter durations that match the current input
-            const matchingDurations = durationOptions.filter(
-              duration => duration.toLowerCase().startsWith(textWithoutPrefix)
-            )
-            setSuggestions(matchingDurations)
-            break
-
-          case 'time':
-            // Filter times that match the current input
-            const timeWithoutPrefix = currentLineText.replace(/^@/, '')
-            const matchingTimes = ['9:00', '10:00', '11:00', '14:00', '15:00'].filter(
-              time => time.startsWith(timeWithoutPrefix)
-            )
-            setSuggestions(matchingTimes)
-            break
-
-          default:
-            setSuggestions([])
-        }
+        const suggestions = await getSuggestions(
+          inputValue,
+          current_text,
+          entryStage,
+          aiSuggestionManager,
+          {
+            categoryOptions,
+            durationOptions,
+            timeOptions: ['9:00', '10:00', '11:00', '14:00', '15:00']
+          }
+        )
+        console.log('suggestions', suggestions)
+        setSuggestions(suggestions)
       } catch (error) {
         console.error('Error getting suggestions:', error)
         setSuggestions([])
@@ -135,6 +147,14 @@ interface AIInputProps {
     }
   
     const handleSuggestionAction = async () => {
+        //consolle ogs to see why this is not working
+        console.log('handleSuggestionAction', showTabPrompt, inputValue.trim().length, isLoading, suggestions.length)
+        console.log('current_text', current_text)
+        console.log('entryStage', entryStage)
+        console.log('suggestions', suggestions)
+        console.log('currentSuggestionIndex', currentSuggestionIndex)
+        console.log('currentSuggestion', currentSuggestion)
+        console.log('inputValue', inputValue)
       if ((showTabPrompt || inputValue.trim().length === 0) && !isLoading && suggestions.length === 0) {
         setShowTabPrompt(false)
         await getSuggestionsByStage()
@@ -171,7 +191,6 @@ interface AIInputProps {
       
       const parsedTasks = parseTaskInput(newValue)
       setPreviewTasks(parsedTasks)
-      onValueChanged(parsedTasks)
       setCurrent_text(newValue.split('\n').pop() || '')
       setCurrentTask(parsedTasks.length > 0 ? parsedTasks[parsedTasks.length - 1] : null)
       setContextTasks(parsedTasks.length > 1 ? parsedTasks.slice(0, -1) : [])
@@ -188,10 +207,6 @@ interface AIInputProps {
         //   return
         // }
         e.preventDefault()
-        console.log("inputValue", inputValue)
-        console.log("showTabPrompt", showTabPrompt)
-        console.log("isLoading", isLoading)
-        console.log("suggestions", suggestions)
         if ((showTabPrompt || inputValue.trim().length === 0) && !isLoading && suggestions.length === 0) {
           setShowTabPrompt(false)
           await getSuggestionsByStage()
@@ -200,32 +215,52 @@ interface AIInputProps {
         }
       } else if (e.key === 'Enter') {
         setShowTabPrompt(true)
-        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-          e.preventDefault()
-          if (suggestions.length > 0) {
-            setInputValue(prev => prev + currentSuggestion)
+        if (e.shiftKey || suggestions.length > 0) {
+            e.preventDefault()
+            let value = inputValue
+            if (suggestions.length > 0) {
+                // Get the current line without any prefixes
+                const currentLine = current_text.trim()
+                let suggestionToAppend = currentSuggestion
+    
+                // Handle different prefixes based on entry stage
+                if (entryStage === 'category' && currentLine.startsWith('#')) {
+                // For category, remove the # from suggestion if current line has #
+                    suggestionToAppend = getFormattedSuggestion()
+                } else if (entryStage === 'time' && currentLine.startsWith('@')) {
+                // For time, remove the @ from suggestion if current line has @
+                    suggestionToAppend = getFormattedSuggestion()
+                }
+    
+                // Replace the current line with the suggestion
+                const lines = inputValue.split('\n')
+                lines[lines.length - 1] = lines[lines.length - 1] + suggestionToAppend
+                const newValue = lines.join('\n')
+    
+                value = newValue
+                setCurrentSuggestionIndex(0)
+            } 
+
             setSuggestions([])
-            setCurrentSuggestionIndex(0)
-          } else {
+            const newValue = processEnterKey(value + '\n')
+            setInputValue(newValue)
+            setCurrent_text(newValue.split('\n').pop() || '')
+            const stage = getCurrentEntryStage(newValue)
+            setEntryStage(stage)
+            const parsedTasks = parseTaskInput(newValue)
+            setPreviewTasks(parsedTasks)
+            
+            // Ensure cursor is visible after adding new line
+            requestAnimationFrame(() => {
+                if (textareaRef.current) {
+                const textarea = textareaRef.current
+                textarea.scrollTop = textarea.scrollHeight
+                }
+            })
+          }
+          else {
             handleSubmit()
           }
-        } else if (e.shiftKey) {
-          e.preventDefault()
-          setSuggestions([])
-          const newValue = processEnterKey(inputValue + '\n')
-          setInputValue(newValue)
-          setPreviousLineCount(newValue.split('\n').length)
-          const stage = getCurrentEntryStage(newValue)
-          setEntryStage(stage)
-          
-          // Ensure cursor is visible after adding new line
-          requestAnimationFrame(() => {
-            if (textareaRef.current) {
-              const textarea = textareaRef.current
-              textarea.scrollTop = textarea.scrollHeight
-            }
-          })
-        }
       } else if (e.key === 'Escape' && onCancel) {
         e.preventDefault()
         handleCancel()
@@ -255,7 +290,7 @@ interface AIInputProps {
             >
               <div className="pt-[9px] pl-[13px] whitespace-pre-wrap break-words text-base md:text-sm">
                 <span className="opacity-0">{inputValue}</span>
-                <span className="text-muted-foreground">{currentSuggestion}</span>
+                <span className="text-muted-foreground">{getFormattedSuggestion()}</span>
               </div>
             </div>
             <Textarea
@@ -265,7 +300,7 @@ interface AIInputProps {
                 (showTabPrompt || showButton || suggestions.length > 0) ? "pb-16" : "pb-4"
               )}
               rows={6}
-              placeholder={placeholder}
+              placeholder={currentSuggestion ? "" : placeholder}
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}

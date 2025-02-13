@@ -15,7 +15,7 @@ interface TaskColumnProps {
   isDragging: boolean
   isOverCalendarZone: boolean
   showCalendarZone: boolean
-  onAddTask?: (task: Task) => void
+  onAddTasks?: (tasks: Task[]) => void
 }
 
 export function TaskColumn({
@@ -24,7 +24,7 @@ export function TaskColumn({
   isDragging,
   isOverCalendarZone,
   showCalendarZone,
-  onAddTask
+  onAddTasks
 }: TaskColumnProps) {
   const { setNodeRef: setColumnRef } = useDroppable({ id })
   const { setNodeRef: setCalendarZoneRef } = useDroppable({
@@ -84,11 +84,11 @@ export function TaskColumn({
             <Calendar className="size-6" />
           </motion.div>
         </motion.div>
-      ) : onAddTask ? (
+      ) : onAddTasks ? (
         <div className="mt-4">
           <AIInput
             onSubmit={() => {
-              onAddTask(previewTasks[0])
+              onAddTasks(previewTasks)
               setPreviewTasks([])
             }}
             onValueChanged={(value) => {

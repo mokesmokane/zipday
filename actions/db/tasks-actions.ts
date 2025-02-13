@@ -101,18 +101,30 @@ export async function getDaysByDateRangeAction(
   }
 }
 
+export async function addTaskAction(
+  dateDoc: string,
+  newTask: Task,
+  insertIndex?: number
+): Promise<ActionState<Task>> { 
+  const result = await addTasksAction(dateDoc, [newTask], insertIndex)
+  if (result.isSuccess && result.data) {
+    return { isSuccess: true, message: "Task created successfully", data: result.data[0] }
+  }
+  return { isSuccess: false, message: "Failed to create task" }
+}
+
 /**
  * Creates a single task in userDays/{userId}/dailyTasks/{dateDoc}.
  * If the daily doc doesn't exist, it is created. The tasks array is then updated.
  */
-export async function addTaskAction(
+export async function addTasksAction(
   dateDoc: string,
-  task: Task,
+  newTasks: Task[],
   insertIndex?: number
-): Promise<ActionState<Task>> {
+): Promise<ActionState<Task[]>> {
   try {
     const userId = await getAuthenticatedUserId()
-    console.log("Adding task:", task)
+    
     const docRef = db
       .collection("userDays")
       .doc(userId)
@@ -122,11 +134,11 @@ export async function addTaskAction(
     const docSnap = await docRef.get()
     console.log("Doc snap:", docSnap)
 
-    let tasks: Task[] = []
+    let existingTasks: Task[] = []
     let day: Day | undefined = undefined
     if (docSnap.exists) {
       const dailyData = docSnap.data() as { tasks: Task[] }
-      tasks = dailyData.tasks || []
+      existingTasks = dailyData.tasks || []
       day = docSnap.data() as Day
     } else {
       console.log("Daily doc not found")
@@ -138,28 +150,28 @@ export async function addTaskAction(
         tasks: []
       }
     }
-    console.log("Tasks:", tasks)
+    console.log("Tasks:", existingTasks)
     // Add task to the end of the array to maintain order
     if (insertIndex !== undefined) {
-      tasks.splice(insertIndex, 0, task)
+      existingTasks.splice(insertIndex, 0, ...newTasks)
     } else {
-      tasks.push(task)
+      existingTasks.push(...newTasks)
     }
-    console.log("Tasks after adding:", tasks)
+    console.log("Tasks after adding:", existingTasks)
 
-    day.tasks = tasks
+    day.tasks = existingTasks
     
-    await docRef.set({ tasks }, { merge: true })
-    console.log("Tasks after setting:", tasks)
+    await docRef.set({ tasks: existingTasks }, { merge: true })
+    console.log("Tasks after setting:", existingTasks)
     // Sync with Google Calendar
-    if (task.calendarItem) {
+    for (const task of newTasks) {
       await syncWithGoogleCalendar(userId, task, 'create')
     }
     console.log("Task created successfully")
     return {
       isSuccess: true,
-      message: "Task created successfully",
-      data: task
+      message: "Tasks created successfully",
+      data: newTasks
     }
   } catch (error) {
     console.error("Failed to create task:", error)
@@ -310,7 +322,7 @@ export async function moveTaskAction(taskId: string, newDate: string, newStartTi
     }
 
     const newTask = { ...task, startTime: newStartTime, endTime: newEndTime }
-    await addTaskAction(newDate, newTask)
+    await addTasksAction(newDate, [newTask])
     await deleteTaskAction(dateDoc, taskId)
     return { isSuccess: true, message: "Task moved successfully from " + dateDoc + " to " + newDate }
   } catch (error) {
@@ -369,7 +381,7 @@ export async function scheduleBacklogTaskAction(taskId: string, date: string, st
     })
 
     // Add to scheduled date first
-    const addResult = await addTaskAction(date, newTask)
+    const addResult = await addTasksAction(date, [newTask])
     if (!addResult.isSuccess) {
       return { isSuccess: false, message: "Failed to add task to schedule" }
     }
@@ -914,7 +926,7 @@ export async function createTask(args: CreateTaskArgs): Promise<ActionState<void
       updatedAt: new Date().toISOString()
     }
     console.log("Task:", task)
-    const result = await addTaskAction(date, task)
+    const result = await addTasksAction(date, [task])
     console.log("Result:", result)
     return {
       isSuccess: true,

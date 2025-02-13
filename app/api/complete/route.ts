@@ -83,11 +83,18 @@ export async function POST(req: Request) {
         },
         {
             role: "user",
+            content: `I am trying to complete the ${completion_type} section of the task.
+            So far I have: "${current_text}"
+            `
+        },
+        {
+            role: "user",
             content: `Please provide suggest 3 completions for the ${completion_type} section of the task.
+            DO NOT INCLUDE THE ORIGINAL STRING AT THE START (${current_text}), your suggestions should IMMEDIATELY follow the original string.
             `
         }
     ] as ChatCompletionMessageParam[]
-
+    console.log(msgs)   
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: msgs,

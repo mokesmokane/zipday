@@ -80,12 +80,12 @@ export function TaskBoard({
     clearPreviews,
     deleteTask: deleteBacklogTask,
     updateTask: updateBacklogTask,
-    addTask: addBacklogTask,
+    addTasks: addBacklogTasks,
     refreshBacklog
   } = useBacklog()
 
-  const { addTask, deleteTask, updateTask, reorderDayTasks, refreshTasks } =
-    useTasks()
+  const { addTasks, addTask, deleteTask, updateTask, reorderDayTasks, refreshTasks } =
+    useTasks()  
 
   // Add this state to track when dragging over calendar
   const [isDraggingOverCalendar, setIsDraggingOverCalendar] = useState(false)
@@ -135,8 +135,8 @@ export function TaskBoard({
         </>
       ),
       tasks: localColumnTasks.backlog || [],
-      onAddTask: async (task: Task, insertIndex?: number) => {
-        await addBacklogTask(task, insertIndex)
+      onAddTasks: async (tasks: Task[], insertIndex?: number) => {
+        await addBacklogTasks(tasks, insertIndex)
       },
       onDeleteTask: async (taskId: string) => {
         await deleteBacklogTask(taskId)
@@ -225,8 +225,8 @@ export function TaskBoard({
         </>
       ),
       tasks: localColumnTasks.today || [],
-      onAddTask: async (task: Task, insertIndex?: number) => {
-        await addTask(today.date, task, insertIndex)
+      onAddTasks: async (tasks: Task[], insertIndex?: number) => {
+        await addTasks(today.date, tasks, insertIndex)
         await refreshTasks()
       },
       onDeleteTask: async (taskId: string) => {
@@ -522,7 +522,7 @@ export function TaskBoard({
         if (sourceColumnId === "backlog") {
           console.log("Moving from backlog to calendar")
           await deleteBacklogTask(activeTask.id)
-          await addTask(targetDate, updatedTask)
+          await addTasks(targetDate, [updatedTask])
         }
         // If dragging from today to today's calendar, just update the task
         else if (
@@ -539,13 +539,13 @@ export function TaskBoard({
         ) {
           console.log("Moving from incomplete/future to calendar")
           // First add to new date, then delete from old
-          await addTask(targetDate, updatedTask)
+          await addTasks(targetDate, [updatedTask]  )
           await deleteTask(activeTask.id)
         }
         // If dragging from any other day column
         else {
           console.log("Moving from other day to calendar")
-          await addTask(targetDate, updatedTask)
+          await addTasks(targetDate, [updatedTask])
           await deleteTask(activeTask.id)
         }
 
@@ -607,12 +607,12 @@ export function TaskBoard({
       //get target column add function
       const targetColumnAdd = columns.find(
         col => col.id === targetColumnId
-      )?.onAddTask
+      )?.onAddTasks
 
       //delete source column task
       sourceColumnDelete && sourceColumnDelete(activeTask.id)
       //add task to target column
-      targetColumnAdd && targetColumnAdd(activeTask, overIndex)
+      targetColumnAdd && targetColumnAdd([activeTask], overIndex)
     } catch (error) {
       console.error("Error handling drag end:", error)
     }
@@ -658,7 +658,7 @@ export function TaskBoard({
                   isDragging={isDragging}
                   isOverCalendarZone={false}
                   showCalendarZone={false}
-                  onAddTask={column.onAddTask}
+                  onAddTasks={column.onAddTasks}
                 >
                   {column.tasks.map(task => (
                     <TaskCard

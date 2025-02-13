@@ -17,7 +17,7 @@ interface BacklogContextType {
   isLoading: boolean
   error: string | null
   refreshBacklog: () => Promise<void>
-  addTask: (task: Task, insertIndex?: number) => Promise<void>
+  addTasks: (tasks: Task[], insertIndex?: number) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
   deleteBacklogTask: (taskId: string) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
@@ -66,10 +66,11 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const addTask = async (task: Task, insertIndex?: number) => {
+  const addTasks = async (tasks: Task[], insertIndex?: number) => {
     // Queue this task addition to run after any pending operations
     taskQueueRef.current = taskQueueRef.current
       .then(async () => {
+        for (const task of tasks) {
         const tempTask: Task = {
           ...task,
           id: task.id || crypto.randomUUID(),
@@ -121,7 +122,8 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
           )
           setError("Failed to add task to backlog")
         } finally {
-          setIsLoading(false)
+            setIsLoading(false)
+          }
         }
       })
       .catch(error => {
@@ -233,7 +235,7 @@ export function BacklogProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         refreshBacklog,
-        addTask,
+        addTasks,
         deleteTask,
         deleteBacklogTask,
         updateTask,

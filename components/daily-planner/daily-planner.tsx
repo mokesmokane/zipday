@@ -26,8 +26,8 @@ import { useDate } from "@/lib/context/date-context"
 import { useTasks } from "@/lib/context/tasks-context"
 import {
   updateTaskAction,
-  addTaskAction,
-  deleteTaskAction
+  deleteTaskAction,
+  addTasksAction
 } from "@/actions/db/tasks-actions"
 import { updateCalendarItemAction } from "@/actions/db/calendar-actions"
 import type {
@@ -473,10 +473,12 @@ export default function DailyPlanner() {
     } else {
       // Different day - delete from old, add to new, and update calendar
       await deleteTaskAction(dragStartDate, activeTask.id)
-      await addTaskAction(fullDate, {
-        ...activeTask,
-        calendarItem
-      })
+      await addTasksAction(fullDate, [
+        {
+          ...activeTask,
+          calendarItem
+        }
+      ])
       await updateCalendarItemAction(activeTask.id, fullDate, calendarItem)
     }
   }
@@ -630,7 +632,7 @@ export default function DailyPlanner() {
       }
 
       for (const task of tasksToAdd) {
-        await addTaskAction(dateStr, task)
+        await addTasksAction(dateStr, [task])
       }
 
       for (const task of tasksToDelete) {
@@ -805,7 +807,7 @@ export default function DailyPlanner() {
                               (!activeId ||
                                 findTaskById(activeId)?.date === column.date)
                             }
-                            onAddTask={async task => {
+                            onAddTasks={async tasks => {
                               setLocalDailyTasks(prev => {
                                 const updated = structuredClone(prev)
                                 if (!updated[column.date]) {
@@ -817,10 +819,10 @@ export default function DailyPlanner() {
                                     updatedAt: ""
                                   }
                                 }
-                                updated[column.date].tasks.push(task)
+                                updated[column.date].tasks.push(...tasks)
                                 return updated
                               })
-                              await addTaskAction(column.date, task)
+                              await addTasksAction(column.date, tasks)
                             }}
                           >
                             {column.tasks.map(task => (
@@ -898,7 +900,7 @@ export default function DailyPlanner() {
                               updated[column.date].tasks.push(task)
                               return updated
                             })
-                            await addTaskAction(column.date, task)
+                            await addTasksAction(column.date, [task])
                           }}
                           onScheduleTask={async hour => {
                             if (activeTask) {
@@ -1045,7 +1047,7 @@ export default function DailyPlanner() {
                   ...prev,
                   [newTaskDate]: updatedDay
                 }))
-                await addTaskAction(newTaskDate, newTask)
+                await addTasksAction(newTaskDate, [newTask])
               } catch (error) {
                 console.error("Failed to add new task:", error)
               }

@@ -10,6 +10,7 @@ import { useDate } from "./date-context"
 import { useAuth } from "./auth-context"
 import { CalendarItem, Day, Task } from "@/types/daily-task-types"
 import {
+  addTasksAction,
   addTaskAction,
   updateTaskAction,
   deleteTaskAction,
@@ -34,6 +35,7 @@ interface TasksContextType {
   incompleteTimeRange: "week" | "month" | "year" | "all"
   futureTimeRange: "week" | "month" | "year" | "all"
   refreshTasks: () => Promise<void>
+  addTasks: (date: string, tasks: Task[], insertIndex?: number) => Promise<void>
   addTask: (date: string, task: Task, insertIndex?: number) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
   markTasksCompleted: (taskIds: string[]) => Promise<void>
@@ -214,13 +216,19 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+
   const addTask = async (date: string, task: Task, insertIndex?: number) => {
-    const tempTask: Task = {
+    const tempTasks: Task[] = [task]
+    await addTasks(date, tempTasks, insertIndex)
+  }
+
+  const addTasks = async (date: string, tasks: Task[], insertIndex?: number) => {
+    const tempTasks: Task[] = tasks.map(task => ({
       ...task,
       id: task.id || crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    }
+    }))
 
     // Optimistic update
     setDailyTasks(prev => ({
@@ -232,17 +240,17 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
           insertIndex !== undefined
             ? [
                 ...(prev[date]?.tasks || []).slice(0, insertIndex),
-                tempTask,
+                ...tempTasks,
                 ...(prev[date]?.tasks || []).slice(insertIndex)
               ]
-            : [...(prev[date]?.tasks || []), tempTask],
+            : [...(prev[date]?.tasks || []), ...tempTasks],
         createdAt: prev[date]?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
     }))
 
     try {
-      const result = await addTaskAction(date, tempTask, insertIndex)
+      const result = await addTasksAction(date, tempTasks, insertIndex)
       if (!result.isSuccess) {
         // Revert on failure
         await refreshTasks()
@@ -582,6 +590,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         refreshTasks,
+        addTasks,
         addTask,
         updateTask,
         markTasksCompleted,
