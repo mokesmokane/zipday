@@ -70,6 +70,14 @@ interface AIInputProps {
     const getSuggestionsByStage = async () => {
       setIsLoading(true)
       try {
+        // Get the current line text without any prefixes
+        const currentLineText = current_text.trim()
+        const textWithoutPrefix = currentLineText
+          .replace(/^-\s*/, '') // Remove subtask prefix
+          .replace(/^#\s*/, '') // Remove category prefix
+          .replace(/^@\s*/, '') // Remove time prefix
+          .toLowerCase() // Case insensitive matching
+
         switch (entryStage) {
           case 'title':
           case 'subtask':
@@ -83,22 +91,36 @@ interface AIInputProps {
             })
             if (!response.ok) throw new Error('Failed to get suggestions')
             const data = await response.json()
-            setSuggestions(data.completions)
+            // Filter AI suggestions based on current input
+            const filteredCompletions = data.completions.filter(
+              (completion: string) => completion.toLowerCase().startsWith(textWithoutPrefix)
+            )
+            setSuggestions(filteredCompletions)
             break
 
           case 'category':
-            // Use predefined categories
-            setSuggestions(categoryOptions.map(cat => `${cat}`))
+            // Filter categories that match the current input
+            const matchingCategories = categoryOptions.filter(
+              cat => cat.toLowerCase().startsWith(textWithoutPrefix)
+            )
+            setSuggestions(matchingCategories)
             break
 
           case 'duration':
-            // Use predefined duration options
-            setSuggestions(durationOptions)
+            // Filter durations that match the current input
+            const matchingDurations = durationOptions.filter(
+              duration => duration.toLowerCase().startsWith(textWithoutPrefix)
+            )
+            setSuggestions(matchingDurations)
             break
 
           case 'time':
-            // Placeholder for time suggestions
-            setSuggestions(['9:00', '10:00', '11:00', '14:00', '15:00']) // These will be replaced by actual available times later
+            // Filter times that match the current input
+            const timeWithoutPrefix = currentLineText.replace(/^@/, '')
+            const matchingTimes = ['9:00', '10:00', '11:00', '14:00', '15:00'].filter(
+              time => time.startsWith(timeWithoutPrefix)
+            )
+            setSuggestions(matchingTimes)
             break
 
           default:
