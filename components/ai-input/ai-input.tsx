@@ -9,7 +9,7 @@ import { Task } from '@/types/daily-task-types'
 import { parseTaskInput } from '@/lib/utils/task-parser'
 import { determineNextEntryStage, getCurrentEntryStage, processEnterKey } from '@/lib/utils/entry-stage-manager'
 import { getSuggestions, SuggestionManager } from "@/lib/utils/suggestion-manager"
-
+import { useGoogleCalendar } from "@/lib/context/google-calendar-context"
 interface AIInputProps {
     onSubmit: (value: string) => void
     onValueChanged: (previewTasks: Task[]) => void
@@ -17,6 +17,7 @@ interface AIInputProps {
     placeholder?: string
     initialValue?: string
     isEditing?: boolean
+    currentDate?: string
   }
   
   export function AIInput({ 
@@ -25,7 +26,8 @@ interface AIInputProps {
     onCancel, 
     onValueChanged,
     initialValue = '', 
-    isEditing = false
+    isEditing = false,
+    currentDate
   }: AIInputProps) {
     const [inputValue, setInputValue] = useState(initialValue)
     const [suggestions, setSuggestions] = useState<string[]>([])
@@ -49,6 +51,7 @@ interface AIInputProps {
     const [flashUpgrade, setFlashUpgrade] = useState(false)
     const [entryStage, setEntryStage] = useState<'title' | 'subtask' | 'category' | 'time' | 'duration' | 'description'>('title')
     const [scrollTop, setScrollTop] = useState(0)
+    const {events} = useGoogleCalendar()
 
     const setPreviewTasks = (tasks: Task[]) => {
       setPrevTasks(tasks)
@@ -133,8 +136,10 @@ interface AIInputProps {
           {
             categoryOptions,
             durationOptions,
-            timeOptions: ['9:00', '10:00', '11:00', '14:00', '15:00']
-          }
+            timeOptions: ['9:00', '10:00', '11:00', '14:00', '15:00'],
+            events: events
+          },
+          currentDate || ''
         )
         console.log('suggestions', suggestions)
         setSuggestions(suggestions)

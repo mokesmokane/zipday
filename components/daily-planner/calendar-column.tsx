@@ -74,7 +74,6 @@ export function CalendarColumn({
     .flat()
     .filter(task => {
       if (!task.calendarItem?.start) return false
-      console.log("startMOKES", task.calendarItem.start)
       const taskDate = format(new Date(task.calendarItem.start.dateTime!.toString()), "yyyy-MM-dd")
       return taskDate === date
     })

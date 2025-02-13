@@ -8,23 +8,7 @@ import {
   ReactNode
 } from "react"
 import { useAuth } from "./auth-context"
-
-interface GoogleCalendarEvent {
-  id: string
-  title: string
-  description?: string
-  calendarItem?: {
-    gcalEventId?: string
-    start?: {
-      dateTime?: string
-    }
-    end?: {
-      dateTime?: string
-    }
-  }
-  allDay?: boolean
-}
-
+import { GoogleCalendarEvent } from "@/types/calendar-types"
 interface GoogleCalendarContextType {
   isConnected: boolean
   events: GoogleCalendarEvent[]
@@ -93,6 +77,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         setIsLoading(true)
         const response = await fetch("/api/google/calendar/events")
         const { events } = await response.json()
+        console.log("eventsmokes", events)
         setEvents(events)
         setError(null)
       } catch (error) {

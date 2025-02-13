@@ -1,5 +1,5 @@
 import { taskToShorthand } from "../task-utils"
-import type { Task } from "@/types/daily-task-types"
+import type { Task, Urgency } from "@/types/daily-task-types"
 
 describe("taskToShorthand", () => {
   const now = new Date().toISOString()
@@ -22,7 +22,7 @@ describe("taskToShorthand", () => {
       completed: false,
       createdAt: now,
       updatedAt: now
-    }
+    } 
 
     const expected = `Reflection & Planning
 Weekly planning session
@@ -106,7 +106,7 @@ Weekly planning session
       updatedAt: now
     }
 
-    expect(taskToShorthand(task)).toBe("Urgent Task\n! (Immediate)")
+    expect(taskToShorthand(task)).toBe("Urgent Task\n!!!!")
   })
 
   it("should format a task with importance", () => {
@@ -120,7 +120,7 @@ Weekly planning session
       updatedAt: now
     }
 
-    expect(taskToShorthand(task)).toBe("Important Task\n**** (Critical)")
+    expect(taskToShorthand(task)).toBe("Important Task\n****")
   })
 
   it("should format a task with both urgency and importance", () => {
@@ -139,21 +139,24 @@ Weekly planning session
   })
 
   it("should format all urgency levels correctly", () => {
-    const urgencyLevels: NonNullable<Task["urgency"]>[] = ["immediate", "soon", "later", "someday"]
-    
-    urgencyLevels.forEach(urgency => {
+    const urgencyLevels = {
+      immediate: "!!!!",
+      soon: "!!!",
+      later: "!!",
+      someday: "!"
+    }
+    Object.entries(urgencyLevels).forEach(([urgency, symbol]) => {
       const task: Task = {
         id: "1",
         title: "Task",
-        urgency,
+        urgency: urgency as Urgency,
         completed: false,
         subtasks: [],
         createdAt: now,
         updatedAt: now
       }
 
-      const capitalizedUrgency = urgency.charAt(0).toUpperCase() + urgency.slice(1)
-      expect(taskToShorthand(task)).toBe(`Task\n! (${capitalizedUrgency})`)
+      expect(taskToShorthand(task)).toBe(`Task\n${symbol}`)
     })
   })
 
@@ -176,8 +179,7 @@ Weekly planning session
         updatedAt: now
       }
 
-      const capitalizedImportance = importance.charAt(0).toUpperCase() + importance.slice(1)
-      expect(taskToShorthand(task)).toBe(`Task\n${stars} (${capitalizedImportance})`)
+      expect(taskToShorthand(task)).toBe(`Task\n${stars}`)
     })
   })
 })

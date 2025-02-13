@@ -32,46 +32,46 @@ describe("parseDuration", () => {
 describe("parseMetadata", () => {
   test("parses importance", () => {
     expect(parseMetadata("!")).toEqual({
-      importance: "optional",
-      urgency: undefined,
+      importance: undefined,
+      urgency: "someday",
       durationMinutes: undefined
     })
     expect(parseMetadata("!!")).toEqual({
-      importance: "valuable",
-      urgency: undefined,
+      importance: undefined,
+      urgency: "later",
       durationMinutes: undefined
     })
     expect(parseMetadata("!!!")).toEqual({
-      importance: "significant",
-      urgency: undefined,
+      importance: undefined,
+      urgency: "soon",
       durationMinutes: undefined
     })
     expect(parseMetadata("!!!!")).toEqual({
-      importance: "critical",
-      urgency: undefined,
+      importance: undefined,
+      urgency: "immediate",
       durationMinutes: undefined
     })
   })
 
   test("parses urgency", () => {
     expect(parseMetadata("*")).toEqual({
-      importance: undefined,
-      urgency: "someday",
+      importance: "optional",
+      urgency: undefined,
       durationMinutes: undefined
     })
     expect(parseMetadata("**")).toEqual({
-      importance: undefined,
-      urgency: "later",
+      importance: "valuable",
+      urgency: undefined,
       durationMinutes: undefined
     })
     expect(parseMetadata("***")).toEqual({
-      importance: undefined,
-      urgency: "soon",
+      importance: "significant",
+      urgency: undefined,
       durationMinutes: undefined
     })
     expect(parseMetadata("****")).toEqual({
-      importance: undefined,
-      urgency: "immediate",
+      importance: "critical",
+      urgency: undefined,
       durationMinutes: undefined
     })
   })
@@ -107,13 +107,13 @@ describe("parseMetadata", () => {
       durationMinutes: undefined
     })
     expect(parseMetadata("!***")).toEqual({
-      importance: "optional",
-      urgency: "soon",
+      importance: "significant",
+      urgency: "someday",
       durationMinutes: undefined
     })
     expect(parseMetadata("****!")).toEqual({
-      importance: "optional",
-      urgency: "immediate",
+      importance: "critical",
+      urgency: "someday",
       durationMinutes: undefined
     })
   })
@@ -161,8 +161,8 @@ describe("parseTaskInput", () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       title: "Buy groceries",
-      importance: "significant",
-      urgency: "later",
+      importance: "valuable",
+      urgency: "soon",
       durationMinutes: 90
     })
   })
@@ -213,14 +213,14 @@ describe("parseTaskInput", () => {
     expect(result).toHaveLength(2)
     expect(result[0]).toMatchObject({
       title: "Buy groceries",
-      importance: "valuable",
-      urgency: undefined,
+      importance: undefined,
+      urgency: "later",
       durationMinutes: 60
     })
     expect(result[1]).toMatchObject({
       title: "Do laundry",
-      importance: undefined,
-      urgency: "soon",
+      importance: "significant",
+      urgency: undefined,
       durationMinutes: 30
     })
   })
@@ -249,8 +249,8 @@ describe("parseTaskInput", () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       title: "Buy groceries",
-      importance: "critical", // Takes the highest value (!!** -> valuable, then !!!! -> critical)
-      urgency: "soon", // Takes the highest value (!!** -> later, then *** -> soon)
+      importance: "significant", // Takes the highest value (!!** -> valuable, then !!!! -> critical)
+      urgency: "immediate", // Takes the highest value (!!** -> later, then *** -> soon)
       durationMinutes: 90
     })
   })
