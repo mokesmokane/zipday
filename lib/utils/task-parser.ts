@@ -117,18 +117,24 @@ export function parseTaskInput(input: string): Task[] {
       const line = lines[i].trim()
       if (!line) continue
       if (line.startsWith("-")) {
-        // Subtask
-        subtasks.push({
-          id: uuidv4(),
-          text: line.slice(1).trim(),
-          completed: false
-        })
+        // Subtask - only add if there's content after the dash
+        const subtaskText = line.slice(1).trim()
+        if (subtaskText && !subtaskText.match(/^[-\s]*$/)) {
+          subtasks.push({
+            id: uuidv4(),
+            text: subtaskText,
+            completed: false
+          })
+        }
       } else if (line.startsWith("#")) {
-        // Tag
-        tags.push(line.slice(1).trim())
+        // Tag - only add if there's content after the hash
+        const tagText = line.slice(1).trim()
+        if (tagText && !tagText.match(/^[#\s]*$/)) {
+          tags.push(tagText)
+        }
       } else if (line.startsWith("@")) {
-        // Time in @HH:MM format
-        const timeMatch = line.match(/@(\d{1,2}):(\d{2})/)
+        // Time in @HH:MM format - allow whitespace after @
+        const timeMatch = line.match(/^@\s*(\d{1,2}):(\d{2})(?:\s*$|$)/)
         if (timeMatch) {
           const [_, hours, minutes] = timeMatch
           const date = new Date()

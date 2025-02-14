@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { format, isToday, subDays, subMonths, subYears } from "date-fns"
-import { Plus } from "lucide-react"
+import { Plus, Briefcase, Clock } from "lucide-react"
 import { v4 as uuidv4 } from "uuid"
 import { TaskColumn } from "./task-column"
 import { TaskCard } from "./task-card"
@@ -90,6 +90,7 @@ export function TaskBoard({
   // Add this state to track when dragging over calendar
   const [isDraggingOverCalendar, setIsDraggingOverCalendar] = useState(false)
 
+  const [timeRange, setTimeRange] = useState<'business' | 'all'>('all')
   // Sync local state with global tasks
   useEffect(() => {
     console.log("Syncing local state with global tasks")
@@ -699,39 +700,60 @@ export function TaskBoard({
 
           <div className="flex-1">
             <div className="mb-4 flex items-center justify-between">
-              <Popover
-                open={isDatePickerOpen}
-                onOpenChange={setIsDatePickerOpen}
-              >
-                <PopoverTrigger asChild>
-                  <div className="space-y-1.5">
-                    <h2 className="text-lg font-semibold hover:cursor-pointer">
-                      Calendar
-                      <span className="text-muted-foreground ml-2 text-sm">
-                        {format(selectedDate, "MMM d")}
-                      </span>
-                    </h2>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={date => {
-                      if (date) {
-                        setSelectedDate(date)
-                        setIsDatePickerOpen(false)
-                      }
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-4">
+                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="space-y-1.5">
+                      <h2 className="text-lg font-semibold hover:cursor-pointer">
+                        Calendar
+                        <span className="text-muted-foreground ml-2 text-sm">
+                          {format(selectedDate, "MMM d")}
+                        </span>
+                      </h2>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={date => {
+                        if (date) {
+                          setSelectedDate(date)
+                          setIsDatePickerOpen(false)
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex h-7 items-center rounded-lg border">
+                <Button
+                  variant={timeRange === 'business' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => setTimeRange('business')}
+                >
+                  <Briefcase className="mr-1 h-3 w-3" />
+                  <span className="text-xs">9-5</span>
+                </Button>
+                <Button
+                  variant={timeRange === 'all' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => setTimeRange('all')}
+                >
+                  <Clock className="mr-1 h-3 w-3" />
+                  <span className="text-xs">All Day</span>
+                </Button>
+              </div>
             </div>
             <CalendarColumn
               id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
               date={format(selectedDate, "yyyy-MM-dd")}
               singleColumn={true}
+              timeRange={timeRange}
               tasks={mergeTasksWithPreview(
                 dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || [],
                 calendarColumnPreviewTask

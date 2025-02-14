@@ -109,7 +109,7 @@ describe('Entry Stage Manager', () => {
 - Prepare agenda
 #work
 @2:30
-1h`
+`
           const result = processEnterKey(input)
           expect(result).toMatchStringWithDiff(expected)
       })
@@ -122,7 +122,7 @@ describe('Entry Stage Manager', () => {
         const expected = `Team Meeting
 - Prepare agenda
 #work
-1h`
+`
           const result = processEnterKey(input)
           expect(result).toMatchStringWithDiff(expected)
       })

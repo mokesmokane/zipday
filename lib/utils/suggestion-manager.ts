@@ -128,13 +128,23 @@ export function generateDurations(events: GoogleCalendarEvent[] = [], selectedDa
 
   // Parse the start time - handle both UTC and local formats
   let startDateTime: Date
-  if (startTime.endsWith('Z')) {
-    // If UTC time, create date directly
-    startDateTime = new Date(startTime)
-  } else {
-    // If local time, parse with date-fns
-    const timeStr = `${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`
-    startDateTime = parse(timeStr, "yyyy-MM-dd'T'HH:mm", new Date())
+  try {
+    if (startTime.endsWith('Z')) {
+      // If UTC time, create date directly
+      startDateTime = new Date(startTime)
+    } else {
+      // If local time, parse with date-fns
+      const timeStr = `${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`
+      startDateTime = parse(timeStr, "yyyy-MM-dd'T'HH:mm", new Date())
+    }
+
+    // Validate the parsed time
+    if (isNaN(startDateTime.getTime())) {
+      return []
+    }
+  } catch (error) {
+    console.error('Error parsing start time:', error)
+    return []
   }
 
   // Find the next event after the start time
@@ -163,7 +173,11 @@ export function generateDurations(events: GoogleCalendarEvent[] = [], selectedDa
     (boundaryTime.getTime() - startDateTime.getTime()) / (1000 * 60)
   )
 
-  console.log('Available minutes:', availableMinutes, 'between', format(startDateTime, 'HH:mm'), 'and', format(boundaryTime, 'HH:mm'))
+  try {
+    console.log('Available minutes:', availableMinutes, 'between', format(startDateTime, 'HH:mm'), 'and', format(boundaryTime, 'HH:mm'))
+  } catch (error) {
+    console.error('Error formatting time:', error)
+  }
 
   // Convert default durations to minutes for comparison
   const durationInMinutes = (durationStr: string): number => {
@@ -223,7 +237,9 @@ export async function getSuggestions(
       console.log("task", task)
       console.log("currentTask", currentTask)
       const durations = generateDurations(options.events, selectedDate, task.calendarItem?.start?.dateTime)
-      return durations
+      return textWithoutPrefix
+        ? durations.filter(duration => duration.startsWith(textWithoutPrefix))
+        : durations
     }
 
     case 'time': {

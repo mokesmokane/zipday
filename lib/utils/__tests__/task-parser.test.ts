@@ -249,9 +249,58 @@ describe("parseTaskInput", () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       title: "Buy groceries",
-      importance: "significant", // Takes the highest value (!!** -> valuable, then !!!! -> critical)
-      urgency: "immediate", // Takes the highest value (!!** -> later, then *** -> soon)
+      importance: "significant",
+      urgency: "immediate",
       durationMinutes: 90
     })
+  })
+
+  test("ignores empty lines with special characters", () => {
+    const input = `Buy groceries
+#
+@
+-
+  #  
+  @  
+  -  
+#    #
+@    @
+-    -`
+    const result = parseTaskInput(input)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      title: "Buy groceries",
+      tags: [],
+      subtasks: [],
+      calendarItem: undefined
+    })
+  })
+
+  test("only parses valid tags, subtasks and times", () => {
+    const input = `Buy groceries
+#validtag
+#
+- valid subtask
+-
+@14:30
+@
+#  tag with content  
+-  subtask with content  
+@  14:45  `
+    const result = parseTaskInput(input)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      title: "Buy groceries",
+      tags: ["validtag", "tag with content"],
+      subtasks: [
+        { text: "valid subtask", completed: false },
+        { text: "subtask with content", completed: false }
+      ]
+    })
+    if (result[0].calendarItem && result[0].calendarItem.start.dateTime) {
+      const date = new Date(result[0].calendarItem.start.dateTime)
+      expect(date.getHours()).toBe(14)
+      expect(date.getMinutes()).toBe(45)
+    }
   })
 })

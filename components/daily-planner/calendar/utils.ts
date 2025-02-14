@@ -39,4 +39,12 @@ export function getOverlappingGroups(
 }
 
 export const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
-export const HOURS = Array.from({ length: 24 }, (_, i) => i)
+
+export function getHoursForRange(range: 'business' | 'all') {
+  if (range === 'business') {
+    // Update business hours to 6-22 (6 AM to 10 PM)
+    return Array.from({ length: 17 }, (_, i) => i + 6)
+  }
+  // All hours (0-23)
+  return Array.from({ length: 24 }, (_, i) => i)
+}

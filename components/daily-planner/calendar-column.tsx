@@ -7,7 +7,7 @@ import { CalendarTask } from "./calendar/calendar-task"
 import { GoogleCalendarEvent } from "./calendar/google-calendar-event"
 import { HourDroppable } from "./calendar/hour-droppable"
 import { CurrentTimeLine } from "./calendar/current-time-line"
-import { getOverlappingGroups, HOURS } from "./calendar/utils"
+import { getOverlappingGroups, getHoursForRange } from "./calendar/utils"
 import { TimeLabels } from "./calendar/time-labels"
 import { AllDayEvent } from "./calendar/all-day-event"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,7 @@ interface CalendarColumnProps {
   date: string
   tasks: Task[]
   singleColumn?: boolean
+  timeRange?: 'business' | 'all'
   onScheduleTask?: (hour: number) => void
   onAddTask: (task: Task) => void
   onDeleteTask: (taskId: string) => void
@@ -50,6 +51,7 @@ export function CalendarColumn({
   date,
   tasks,
   singleColumn,
+  timeRange = 'all',
   onScheduleTask,
   onAddTask,
   onDeleteTask,
@@ -162,12 +164,12 @@ export function CalendarColumn({
 
       <div className="scrollbar-hide relative min-h-0 flex-1 overflow-y-auto">
         {/* Time labels column */}
-        <TimeLabels />
+        <TimeLabels timeRange={timeRange} />
 
         {/* Main calendar grid with absolute positioning */}
         <div className="relative ml-12">
-          {HOURS.map(hour => (
-            <HourDroppable key={hour} id={id} hour={hour} />
+          {getHoursForRange(timeRange).map(hour => (
+            <HourDroppable key={hour} id={id} hour={hour} timeRange={timeRange} />
           ))}
 
           {tasks.map((task, idx) => {
@@ -178,6 +180,7 @@ export function CalendarColumn({
                 key={task.id}
                 task={task}
                 position={position}
+                timeRange={timeRange}
                 onResize={onResizeTask}
                 day={{
                   date,
@@ -200,6 +203,7 @@ export function CalendarColumn({
                 key={task.id}
                 task={task}
                 position={position}
+                timeRange={timeRange}
                 isPreview={true}
                 day={{
                   date,
@@ -231,7 +235,7 @@ export function CalendarColumn({
             )
           })}
 
-          {isCurrentDay && <CurrentTimeLine />}
+          {isCurrentDay && <CurrentTimeLine timeRange={timeRange} />}
         </div>
       </div>
     </div>

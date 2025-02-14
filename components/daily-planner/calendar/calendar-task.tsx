@@ -8,14 +8,28 @@ import { EditTaskDialog } from "../edit-task-dialog"
 import type { Task, Day } from "@/types/daily-task-types"
 import type { CSSProperties } from "react"
 import { cn } from "@/lib/utils"
+import { getHoursForRange } from "./utils"
 
 const HOUR_HEIGHT = 60 // Height of each hour cell in pixels
+
+interface CalendarTaskProps {
+  id: string
+  task: Task
+  position: { index: number; total: number }
+  day?: Day
+  isPreview?: boolean
+  onResize?: (taskId: string, durationMinutes: number) => void
+  onTaskUpdate?: (task: Task) => void
+  onDeleteTask?: (taskId: string) => void
+  timeRange?: 'business' | 'all'
+}
 
 // Helper to calculate task position and height
 function getTaskStyle(
   task: Task,
   index: number,
-  total: number
+  total: number,
+  timeRange: 'business' | 'all' = 'all'
 ): CSSProperties | null {
   if (!task.calendarItem?.start) return null
 
@@ -25,11 +39,13 @@ function getTaskStyle(
       ? new Date(task.calendarItem.start.date)
       : null
   if (!startDate) return null
+  
   const startHour = startDate.getHours()
   const startMinute = startDate.getMinutes()
   const durationMinutes = task.durationMinutes || 60
+  const firstHour = getHoursForRange(timeRange)[0]
 
-  const top = startHour * HOUR_HEIGHT + (startMinute / 60) * HOUR_HEIGHT
+  const top = (startHour - firstHour) * HOUR_HEIGHT + (startMinute / 60) * HOUR_HEIGHT
   const height = (durationMinutes / 60) * HOUR_HEIGHT
 
   const width = `${100 / total}%`
@@ -45,17 +61,6 @@ function getTaskStyle(
   }
 }
 
-interface CalendarTaskProps {
-  id: string
-  task: Task
-  position: { index: number; total: number }
-  day: Day
-  isPreview?: boolean
-  onResize?: (taskId: string, durationMinutes: number) => void
-  onTaskUpdate?: (task: Task) => void
-  onDeleteTask?: (taskId: string) => void
-}
-
 export function CalendarTask({
   id,
   task,
@@ -64,9 +69,13 @@ export function CalendarTask({
   isPreview = false,
   onResize,
   onTaskUpdate,
-  onDeleteTask
+  onDeleteTask,
+  timeRange = 'all'
 }: CalendarTaskProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const style = getTaskStyle(task, position.index, position.total, timeRange) || {
+    display: "none"
+  }
   const {
     attributes,
     listeners,
@@ -81,9 +90,6 @@ export function CalendarTask({
       task
     }
   })
-
-  const style = getTaskStyle(task, position.index, position.total)
-  if (!style) return null
 
   const dragStyle = {
     ...style,

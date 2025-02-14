@@ -124,6 +124,7 @@ interface AIInputProps {
         setContextTasks([])
         setCurrent_text('')
         setSuggestions([])
+        setEntryStage('title')
         setCurrentSuggestionIndex(0)
       }
     }
