@@ -179,6 +179,8 @@ export function TaskCard({
       <Card
         ref={setNodeRef}
         style={style}
+        data-task-id={task.id}
+        data-task={JSON.stringify(task)}
         className={cn(
           "bg-card group relative cursor-grab touch-none transition-colors duration-200 active:cursor-grabbing",
           isOverCalendarZone && "border-blue-500",

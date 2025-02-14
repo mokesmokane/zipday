@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react"
 import {
-  DndContext,
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay
+  useDndContext
 } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { format, isToday, subDays, subMonths, subYears } from "date-fns"
@@ -30,11 +29,13 @@ import {
 import { cn } from "@/lib/utils"
 import { useTasks } from "@/lib/context/tasks-context"
 import { useBacklog } from "@/lib/context/backlog-context"
+import { useActiveTask, ColumnId } from "@/lib/context/active-task-context"
+import { useDate } from "@/lib/context/date-context"
 
-// Add this type definition at the top of the file
-type ColumnId = "backlog" | "incomplete" | "today" | "future" | "calendar"
+interface TaskBoardProps {
+  today: Day
+}
 
-// Add this constant to define allowed drag destinations for each column
 const ALLOWED_DROPS: Record<ColumnId, ColumnId[]> = {
   backlog: ["today", "calendar", "backlog"],
   incomplete: ["backlog", "today", "calendar"],
@@ -43,28 +44,31 @@ const ALLOWED_DROPS: Record<ColumnId, ColumnId[]> = {
   calendar: ["backlog", "today", "calendar"]
 }
 
-interface TaskBoardProps {
-  today: Day
-  selectedDate: Date
-  setSelectedDate: (date: Date) => void
-}
-
 export function TaskBoard({
   today,
-  selectedDate,
-  setSelectedDate
 }: TaskBoardProps) {
-  const [activeTask, setActiveTask] = useState<Task | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
+  const { over } = useDndContext()
+  const { selectedDate, setSelectedDate } = useDate()
+  const isDraggingOverChat = over?.id === "ai-chat-droppable"
+  const { 
+    activeTask, 
+    setActiveTask, 
+    isDragging,
+    setIsDragging,
+    isDraggingOverCalendar, 
+    setIsDraggingOverCalendar,
+    previewTask,
+    setPreviewTask,
+    sourceColumnId,
+    setSourceColumnId,
+    previewColumnId,
+    setPreviewColumnId,
+    localColumnTasks,
+    setLocalColumnTasks
+  } = useActiveTask()
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
-  const [localColumnTasks, setLocalColumnTasks] = useState<
-    Record<string, Task[]>
-  >({})
-  const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
-  const [sourceColumnId, setSourceColumnId] = useState<ColumnId | null>(null)
-  const [calendarColumnPreviewTask, setCalendarColumnPreviewTask] =
-    useState<Task | null>(null)
+
   const {
     incompleteTasks,
     futureTasks,
@@ -87,10 +91,8 @@ export function TaskBoard({
   const { addTasks, addTask, deleteTask, updateTask, reorderDayTasks, refreshTasks } =
     useTasks()  
 
-  // Add this state to track when dragging over calendar
-  const [isDraggingOverCalendar, setIsDraggingOverCalendar] = useState(false)
-
   const [timeRange, setTimeRange] = useState<'business' | 'all'>('all')
+
   // Sync local state with global tasks
   useEffect(() => {
     console.log("Syncing local state with global tasks")
@@ -303,7 +305,6 @@ export function TaskBoard({
   ]
 
   function handleDragStart(event: DragStartEvent) {
-    console.log("Drag start event data:", event)
     const { active } = event
     const activeId = active.id.toString()
 
@@ -376,7 +377,7 @@ export function TaskBoard({
         }
       }
 
-      setCalendarColumnPreviewTask(updatedTask)
+      setPreviewTask(updatedTask)
 
       setLocalColumnTasks(prev => {
         const updated = structuredClone(prev)
@@ -404,7 +405,7 @@ export function TaskBoard({
       setIsDraggingOverCalendar(false)
     }
 
-    /// Get target column id either from sortable container or direct column id
+    // Get target column id either from sortable container or direct column id
     const targetColumnId =
       over.data.current?.sortable?.containerId?.split("-")[0] ||
       (typeof over.id === "string" && over.id.split("-")[0])
@@ -415,7 +416,6 @@ export function TaskBoard({
     if (!newCol) return
 
     setLocalColumnTasks(prev => {
-      console.log("Updating local column tasks")
       const updated = structuredClone(prev)
 
       // Remove from all dates for preview
@@ -470,10 +470,6 @@ export function TaskBoard({
     // Handle calendar drops
     if (isCalendarTarget && targetDate) {
       try {
-        console.log("Calendar drop - Source column:", sourceColumnId)
-        console.log("Calendar drop - Target date:", targetDate)
-        console.log("Calendar drop - Active task:", activeTask)
-
         const isTodayCalendar =
           format(selectedDate, "yyyy-MM-dd") ===
           format(new Date(), "yyyy-MM-dd")
@@ -538,25 +534,23 @@ export function TaskBoard({
           sourceColumnId === "incomplete" ||
           sourceColumnId === "future"
         ) {
-          console.log("Moving from incomplete/future to calendar")
           // First add to new date, then delete from old
           await addTasks(targetDate, [updatedTask]  )
           await deleteTask(activeTask.id)
         }
         // If dragging from any other day column
         else {
-          console.log("Moving from other day to calendar")
           await addTasks(targetDate, [updatedTask])
           await deleteTask(activeTask.id)
         }
 
-        console.log("Refreshing tasks and backlog")
         await refreshTasks()
         await refreshBacklog()
+        setPreviewTask(null)
+        setSourceColumnId(null)
         return
       } catch (error) {
         console.error("Error handling calendar drag end:", error)
-        console.error(error)
         return
       }
     }
@@ -578,7 +572,6 @@ export function TaskBoard({
         }))
 
         // If in backlog, use backlog reorder function
-        // Then in your reordering code:
         if (targetColumnId === "backlog") {
           await reorderBacklogTasks(newTasks.map(t => t.id))
         } else if (targetColumnId === "today") {
@@ -588,6 +581,8 @@ export function TaskBoard({
           )
         }
       }
+      setPreviewTask(null)
+      setSourceColumnId(null)
       return
     }
 
@@ -622,14 +617,12 @@ export function TaskBoard({
     clearPreviews()
     setPreviewColumnId(null)
     setIsDragging(false)
-    setActiveTask(null)
+    setPreviewTask(null)
+    setSourceColumnId(null)
   }
 
   // Add this function
-  const mergeTasksWithPreview = (
-    tasks: Task[],
-    previewTask: Task | null
-  ): Task[] => {
+  const mergeTasksWithPreview = (tasks: Task[]): Task[] => {
     if (!previewTask) return tasks
     const filtered = tasks.filter(t => t.id !== previewTask.id)
     return [...filtered, previewTask]
@@ -637,237 +630,218 @@ export function TaskBoard({
 
   return (
     <div className="relative size-full">
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-6 px-6">
-          {columns.map(column => (
-            <div key={column.id} className="flex w-[300px] flex-col">
-              <div className="mb-4 flex items-center justify-between">
-                {column.title}
-              </div>
-              <SortableContext
-                id={`${column.id}-sortable`}
-                items={column.tasks.map(t => t.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <TaskColumn
-                  id={column.id}
-                  isDragging={isDragging}
-                  isOverCalendarZone={false}
-                  showCalendarZone={false}
-                  onAddTasks={column.onAddTasks}
-                >
-                  {column.tasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      day={today}
-                      isOverCalendarZone={false}
-                      onDelete={async taskId => {
-                        if (column.id === "backlog") {
-                          await deleteBacklogTask(taskId)
-                          await refreshBacklog()
-                        } else {
-                          const date = column.id.startsWith("calendar")
-                            ? column.id.split("-")[1]
-                            : format(new Date(), "yyyy-MM-dd")
-                          await deleteTask(taskId)
-                          await refreshTasks()
-                        }
-                      }}
-                      onTaskUpdate={async updatedTask => {
-                        if (column.id === "backlog") {
-                          await updateBacklogTask(updatedTask.id, updatedTask)
-                          await refreshBacklog()
-                        } else {
-                          const date = column.id.startsWith("calendar")
-                            ? column.id.split("-")[1]
-                            : format(new Date(), "yyyy-MM-dd")
-                          await updateTask(updatedTask.id, updatedTask)
-                          await refreshTasks()
-                        }
-                      }}
-                    />
-                  ))}
-                </TaskColumn>
-              </SortableContext>
-            </div>
-          ))}
-
-          <div className="flex-1">
+      <div className="flex gap-6 px-6">
+        {columns.map(column => (
+          <div key={column.id} className="flex w-[300px] flex-col">
             <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <div className="space-y-1.5">
-                      <h2 className="text-lg font-semibold hover:cursor-pointer">
-                        Calendar
-                        <span className="text-muted-foreground ml-2 text-sm">
-                          {format(selectedDate, "MMM d")}
-                        </span>
-                      </h2>
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={date => {
-                        if (date) {
-                          setSelectedDate(date)
-                          setIsDatePickerOpen(false)
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="flex h-7 items-center rounded-lg border">
-                <Button
-                  variant={timeRange === 'business' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-6 px-2"
-                  onClick={() => setTimeRange('business')}
-                >
-                  <Briefcase className="mr-1 h-3 w-3" />
-                  <span className="text-xs">9-5</span>
-                </Button>
-                <Button
-                  variant={timeRange === 'all' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-6 px-2"
-                  onClick={() => setTimeRange('all')}
-                >
-                  <Clock className="mr-1 h-3 w-3" />
-                  <span className="text-xs">All Day</span>
-                </Button>
-              </div>
+              {column.title}
             </div>
-            <CalendarColumn
-              id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
-              date={format(selectedDate, "yyyy-MM-dd")}
-              singleColumn={true}
-              timeRange={timeRange}
-              tasks={mergeTasksWithPreview(
-                dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || [],
-                calendarColumnPreviewTask
-              )}
-              onDeleteTask={async taskId => {
-                await deleteTask(taskId)
-                await refreshTasks()
-              }}
-              onTaskUpdate={async task => {
-                await updateTask(task.id, task)
-                await refreshTasks()
-              }}
-              onAddTask={async task => {
-                const date = format(selectedDate, "yyyy-MM-dd")
-                await addTask(date, task)
-                await refreshTasks()
-              }}
-              onResizeTask={async (taskId, durationMinutes) => {
-                console.log("Resizing task:", taskId)
-                const task = dailyTasks[
-                  format(selectedDate, "yyyy-MM-dd")
-                ]?.tasks.find(t => t.id === taskId)
-                if (!task) return
-
-                const updatedTask = {
-                  ...task,
-                  durationMinutes
-                }
-
-                // If the task has a calendar time, update the end time based on the new duration
-                if (updatedTask.calendarItem?.start?.dateTime) {
-                  const startTime = new Date(
-                    updatedTask.calendarItem.start.dateTime
-                  )
-                  const endTime = new Date(
-                    startTime.getTime() + durationMinutes * 60000
-                  )
-
-                  updatedTask.calendarItem = {
-                    ...updatedTask.calendarItem,
-                    end: {
-                      date: format(endTime, "yyyy-MM-dd"),
-                      dateTime: endTime.toISOString()
-                    }
-                  }
-                }
-
-                try {
-                  // Update local state first
-                  setLocalColumnTasks(prev => {
-                    const updated = structuredClone(prev)
-                    const date = format(selectedDate, "yyyy-MM-dd")
-                    if (!updated[date]) {
-                      updated[date] = []
-                    }
-                    updated[date] = updated[date].map(t =>
-                      t.id === taskId ? updatedTask : t
-                    )
-                    return updated
-                  })
-
-                  // Then make the API call
-                  await updateTask(taskId, updatedTask)
-                  await refreshTasks()
-                } catch (error) {
-                  console.error("Failed to update task duration:", error)
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        <DragOverlay>
-          {activeTask ? (
-            <div className={cn(isDraggingOverCalendar && "opacity-50")}>
-              <TaskCard
-                task={activeTask}
-                day={today}
+            <SortableContext
+              id={`${column.id}-sortable`}
+              items={column.tasks.map(t => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <TaskColumn
+                id={column.id}
+                isDragging={isDragging}
                 isOverCalendarZone={false}
-              />
-            </div>
-          ) : null}
-        </DragOverlay>
+                showCalendarZone={false}
+                onAddTasks={column.onAddTasks}
+              >
+                {column.tasks.map(task => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    day={today}
+                    isOverCalendarZone={false}
+                    onDelete={async taskId => {
+                      if (column.id === "backlog") {
+                        await deleteBacklogTask(taskId)
+                        await refreshBacklog()
+                      } else {
+                        const date = column.id.startsWith("calendar")
+                          ? column.id.split("-")[1]
+                          : format(new Date(), "yyyy-MM-dd")
+                        await deleteTask(taskId)
+                        await refreshTasks()
+                      }
+                    }}
+                    onTaskUpdate={async updatedTask => {
+                      if (column.id === "backlog") {
+                        await updateBacklogTask(updatedTask.id, updatedTask)
+                        await refreshBacklog()
+                      } else {
+                        const date = column.id.startsWith("calendar")
+                          ? column.id.split("-")[1]
+                          : format(new Date(), "yyyy-MM-dd")
+                        await updateTask(updatedTask.id, updatedTask)
+                        await refreshTasks()
+                      }
+                    }}
+                  />
+                ))}
+              </TaskColumn>
+            </SortableContext>
+          </div>
+        ))}
 
-        <EditTaskDialog
-          day={today}
-          isNewTask={true}
-          task={{
-            id: crypto.randomUUID(),
-            title: "New Task",
-            description: "",
-            durationMinutes: 0,
-            subtasks: [],
-            completed: false,
-            tags: ["work"],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }}
-          open={isNewTaskDialogOpen}
-          onOpenChange={setIsNewTaskDialogOpen}
-          onDelete={async taskId => {
-            await deleteTask(taskId)
-            await refreshTasks()
-          }}
-          onSave={async task => {
-            if (task.id) {
-              const date = format(new Date(), "yyyy-MM-dd")
+        <div className="flex-1">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <div className="space-y-1.5">
+                    <h2 className="text-lg font-semibold hover:cursor-pointer">
+                      Calendar
+                      <span className="text-muted-foreground ml-2 text-sm">
+                        {format(selectedDate, "MMM d")}
+                      </span>
+                    </h2>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={date => {
+                      if (date) {
+                        setSelectedDate(date)
+                        setIsDatePickerOpen(false)
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex h-7 items-center rounded-lg border">
+              <Button
+                variant={timeRange === 'business' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-6 px-2"
+                onClick={() => setTimeRange('business')}
+              >
+                <Briefcase className="mr-1 h-3 w-3" />
+                <span className="text-xs">9-5</span>
+              </Button>
+              <Button
+                variant={timeRange === 'all' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-6 px-2"
+                onClick={() => setTimeRange('all')}
+              >
+                <Clock className="mr-1 h-3 w-3" />
+                <span className="text-xs">All Day</span>
+              </Button>
+            </div>
+          </div>
+
+          <CalendarColumn
+            id={`calendar-${format(selectedDate, "yyyy-MM-dd")}`}
+            date={format(selectedDate, "yyyy-MM-dd")}
+            singleColumn={true}
+            timeRange={timeRange}
+            tasks={mergeTasksWithPreview(
+              dailyTasks[format(selectedDate, "yyyy-MM-dd")]?.tasks || []
+            )}
+            onDeleteTask={async taskId => {
+              await deleteTask(taskId)
+              await refreshTasks()
+            }}
+            onTaskUpdate={async task => {
+              await updateTask(task.id, task)
+              await refreshTasks()
+            }}
+            onAddTask={async task => {
+              const date = format(selectedDate, "yyyy-MM-dd")
               await addTask(date, task)
               await refreshTasks()
-            }
-            setIsNewTaskDialogOpen(false)
-          }}
-        />
-      </DndContext>
+            }}
+            onResizeTask={async (taskId, durationMinutes) => {
+              console.log("Resizing task:", taskId)
+              const task = dailyTasks[
+                format(selectedDate, "yyyy-MM-dd")
+              ]?.tasks.find(t => t.id === taskId)
+              if (!task) return
+
+              const updatedTask = {
+                ...task,
+                durationMinutes
+              }
+
+              // If the task has a calendar time, update the end time based on the new duration
+              if (updatedTask.calendarItem?.start?.dateTime) {
+                const startTime = new Date(
+                  updatedTask.calendarItem.start.dateTime
+                )
+                const endTime = new Date(
+                  startTime.getTime() + durationMinutes * 60000
+                )
+
+                updatedTask.calendarItem = {
+                  ...updatedTask.calendarItem,
+                  end: {
+                    date: format(endTime, "yyyy-MM-dd"),
+                    dateTime: endTime.toISOString()
+                  }
+                }
+              }
+
+              try {
+                // Update local state first
+                setLocalColumnTasks(prev => {
+                  const updated = structuredClone(prev)
+                  const date = format(selectedDate, "yyyy-MM-dd")
+                  if (!updated[date]) {
+                    updated[date] = []
+                  }
+                  updated[date] = updated[date].map(t =>
+                    t.id === taskId ? updatedTask : t
+                  )
+                  return updated
+                })
+
+                // Then make the API call
+                await updateTask(taskId, updatedTask)
+                await refreshTasks()
+              } catch (error) {
+                console.error("Failed to update task duration:", error)
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      <EditTaskDialog
+        day={today}
+        isNewTask={true}
+        task={{
+          id: crypto.randomUUID(),
+          title: "New Task",
+          description: "",
+          durationMinutes: 0,
+          subtasks: [],
+          completed: false,
+          tags: ["work"],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }}
+        open={isNewTaskDialogOpen}
+        onOpenChange={setIsNewTaskDialogOpen}
+        onDelete={async taskId => {
+          await deleteTask(taskId)
+          await refreshTasks()
+        }}
+        onSave={async task => {
+          if (task.id) {
+            const date = format(new Date(), "yyyy-MM-dd")
+            await addTask(date, task)
+            await refreshTasks()
+          }
+          setIsNewTaskDialogOpen(false)
+        }}
+      />
     </div>
   )
 }

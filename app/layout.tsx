@@ -20,6 +20,9 @@ import { FunctionCallProvider } from "@/lib/context/function-call-context"
 import { VoiceSessionProvider } from "@/lib/context/voice-session-context"
 import { PlanProvider } from "@/lib/context/plan-context"
 import { WorkflowProvider } from "@/lib/context/agent-workflow-context"
+import { ActiveTaskProvider } from "@/lib/context/active-task-context"
+import { DndContextProvider } from "@/components/providers/dnd-context-provider"
+import { cn } from "@/lib/utils"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
@@ -53,29 +56,33 @@ export default async function RootLayout({
                         <RealtimeProvider>
                           <TasksProvider>
                             <BacklogProvider>
-                              <FunctionCallProvider>
-                                <TaskActionsProvider>
-                                  <FilterProvider>
-                                    <CurrentViewProvider>
-                                      <GoogleCalendarProvider>
-                                        <SelectedTasksProvider>
-                                          <PreviewTasksProvider>
-                                            <AiProvider>
-                                              <div className="flex min-h-screen flex-col">
-                                                <div className="flex flex-1">
-                                                  <main className="flex-1 overflow-y-auto">
-                                                    {children}
-                                                  </main>
-                                                </div>
-                                              </div>
-                                            </AiProvider>
-                                          </PreviewTasksProvider>
-                                        </SelectedTasksProvider>
-                                      </GoogleCalendarProvider>
-                                    </CurrentViewProvider>
-                                  </FilterProvider>
-                                </TaskActionsProvider>
-                              </FunctionCallProvider>
+                              <ActiveTaskProvider>
+                                <FunctionCallProvider>
+                                  <TaskActionsProvider>
+                                    <FilterProvider>
+                                      <CurrentViewProvider>
+                                        <GoogleCalendarProvider>
+                                          <SelectedTasksProvider>
+                                            <PreviewTasksProvider>
+                                              <AiProvider>
+                                                <DndContextProvider>
+                                                  <div className="flex min-h-screen flex-col">
+                                                    <div className="flex flex-1">
+                                                      <main className="flex-1 overflow-y-auto">
+                                                        {children}
+                                                      </main>
+                                                    </div>
+                                                  </div>
+                                                </DndContextProvider>
+                                              </AiProvider>
+                                            </PreviewTasksProvider>
+                                          </SelectedTasksProvider>
+                                        </GoogleCalendarProvider>
+                                      </CurrentViewProvider>
+                                    </FilterProvider>
+                                  </TaskActionsProvider>
+                                </FunctionCallProvider>
+                              </ActiveTaskProvider>
                             </BacklogProvider>
                           </TasksProvider>
                         </RealtimeProvider>

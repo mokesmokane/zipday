@@ -12,12 +12,9 @@ interface TaskBoardWrapperProps {
 }
 
 export function TaskBoardWrapper({ today }: TaskBoardWrapperProps) {
-  const { selectedDate, setSelectedDate } = useDate()
   return (
     <TaskBoard
       today={today}
-      selectedDate={selectedDate || new Date()}
-      setSelectedDate={setSelectedDate}
     />
   )
 }

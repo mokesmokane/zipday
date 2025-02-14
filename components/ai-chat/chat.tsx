@@ -11,7 +11,11 @@ import {
   Maximize2,
   Minimize2,
   Bot,
-  MoreVertical
+  MoreVertical,
+  ListTodo,
+  Calendar,
+  Brain,
+  Sparkles
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,6 +52,70 @@ import { PulsatingSphereVisualizer } from "./ai-voice-sphere"
 import { FunctionCallDisplay } from "@/components/ai-chat/function-call-display"
 import { RealtimeMessagesWindow } from "@/components/ai-chat/realtime-messages-window"
 import { RealtimeSessionDialog } from "@/components/ai-chat/realtime-session-dialog"
+import { useDroppable } from "@dnd-kit/core"
+import { Task } from "@/types/daily-task-types"
+
+interface TaskDropMenuProps {
+  task: Task
+  onClose: () => void
+  onAction: (action: string) => void
+}
+
+function TaskDropMenu({ task, onClose, onAction }: TaskDropMenuProps) {
+  const actions = [
+    {
+      id: "enhance",
+      label: "Enhance Task Details",
+      description: "Add more detailed subtasks and description",
+      icon: Brain
+    },
+    {
+      id: "schedule",
+      label: "Smart Schedule",
+      description: "Find the best time slot in your calendar",
+      icon: Calendar
+    },
+    {
+      id: "breakdown",
+      label: "Task Breakdown",
+      description: "Break down into smaller manageable tasks",
+      icon: ListTodo
+    },
+    {
+      id: "optimize",
+      label: "Optimize Task",
+      description: "Suggest improvements and optimizations",
+      icon: Sparkles
+    }
+  ]
+
+  return (
+    <Card className="w-[300px]">
+      <CardHeader>
+        <CardTitle className="text-sm">AI Actions for: {task.title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        {actions.map(action => (
+          <Button
+            key={action.id}
+            variant="ghost"
+            className="w-full justify-start gap-2"
+            onClick={() => onAction(action.id)}
+          >
+            <action.icon className="size-4" />
+            <div className="flex flex-col items-start">
+              <div className="font-medium">{action.label}</div>
+              <div className="text-muted-foreground text-xs">
+                {action.description}
+              </div>
+            </div>
+          </Button>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function ChatForm({
   className,
   ...props
@@ -87,6 +155,29 @@ export function ChatForm({
   } = useRealtimeAudio({
     idMappings: idMappings
   })
+
+  const [droppedTask, setDroppedTask] = useState<Task | null>(null)
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: "ai-chat-droppable"
+  })
+
+  // Add effect to listen for task drops
+  useEffect(() => {
+    const handleTaskDrop = (e: CustomEvent<Task>) => {
+      setDroppedTask(e.detail)
+    }
+
+    const element = document.querySelector("[data-droppable-id='ai-chat-droppable']")
+    if (element) {
+      element.addEventListener("taskdrop", handleTaskDrop as EventListener)
+    }
+
+    return () => {
+      if (element) {
+        element.removeEventListener("taskdrop", handleTaskDrop as EventListener)
+      }
+    }
+  }, [])
 
   const handlePopOutToggle = () => {
     setIsPoppedOut(!isPoppedOut)
@@ -167,14 +258,74 @@ export function ChatForm({
     </div>
   )
 
+  const handleTaskAction = async (action: string) => {
+    if (!droppedTask) return
+
+    let prompt = ""
+    switch (action) {
+      case "enhance":
+        prompt = `Please enhance this task with more detailed subtasks and description. Here's the current task: ${JSON.stringify(droppedTask, null, 2)}
+
+Please provide:
+1. An expanded description that clarifies the goal and context
+2. A detailed list of subtasks that break down the implementation
+3. Any additional considerations or dependencies`
+        break
+      case "schedule":
+        prompt = `Please suggest the best time slot for this task considering my calendar. Here's the task: ${JSON.stringify(droppedTask, null, 2)}
+
+Please consider:
+1. Task duration and urgency
+2. Best practices for this type of task
+3. Typical scheduling patterns
+4. Dependencies and prerequisites`
+        break
+      case "breakdown":
+        prompt = `Please break down this task into smaller manageable tasks. Here's the current task: ${JSON.stringify(droppedTask, null, 2)}
+
+Please provide:
+1. A logical sequence of smaller tasks
+2. Estimated time for each sub-task
+3. Dependencies between tasks
+4. Any prerequisites or preparation needed`
+        break
+      case "optimize":
+        prompt = `Please suggest improvements and optimizations for this task. Here's the current task: ${JSON.stringify(droppedTask, null, 2)}
+
+Please suggest:
+1. Ways to make the task more efficient
+2. Potential automation opportunities
+3. Best practices that could be applied
+4. Resources that could help`
+        break
+    }
+
+    if (prompt) {
+      void append({ content: prompt, role: "user" })
+    }
+    setDroppedTask(null)
+  }
+
   const mainContent = (
     <main
+      ref={setDroppableRef}
+      data-droppable-id="ai-chat-droppable"
       className={cn(
         "ring-none flex size-full flex-col items-stretch border-none",
-        className
+        className,
+        isOver && "bg-accent/50"
       )}
       {...props}
     >
+      {droppedTask && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
+          <TaskDropMenu
+            task={droppedTask}
+            onClose={() => setDroppedTask(null)}
+            onAction={handleTaskAction}
+          />
+        </div>
+      )}
       <div className="min-h-0 flex-1 content-center overflow-y-auto px-6 [&::-webkit-scrollbar]:hidden">
         {isSessionActive ? (
           <>
