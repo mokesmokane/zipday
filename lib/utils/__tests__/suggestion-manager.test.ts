@@ -1,8 +1,7 @@
-import { getSuggestions, SuggestionManager } from "../suggestion-manager"
+import { getSuggestions, SuggestionManager, generateTimeSlots, generateDurations, DEFAULT_OPTIONS } from "../suggestion-manager"
 import { EntryStage } from "../entry-stage-manager"
 import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 import { GoogleCalendarEvent } from '@/types/calendar-types'
-import { generateTimeSlots } from '../suggestion-manager'
 
 // Mock suggestion manager that returns predictable results
 const mockSuggestionManager: SuggestionManager = {
@@ -55,12 +54,12 @@ describe("getSuggestions", () => {
   describe("duration suggestions", () => {
     it("returns all durations when input is empty", async () => {
       const result = await getSuggestions("Buy groceries\n#personal", "", "duration", mockSuggestionManager, testOptions, new Date('2024-03-20'))
-      expect(result).toEqual(["30m", "1h", "2h"])
+      expect(result).toEqual(["30m", "1h", "1h30m", "2h", "3h", "4h"])
     })
 
     it("filters durations based on input", async () => {
       const result = await getSuggestions("Buy groceries\n#personal", "1", "duration", mockSuggestionManager, testOptions, new Date('2024-03-20'))
-      expect(result).toEqual(["1h"])
+      expect(result).toEqual(["1h", "1h30m"])
     })
 
     it("handles no matches", async () => {
@@ -365,6 +364,64 @@ describe("getSuggestions", () => {
       // Should only include 13:00 and 13:30 as they match the prefix and don't overlap
       expect(result).toEqual(['13:00', '13:30'])
     })
+
+    it("handles full ISO datetime strings in events", async () => {
+      const events: GoogleCalendarEvent[] = [{
+        id: '1',
+        title: 'Test Event',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T14:00:00.000Z' },
+          end: { dateTime: '2024-03-20T16:30:00.000Z' }
+        }
+      }]
+
+      const result = await getSuggestions(
+        "Task\n#work\n30m",
+        "",
+        "time",
+        mockSuggestionManager,
+        { ...testOptions, events },
+        new Date('2024-03-20')
+      )
+
+      // All times within the event should be excluded
+      expect(result).not.toContain('14:00')
+      expect(result).not.toContain('14:30')
+      expect(result).not.toContain('15:00')
+      expect(result).not.toContain('15:30')
+      expect(result).not.toContain('16:00')
+
+      // Times before and after should be available
+      expect(result).toContain('13:30')
+      expect(result).toContain('16:30')
+    })
+
+    it("handles events with different timezone offsets", async () => {
+      const events: GoogleCalendarEvent[] = [{
+        id: '1',
+        title: 'Test Event',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T14:00:00+02:00' }, // Different timezone
+          end: { dateTime: '2024-03-20T15:00:00+02:00' }
+        }
+      }]
+
+      const result = await getSuggestions(
+        "Task\n#work\n30m",
+        "",
+        "time",
+        mockSuggestionManager,
+        { ...testOptions, events },
+        new Date('2024-03-20')
+      )
+
+      // Times should be adjusted for timezone
+      // If local time is UTC, a 14:00+02:00 event would be at 12:00 UTC
+      expect(result).not.toContain('12:00')
+      expect(result).not.toContain('12:30')
+      expect(result).toContain('11:30')
+      expect(result).toContain('13:00')
+    })
   })
 
   describe("edge cases", () => {
@@ -597,5 +654,177 @@ describe('generateTimeSlots', () => {
     expect(slots).not.toContain('10:00')
     expect(slots).not.toContain('10:30')
     expect(slots).not.toContain('11:00')
+  })
+
+  it('should handle full ISO datetime strings in events', () => {
+    const events: GoogleCalendarEvent[] = [
+      {
+        id: '1',
+        title: 'Test Event',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T10:00:00.000Z' },
+          end: { dateTime: '2024-03-20T11:30:00.000Z' }
+        }
+      }
+    ]
+
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
+
+    // These slots should be excluded due to the event
+    expect(slots).not.toContain('10:00')
+    expect(slots).not.toContain('10:30')
+    expect(slots).not.toContain('11:00')
+
+    // These slots should still be present
+    expect(slots).toContain('09:30')
+    expect(slots).toContain('11:30')
+    expect(slots).toContain('12:00')
+  })
+
+  it('should handle milliseconds and timezone offsets in datetime strings', () => {
+    const events: GoogleCalendarEvent[] = [
+      {
+        id: '1',
+        title: 'Test Event 1',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T10:00:00.123Z' },
+          end: { dateTime: '2024-03-20T11:00:00.456Z' }
+        }
+      },
+      {
+        id: '2',
+        title: 'Test Event 2',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T14:00:00+01:00' },
+          end: { dateTime: '2024-03-20T15:00:00+01:00' }
+        }
+      }
+    ]
+
+    const slots = generateTimeSlots(events, new Date('2024-03-20'))
+
+    // Event 1 slots should be excluded (UTC times)
+    expect(slots).not.toContain('10:00')
+    expect(slots).not.toContain('10:30')
+    
+    // Event 2 slots should be excluded (timezone adjusted)
+    // If local time is UTC, a 14:00+01:00 event would be at 13:00 UTC
+    expect(slots).not.toContain('13:00')
+    expect(slots).not.toContain('13:30')
+
+    // Adjacent slots should be available
+    expect(slots).toContain('09:30')
+    expect(slots).toContain('11:00')
+    expect(slots).toContain('12:30')
+    expect(slots).toContain('14:00')
+  })
+})
+
+describe("generateDurations", () => {
+  beforeEach(() => {
+    // Set a fixed time for all tests in this describe block
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2024-03-20T09:15:00'))
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it("returns all default durations when no start time is provided", () => {
+    const result = generateDurations([], new Date('2024-03-20'))
+    expect(result).toEqual(DEFAULT_OPTIONS.durationOptions)
+  })
+
+  it("returns all durations that fit before end of day", () => {
+    const result = generateDurations([], new Date('2024-03-20'), '22:00')
+    // At 22:00, we have 1h59m until end of day (23:59)
+    expect(result).toContain('30m')
+    expect(result).toContain('1h')
+    expect(result).toContain('1h30m')
+    expect(result).not.toContain('2h')
+    expect(result).not.toContain('3h')
+    expect(result).not.toContain('4h')
+  })
+
+  it("returns only durations that fit before next event", () => {
+    const events: GoogleCalendarEvent[] = [{
+      id: '1',
+      title: 'Test Event',
+      calendarItem: {
+        start: { dateTime: '2024-03-20T11:00:00' },
+        end: { dateTime: '2024-03-20T12:00:00' }
+      }
+    }]
+
+    const result = generateDurations(events, new Date('2024-03-20'), '10:00')
+    // From 10:00 to 11:00, we have 1h available
+    expect(result).toContain('30m')
+    expect(result).toContain('1h')
+    expect(result).not.toContain('1h30m')
+    expect(result).not.toContain('2h')
+  })
+
+  it("handles multiple events and returns durations for the next available slot", () => {
+    const events: GoogleCalendarEvent[] = [
+      {
+        id: '1',
+        title: 'Morning Meeting',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T11:00:00' },
+          end: { dateTime: '2024-03-20T12:00:00' }
+        }
+      },
+      {
+        id: '2',
+        title: 'Afternoon Meeting',
+        calendarItem: {
+          start: { dateTime: '2024-03-20T14:00:00' },
+          end: { dateTime: '2024-03-20T15:00:00' }
+        }
+      }
+    ]
+
+    const result = generateDurations(events, new Date('2024-03-20'), '12:30')
+    // From 12:30 to 14:00, we have 1h30m available
+    expect(result).toContain('30m')
+    expect(result).toContain('1h')
+    expect(result).toContain('1h30m')
+    expect(result).not.toContain('2h')
+  })
+
+  it("returns all durations when no events are scheduled after start time", () => {
+    const events: GoogleCalendarEvent[] = [{
+      id: '1',
+      title: 'Morning Meeting',
+      calendarItem: {
+        start: { dateTime: '2024-03-20T09:00:00' },
+        end: { dateTime: '2024-03-20T10:00:00' }
+      }
+    }]
+
+    const result = generateDurations(events, new Date('2024-03-20'), '10:30')
+    // After 10:30, we have the rest of the day available
+    expect(result).toEqual(DEFAULT_OPTIONS.durationOptions)
+  })
+
+  it("handles events on different days", () => {
+    const events: GoogleCalendarEvent[] = [{
+      id: '1',
+      title: 'Tomorrow Meeting',
+      calendarItem: {
+        start: { dateTime: '2024-03-21T09:00:00' },
+        end: { dateTime: '2024-03-21T10:00:00' }
+      }
+    }]
+
+    const result = generateDurations(events, new Date('2024-03-20'), '15:00')
+    // Events on different days shouldn't affect duration suggestions
+    expect(result).toEqual(DEFAULT_OPTIONS.durationOptions)
+  })
+
+  it("returns empty array for invalid start times", () => {
+    const result = generateDurations([], new Date('2024-03-20'), '24:00')
+    expect(result).toEqual([])
   })
 }) 

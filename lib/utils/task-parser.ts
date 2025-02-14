@@ -91,7 +91,6 @@ export function parseMetadata(line: string): ParsedMetadata | undefined {
 }
 
 export function parseTaskInput(input: string): Task[] {
-
   const tasks: Task[] = []
   const taskBlocks = input.split("\n\n").filter(Boolean).filter(block => block.trim() !== "")
   for (const block of taskBlocks) {

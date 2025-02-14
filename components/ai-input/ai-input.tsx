@@ -11,6 +11,8 @@ import { determineNextEntryStage, getCurrentEntryStage, processEnterKey } from '
 import { getSuggestions, SuggestionManager } from "@/lib/utils/suggestion-manager"
 import { useGoogleCalendar } from "@/lib/context/google-calendar-context"
 import { useDate } from "@/lib/context/date-context"
+import { EntryStage } from '@/lib/utils/entry-stage-manager'
+
 interface AIInputProps {
     onSubmit: (value: string) => void
     onValueChanged: (previewTasks: Task[]) => void
@@ -112,8 +114,17 @@ interface AIInputProps {
 
     const handleSubmit = () => {
       if (inputValue.trim()) {
+        console.log('handleSubmit', inputValue.trim())
         onSubmit(inputValue.trim())
         setInputValue('')
+        // Clear preview tasks and reset related state
+        setPreviewTasks([])
+        setShowTabPrompt(false)
+        setCurrentTask(null)
+        setContextTasks([])
+        setCurrent_text('')
+        setSuggestions([])
+        setCurrentSuggestionIndex(0)
       }
     }
   
@@ -123,15 +134,15 @@ interface AIInputProps {
     }
 
     // Function to get suggestions based on entry stage
-    const getSuggestionsByStage = async () => {
+    const getSuggestionsByStage = async (stage: EntryStage) => {
       setIsLoading(true)
       try {
-        console.log('getSuggestionsByStage', current_text, entryStage)
+        console.log('getSuggestionsByStage', current_text, stage)
 
         const suggestions = await getSuggestions(
           inputValue,
           current_text,
-          entryStage,
+          stage,
           aiSuggestionManager,
           {
             categoryOptions,
@@ -163,7 +174,7 @@ interface AIInputProps {
         console.log('inputValue', inputValue)
       if ((showTabPrompt || inputValue.trim().length === 0) && !isLoading && suggestions.length === 0) {
         setShowTabPrompt(false)
-        await getSuggestionsByStage()
+        await getSuggestionsByStage(entryStage)
       } else if (suggestions.length > 0) {
         setCurrentSuggestionIndex((prev) => (prev + 1) % suggestions.length)
       }
@@ -215,7 +226,7 @@ interface AIInputProps {
         e.preventDefault()
         if ((showTabPrompt || inputValue.trim().length === 0) && !isLoading && suggestions.length === 0) {
           setShowTabPrompt(false)
-          const newSuggestions = await getSuggestionsByStage()
+          const newSuggestions = await getSuggestionsByStage(entryStage)
           if (newSuggestions && newSuggestions.length > 0) {
             const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion(newSuggestions[0]))
             setPreviewTasks(parsedTasks)
@@ -255,10 +266,27 @@ interface AIInputProps {
 
             setSuggestions([])
             const newValue = processEnterKey(value + '\n')
+            console.log('newValue', newValue)
             setInputValue(newValue)
             setCurrent_text(newValue.split('\n').pop() || '')
             const stage = getCurrentEntryStage(newValue)
             setEntryStage(stage)
+            console.log('stage', stage)
+            if(stage === 'duration') {
+                console.log('showTabPrompt', showTabPrompt)
+                console.log('inputValue.trim().length', inputValue.trim().length)
+                console.log('isLoading', isLoading)
+                console.log('suggestions.length', suggestions.length)
+                if ((showTabPrompt || inputValue.trim().length === 0) && !isLoading && suggestions.length === 0) {
+                    setShowTabPrompt(false)
+                    const newSuggestions = await getSuggestionsByStage(stage)
+                    console.log('newSuggestions', newSuggestions)
+                    if (newSuggestions && newSuggestions.length > 0) {
+                      const parsedTasks = parseTaskInput(inputValue + getFormattedSuggestion(newSuggestions[0]))
+                      setPreviewTasks(parsedTasks)
+                    }
+                  }
+            }
             const parsedTasks = parseTaskInput(newValue)
             setPreviewTasks(parsedTasks)
             
@@ -271,6 +299,8 @@ interface AIInputProps {
             })
           }
           else {
+            e.preventDefault()
+            console.log('handleSubmit', inputValue.trim())
             handleSubmit()
           }
       } else if (e.key === 'Escape' && onCancel) {

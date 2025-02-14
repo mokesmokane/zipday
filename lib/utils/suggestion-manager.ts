@@ -2,7 +2,7 @@ import { Task } from "@/types/daily-task-types"
 import { EntryStage } from "./entry-stage-manager"
 import { format, addMinutes, isAfter, isBefore, parse } from "date-fns"
 import { GoogleCalendarEvent } from "@/types/calendar-types"
-
+import { parseTaskInput } from "./task-parser"
 
 export interface SuggestionOptions {
   categoryOptions?: string[]
@@ -11,7 +11,7 @@ export interface SuggestionOptions {
   events?: GoogleCalendarEvent[]
 }
 
-const DEFAULT_OPTIONS: SuggestionOptions = {
+export const DEFAULT_OPTIONS: SuggestionOptions = {
   categoryOptions: ['work', 'personal', 'health', 'errands', 'meeting'],
   durationOptions: ['30m', '1h', '1h30m', '2h', '3h', '4h'],
   timeOptions: [], // Will be generated dynamically
@@ -30,8 +30,8 @@ export interface SuggestionManager {
 }
 
 export function generateTimeSlots(events: GoogleCalendarEvent[] = [], selectedDate: Date): string[] {
-    console.log("events", events.map(event => event.calendarItem?.start?.dateTime))
-    console.log("selectedDate", selectedDate)
+  console.log("events", events.map(event => event.calendarItem?.start?.dateTime))
+  console.log("selectedDate", selectedDate)
   const now = new Date()
   const currentHour = now.getHours()
   const currentMinute = now.getMinutes()
@@ -66,11 +66,29 @@ export function generateTimeSlots(events: GoogleCalendarEvent[] = [], selectedDa
         return null
       }
       
+      // Parse the dates and handle timezone offsets
       const start = new Date(startDateTime)
       const end = event.calendarItem?.end?.dateTime 
         ? new Date(event.calendarItem.end.dateTime)
         : addMinutes(start, 60) // Default 1 hour if no duration specified
-      return { start, end }
+
+      // Convert to local time by using UTC methods to avoid timezone issues
+      const startLocal = new Date(Date.UTC(
+        start.getUTCFullYear(),
+        start.getUTCMonth(),
+        start.getUTCDate(),
+        start.getUTCHours(),
+        start.getUTCMinutes()
+      ))
+      const endLocal = new Date(Date.UTC(
+        end.getUTCFullYear(),
+        end.getUTCMonth(),
+        end.getUTCDate(),
+        end.getUTCHours(),
+        end.getUTCMinutes()
+      ))
+
+      return { start: startLocal, end: endLocal }
     })
     .filter((slot): slot is { start: Date; end: Date } => slot !== null)
 
@@ -102,6 +120,67 @@ export function generateTimeSlots(events: GoogleCalendarEvent[] = [], selectedDa
   return timeSlots
 }
 
+export function generateDurations(events: GoogleCalendarEvent[] = [], selectedDate: Date, startTime?: string): string[] {
+  // If no start time is provided, return default durations
+  if (!startTime) {
+    return DEFAULT_OPTIONS.durationOptions || []
+  }
+
+  // Parse the start time - handle both UTC and local formats
+  let startDateTime: Date
+  if (startTime.endsWith('Z')) {
+    // If UTC time, create date directly
+    startDateTime = new Date(startTime)
+  } else {
+    // If local time, parse with date-fns
+    const timeStr = `${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`
+    startDateTime = parse(timeStr, "yyyy-MM-dd'T'HH:mm", new Date())
+  }
+
+  // Find the next event after the start time
+  const nextEvent = events
+    .filter(event => event.calendarItem?.start?.dateTime)
+    .map(event => ({
+      start: new Date(event.calendarItem!.start!.dateTime!),
+      end: event.calendarItem!.end?.dateTime 
+        ? new Date(event.calendarItem!.end.dateTime)
+        : addMinutes(new Date(event.calendarItem!.start!.dateTime!), 60)
+    }))
+    .filter(event => 
+      format(event.start, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
+      isAfter(event.start, startDateTime)
+    )
+    .sort((a, b) => a.start.getTime() - b.start.getTime())[0]
+
+  // Calculate end boundary (either next event or end of day)
+  const endOfDay = new Date(selectedDate)
+  endOfDay.setHours(23, 59, 59)
+  
+  const boundaryTime = nextEvent ? nextEvent.start : endOfDay
+  
+  // Calculate available minutes
+  const availableMinutes = Math.floor(
+    (boundaryTime.getTime() - startDateTime.getTime()) / (1000 * 60)
+  )
+
+  console.log('Available minutes:', availableMinutes, 'between', format(startDateTime, 'HH:mm'), 'and', format(boundaryTime, 'HH:mm'))
+
+  // Convert default durations to minutes for comparison
+  const durationInMinutes = (durationStr: string): number => {
+    const hours = durationStr.match(/(\d+)h/)?.[1] || '0'
+    const minutes = durationStr.match(/(\d+)m/)?.[1] || '0'
+    return parseInt(hours) * 60 + parseInt(minutes)
+  }
+
+  // Filter durations that fit within available time
+  return (DEFAULT_OPTIONS.durationOptions || []).filter(duration => {
+    const mins = durationInMinutes(duration)
+    const fits = mins <= availableMinutes
+    console.log('Duration', duration, '=', mins, 'minutes, fits?', fits)
+    return fits
+  })
+}
+
 export async function getSuggestions(
   currentTask: string,
   currentText: string,
@@ -110,6 +189,7 @@ export async function getSuggestions(
   options: SuggestionOptions = DEFAULT_OPTIONS,
   selectedDate: Date
 ): Promise<string[]> {
+    const task = parseTaskInput(currentTask)[0]
   // Get the current line text without any prefixes
   const textWithoutPrefix = currentText
     .trim()
@@ -140,12 +220,10 @@ export async function getSuggestions(
     }
 
     case 'duration': {
-      const durations = options.durationOptions || DEFAULT_OPTIONS.durationOptions!
-      return textWithoutPrefix
-        ? durations.filter(duration => 
-            duration.toLowerCase().startsWith(textWithoutPrefix)
-          )
-        : durations
+      console.log("task", task)
+      console.log("currentTask", currentTask)
+      const durations = generateDurations(options.events, selectedDate, task.calendarItem?.start?.dateTime)
+      return durations
     }
 
     case 'time': {

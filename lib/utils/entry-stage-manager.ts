@@ -99,13 +99,13 @@ export function processEnterKey(input: string): string {
     // If the line before starts with @ and has no content, next line should be 1h
     if (previousLine.match(/^\s*@\s*$/)) {
         console.log('previousLine is a time with no content')
-        result = [...otherLines, '1h'].join('\n')
+        result = [...otherLines].join('\n') + '\n'
     }
 
     //if the line before starts with '@', ' @ ' or ' @' and has some non whitespace characters the last line should now be "1h "
     if (previousLine.match(/^\s*@\s*\S+/)) {
         console.log('previousLine is a time with content')
-        result = [...otherLines, previousLine, '1h'].join('\n')
+        result = [...otherLines, previousLine].join('\n') + '\n'
     }
 
     //if the line before starts with alphanumeric characters the last line should now be " - "
@@ -131,12 +131,13 @@ export function getCurrentEntryStage(input: string): EntryStage {
   const currentSection = sections[sections.length - 1]
   const lines = currentSection.split('\n')
   const currentLine = lines[lines.length - 1].trim()
+  const previousLine = lines.length > 1 ? lines[lines.length - 2].trim() : ''
 
   // Check current line prefixes
   if (currentLine.trim().startsWith('-')) return 'subtask'
   if (currentLine.trim().startsWith('#')) return 'category'
   if (currentLine.trim().startsWith('@')) return 'time'
-  if (currentLine.trim().match(/^\d+[hm]$/)) return 'duration'
+  if (currentLine.trim().match(/^\d+[hm]$/) || previousLine.trim().startsWith('@')) return 'duration'
 
   // Find if there's a previous plain text line in this section
   const hasEarlierPlainLine = lines.slice(0, -1).some(line => {
