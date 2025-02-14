@@ -57,62 +57,81 @@ import { Task } from "@/types/daily-task-types"
 
 interface TaskDropMenuProps {
   task: Task
-  onClose: () => void
   onAction: (action: string) => void
 }
 
-function TaskDropMenu({ task, onClose, onAction }: TaskDropMenuProps) {
+async function handleTaskAction(action: string, task: Task | null, append: any) {
+  if (!task) return
+
+  let prompt = ""
+  switch (action) {
+    case "enhance":
+      prompt = `Please enhance this task with more detailed subtasks and description. Here's the current task: ${JSON.stringify(task, null, 2)}
+
+Please provide:
+1. An expanded description that clarifies the goal and context
+2. A detailed list of subtasks that break down the implementation
+3. Any additional considerations or dependencies`
+      break
+    case "schedule":
+      prompt = `Please suggest the best time slot for this task considering my calendar. Here's the task: ${JSON.stringify(task, null, 2)}
+
+Please consider:
+1. Task duration and urgency
+2. Best practices for this type of task
+3. Typical scheduling patterns
+4. Dependencies and prerequisites`
+      break
+    case "breakdown":
+      prompt = `Please break down this task into smaller manageable tasks. Here's the current task: ${JSON.stringify(task, null, 2)}
+
+Please provide:
+1. A logical sequence of smaller tasks
+2. Estimated time for each sub-task
+3. Dependencies between tasks
+4. Any prerequisites or preparation needed`
+      break
+    case "optimize":
+      prompt = `Please suggest improvements and optimizations for this task. Here's the current task: ${JSON.stringify(task, null, 2)}
+
+Please suggest:
+1. Ways to make the task more efficient
+2. Potential automation opportunities
+3. Best practices that could be applied
+4. Resources that could help`
+      break
+  }
+
+  if (prompt) {
+    void append({ content: prompt, role: "user" })
+  }
+}
+
+function TaskActionButtons({ task, onAction }: TaskDropMenuProps) {
   const actions = [
-    {
-      id: "enhance",
-      label: "Enhance Task Details",
-      description: "Add more detailed subtasks and description",
-      icon: Brain
-    },
-    {
-      id: "schedule",
-      label: "Smart Schedule",
-      description: "Find the best time slot in your calendar",
-      icon: Calendar
-    },
-    {
-      id: "breakdown",
-      label: "Task Breakdown",
-      description: "Break down into smaller manageable tasks",
-      icon: ListTodo
-    },
-    {
-      id: "optimize",
-      label: "Optimize Task",
-      description: "Suggest improvements and optimizations",
-      icon: Sparkles
-    }
+    { id: "enhance", label: "Enhance", icon: Brain },
+    { id: "schedule", label: "Schedule", icon: Calendar },
+    { id: "breakdown", label: "Break Down", icon: ListTodo },
+    { id: "optimize", label: "Optimize", icon: Sparkles }
   ]
 
   return (
-    <Card className="w-[300px]">
-      <CardHeader>
-        <CardTitle className="text-sm">AI Actions for: {task.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-2">
+    <div className="animate-in slide-in-from-left-5 fade-in duration-300">
+      <div className="mt-2 flex flex-wrap gap-2">
         {actions.map(action => (
           <Button
             key={action.id}
-            variant="ghost"
-            className="w-full justify-start gap-2"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5"
             onClick={() => onAction(action.id)}
           >
-            <action.icon className="size-4" />
-            <div className="flex flex-col items-start">
-              <div className="font-medium">{action.label}</div>
-              <div className="text-muted-foreground text-xs">
-                {action.description}
-              </div>
-            </div>
+            <action.icon className="size-3.5" />
+            {action.label}
           </Button>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -158,13 +177,24 @@ export function ChatForm({
 
   const [droppedTask, setDroppedTask] = useState<Task | null>(null)
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: "ai-chat-droppable"
+    id: "ai-chat-droppable",
+    data: {
+      accepts: ["task"]
+    }
   })
 
-  // Add effect to listen for task drops
+  // Update effect to handle drops
   useEffect(() => {
     const handleTaskDrop = (e: CustomEvent<Task>) => {
+      console.log("Chat received task drop:", e.detail)
       setDroppedTask(e.detail)
+      // Auto scroll to bottom to show the dropped task
+      const chatContainer = document.querySelector("[data-droppable-id='ai-chat-droppable'] .overflow-y-auto")
+      if (chatContainer) {
+        setTimeout(() => {
+          chatContainer.scrollTop = chatContainer.scrollHeight
+        }, 100)
+      }
     }
 
     const element = document.querySelector("[data-droppable-id='ai-chat-droppable']")
@@ -219,6 +249,11 @@ export function ChatForm({
     }
   }
 
+  const handleTaskActionWrapper = (action: string) => {
+    void handleTaskAction(action, droppedTask, append)
+    setDroppedTask(null)
+  }
+
   const messageList = (
     <div className="my-4 flex h-fit min-h-full flex-col gap-4">
       {messages.map((message, index) => (
@@ -230,6 +265,17 @@ export function ChatForm({
           {message.content}
         </div>
       ))}
+      {droppedTask && (
+        <div className="self-start">
+          <div className="max-w-[80%] rounded-xl bg-gray-100 px-3 py-2 text-sm text-black">
+            <div className="font-medium">{droppedTask.title}</div>
+            {droppedTask.description && (
+              <div className="mt-1 text-xs text-gray-600">{droppedTask.description}</div>
+            )}
+          </div>
+          <TaskActionButtons task={droppedTask} onAction={handleTaskActionWrapper} />
+        </div>
+      )}
     </div>
   )
 
@@ -258,74 +304,17 @@ export function ChatForm({
     </div>
   )
 
-  const handleTaskAction = async (action: string) => {
-    if (!droppedTask) return
-
-    let prompt = ""
-    switch (action) {
-      case "enhance":
-        prompt = `Please enhance this task with more detailed subtasks and description. Here's the current task: ${JSON.stringify(droppedTask, null, 2)}
-
-Please provide:
-1. An expanded description that clarifies the goal and context
-2. A detailed list of subtasks that break down the implementation
-3. Any additional considerations or dependencies`
-        break
-      case "schedule":
-        prompt = `Please suggest the best time slot for this task considering my calendar. Here's the task: ${JSON.stringify(droppedTask, null, 2)}
-
-Please consider:
-1. Task duration and urgency
-2. Best practices for this type of task
-3. Typical scheduling patterns
-4. Dependencies and prerequisites`
-        break
-      case "breakdown":
-        prompt = `Please break down this task into smaller manageable tasks. Here's the current task: ${JSON.stringify(droppedTask, null, 2)}
-
-Please provide:
-1. A logical sequence of smaller tasks
-2. Estimated time for each sub-task
-3. Dependencies between tasks
-4. Any prerequisites or preparation needed`
-        break
-      case "optimize":
-        prompt = `Please suggest improvements and optimizations for this task. Here's the current task: ${JSON.stringify(droppedTask, null, 2)}
-
-Please suggest:
-1. Ways to make the task more efficient
-2. Potential automation opportunities
-3. Best practices that could be applied
-4. Resources that could help`
-        break
-    }
-
-    if (prompt) {
-      void append({ content: prompt, role: "user" })
-    }
-    setDroppedTask(null)
-  }
-
   const mainContent = (
     <main
       ref={setDroppableRef}
       data-droppable-id="ai-chat-droppable"
       className={cn(
-        "ring-none flex size-full flex-col items-stretch border-none",
+        "ring-none flex size-full flex-col items-stretch border-none transition-colors duration-200",
         className,
         isOver && "bg-accent/50"
       )}
       {...props}
     >
-      {droppedTask && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
-          <TaskDropMenu
-            task={droppedTask}
-            onClose={() => setDroppedTask(null)}
-            onAction={handleTaskAction}
-          />
-        </div>
-      )}
       <div className="min-h-0 flex-1 content-center overflow-y-auto px-6 [&::-webkit-scrollbar]:hidden">
         {isSessionActive ? (
           <>
@@ -358,11 +347,14 @@ Please suggest:
               />
             </div>
           </>
-        ) : messages.length ? (
+        ) : messages.length || droppedTask ? (
           messageList
         ) : (
-          <div className="text-muted-foreground text-center">
-            No messages yet
+          <div className="text-muted-foreground flex h-full items-center justify-center">
+            <div className="text-center">
+              <MessageCircle className="mx-auto mb-2 size-8 opacity-50" />
+              <div>Drop a task here to get AI assistance</div>
+            </div>
           </div>
         )}
       </div>

@@ -85,14 +85,30 @@ export function DndContextProvider({ children }: DndContextProviderProps) {
 //   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { over } = event
+    const { active, over } = event
     if (!over) return
 
     // Check if dragging over chat
-    const isOverChat = over.id === "ai-chat-droppable"
-    setIsDraggingOverChat(isOverChat)
+    if (over.id === "ai-chat-droppable") {
+      setIsDraggingOverChat(true)
+      setLocalColumnTasks((prev: Record<string, Task[]>) => {
+        const updated = structuredClone(prev)
 
-    handleDragOverOriginal(event)
+        Object.keys(updated).forEach(date => {
+            if (date !== over.id && date !== sourceColumnId) {
+                updated[date] = updated[date].filter((t: Task) => t.id !== active.id)
+            }
+        })
+
+        return updated
+      })
+      return
+    } else {
+      setIsDraggingOverChat(false)
+      // Handle other drag over cases...
+      handleDragOverOriginal(event)
+    }
+
   }
 
   const handleDragOverOriginal = (event: DragOverEvent) => {
@@ -177,7 +193,7 @@ export function DndContextProvider({ children }: DndContextProviderProps) {
 
       // Remove from all dates for preview
       Object.keys(updated).forEach(date => {
-        if (date !== targetColumnId) {
+        if (date !== targetColumnId && date !== sourceColumnId) {
           updated[date] = updated[date].filter((t: Task) => t.id !== activeId)
         }
       })
@@ -217,22 +233,30 @@ export function DndContextProvider({ children }: DndContextProviderProps) {
       return
     }
     console.log("Over:", over)
+    
     // Only handle the drop if it's on the chat
     if (over.id === "ai-chat-droppable" && activeTask) {
-        console.log("Dragging over chat")
+      console.log("Dropping on chat:", activeTask)
       const chatForm = document.querySelector("[data-droppable-id='ai-chat-droppable']")
       if (chatForm) {
-        console.log("Chat form found") 
-        chatForm.dispatchEvent(new CustomEvent("taskdrop", { detail: activeTask }))
+        const taskDropEvent = new CustomEvent("taskdrop", { 
+          detail: activeTask,
+          bubbles: true // Make sure the event bubbles up
+        })
+        chatForm.dispatchEvent(taskDropEvent)
       }
     } else {
-        console.log("Dragging over column")
-        await handleDragEndOriginal(event)
+      console.log("Dropping on column")
+      await handleDragEndOriginal(event)
     }
 
+    // Clear states
     setActiveTask(null)
     setIsDraggingOverChat(false)
     setIsDraggingOverCalendar(false)
+    setPreviewTask(null)
+    setPreviewColumnId(null)
+    setSourceColumnId(null)
   }
 
   async function handleDragEndOriginal(event: DragEndEvent) {
